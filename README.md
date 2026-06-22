@@ -112,5 +112,3 @@ Everything is static; the only "backend" is the weekly Action that refreshes `da
 - TCGdex language coverage varies (EN/DE/FR solid; ES/IT/PT partial; KR/SC are placeholders;
   JA comes from Bulbapedia). Missing-language card images simply don't render — the checklist
   is always complete.
-- A future server (FastAPI + PostgreSQL + Docker) is intentionally **out of scope**; this is
-  a static, client-side tool.
