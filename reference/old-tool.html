@@ -1,0 +1,2571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pokémon TCG Master Set Checklist</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:Arial,Helvetica,sans-serif;background:var(--c-body-bg,#ecf5ec);color:#1a1a1a;font-size:12px;  --c-set-head-jp:#bf360c;
+}
+
+/* ── COLOUR THEME — CSS custom properties ── */
+:root{
+  /* placeholder card colours */
+  --ph-bg1:#1a3a2a;--ph-bg2:#2d5a3d;--ph-border:#c8a400;
+  --ph-name:#ffd54f;--ph-native:#ffe082;--ph-set:#a5d6a7;--ph-num:#81c784;
+  --ph-inner:rgba(200,164,0,.35);
+  /* page-wide accent colours */
+  --c-accent1:#1b5e20;--c-accent2:#2e7d32;--c-accent3:#388e3c;
+  --c-poke-bar:#1b5e20;--c-poke-bar-border:#145214;
+  --c-body-bg:#ecf5ec;
+  --c-era:#2e7d32;--c-era-bg:#e8f5e9;
+  --c-set-head:#2e7d32;
+  --c-card-done-bg:#e8f5e9;--c-card-done-border:#43a047;
+  --c-card-hover:#f0f8f0;--c-card-hover-border:#81c784;
+  --c-divider:#e8f5e9;--c-divider-text:#2e7d32;--c-divider-alt:#81c784;
+}
+/* Ocean */
+body.palette-ocean{
+  --ph-bg1:#0d2137;--ph-bg2:#1a3d5c;--ph-border:#29b6f6;--ph-name:#81d4fa;--ph-native:#b3e5fc;--ph-set:#4fc3f7;--ph-num:#29b6f6;--ph-inner:rgba(41,182,246,.3);
+  --c-accent1:#01579b;--c-accent2:#0277bd;--c-accent3:#0288d1;
+  --c-poke-bar:#01579b;--c-poke-bar-border:#013a6b;
+  --c-body-bg:#e1f0fa;
+  --c-era:#0277bd;--c-era-bg:#e1f5fe;
+  --c-set-head:#0277bd;
+  --c-card-done-bg:#e1f5fe;--c-card-done-border:#0288d1;
+  --c-card-hover:#e8f4fd;--c-card-hover-border:#4fc3f7;
+  --c-divider:#e1f5fe;--c-divider-text:#0277bd;--c-divider-alt:#4fc3f7;
+  --c-set-head-jp:#01579b;
+}
+/* Dusk */
+body.palette-dusk{
+  --ph-bg1:#2a1a3a;--ph-bg2:#3d2d5a;--ph-border:#ce93d8;--ph-name:#e1bee7;--ph-native:#f3e5f5;--ph-set:#ce93d8;--ph-num:#ba68c8;--ph-inner:rgba(206,147,216,.3);
+  --c-accent1:#4a148c;--c-accent2:#6a1b9a;--c-accent3:#7b1fa2;
+  --c-poke-bar:#4a148c;--c-poke-bar-border:#2d0059;
+  --c-body-bg:#f3e5f5;
+  --c-era:#6a1b9a;--c-era-bg:#f3e5f5;
+  --c-set-head:#6a1b9a;
+  --c-card-done-bg:#f3e5f5;--c-card-done-border:#8e24aa;
+  --c-card-hover:#fce4ec;--c-card-hover-border:#ce93d8;
+  --c-divider:#f3e5f5;--c-divider-text:#6a1b9a;--c-divider-alt:#ce93d8;
+  --c-set-head-jp:#6a1b9a;
+}
+/* Fire */
+body.palette-fire{
+  --ph-bg1:#3a1a0d;--ph-bg2:#5a2d1a;--ph-border:#ff8f00;--ph-name:#ffcc80;--ph-native:#ffe0b2;--ph-set:#ffb74d;--ph-num:#ffa726;--ph-inner:rgba(255,143,0,.3);
+  --c-accent1:#bf360c;--c-accent2:#d84315;--c-accent3:#e64a19;
+  --c-poke-bar:#bf360c;--c-poke-bar-border:#870000;
+  --c-body-bg:#fbe9e7;
+  --c-era:#d84315;--c-era-bg:#fbe9e7;
+  --c-set-head:#d84315;
+  --c-card-done-bg:#fbe9e7;--c-card-done-border:#e64a19;
+  --c-card-hover:#fce4e0;--c-card-hover-border:#ffb74d;
+  --c-divider:#fbe9e7;--c-divider-text:#d84315;--c-divider-alt:#ffa726;
+  --c-set-head-jp:#bf360c;
+}
+/* Mono */
+body.palette-mono{
+  --ph-bg1:#1c1c1c;--ph-bg2:#2e2e2e;--ph-border:#9e9e9e;--ph-name:#f5f5f5;--ph-native:#e0e0e0;--ph-set:#bdbdbd;--ph-num:#9e9e9e;--ph-inner:rgba(158,158,158,.3);
+  --c-accent1:#424242;--c-accent2:#616161;--c-accent3:#757575;
+  --c-poke-bar:#424242;--c-poke-bar-border:#212121;
+  --c-body-bg:#f5f5f5;
+  --c-era:#616161;--c-era-bg:#eeeeee;
+  --c-set-head:#616161;
+  --c-card-done-bg:#eeeeee;--c-card-done-border:#757575;
+  --c-card-hover:#f5f5f5;--c-card-hover-border:#bdbdbd;
+  --c-divider:#eeeeee;--c-divider-text:#616161;--c-divider-alt:#9e9e9e;
+  --c-set-head-jp:#424242;
+}
+/* Apply page-wide variables */
+body{background:var(--c-body-bg);}
+.header{background:linear-gradient(135deg,var(--c-accent1) 0%,var(--c-accent2) 60%,var(--c-accent3) 100%);}
+.poke-bar{background:var(--c-poke-bar);border-bottom-color:var(--c-poke-bar-border);}
+.era-label{color:var(--c-era);}
+.set-head.c-green{background:var(--c-set-head);}
+.card:hover{background:var(--c-card-hover);border-color:var(--c-card-hover-border);}
+.card.done{background:var(--c-card-done-bg);border-color:var(--c-card-done-border);}
+.poke-divider{color:var(--c-divider-text);border-top-color:var(--c-divider);}
+.poke-divider-names-alt{color:var(--c-divider-alt);}
+.poke-sug-item:hover{background:var(--c-era-bg);}
+/* placeholder card colours */
+.custom-placeholder{background:linear-gradient(160deg,var(--ph-bg1) 0%,var(--ph-bg2) 50%,var(--ph-bg1) 100%)!important;border-color:var(--ph-border)!important;}
+.custom-placeholder::before{border-color:var(--ph-inner)!important;}
+.cp-name{color:var(--ph-name)!important;}
+.cp-native{color:var(--ph-native)!important;}
+.cp-set{color:var(--ph-set)!important;}
+.cp-num{color:var(--ph-num)!important;}
+/* Palette toolbar in header */
+.palette-bar{display:flex;align-items:center;gap:4px;}
+.palette-label{font-size:9px;color:rgba(255,255,255,.7);white-space:nowrap;}
+.palette-btn{width:16px;height:16px;border-radius:50%;border:2px solid rgba(255,255,255,.3);cursor:pointer;flex-shrink:0;transition:transform .1s,border-color .1s;}
+.palette-btn:hover{transform:scale(1.25);}
+.palette-btn.active{border-color:white;box-shadow:0 0 0 1px rgba(255,255,255,.5);}
+@media print{.palette-bar{display:none!important;}}
+
+/* ── HEADER ── */
+.header{background:linear-gradient(135deg,var(--c-accent1) 0%,var(--c-accent2) 60%,var(--c-accent3) 100%);color:white;padding:8px 14px;display:flex;align-items:center;gap:7px;flex-wrap:wrap;box-shadow:0 4px 16px rgba(0,0,0,.35);border-radius:12px 12px 0 0;}
+.header h1{font-size:12px;flex:1;min-width:120px;}
+.stats{font-size:11px;background:rgba(0,0,0,.25);padding:3px 9px;border-radius:20px;white-space:nowrap;}
+.btn{padding:4px 10px;border:1.5px solid rgba(255,255,255,.7);border-radius:5px;background:transparent;color:white;cursor:pointer;font-size:10px;font-weight:bold;white-space:nowrap;}
+.btn:hover{background:rgba(255,255,255,.18);}
+.btn:disabled{opacity:.4;cursor:not-allowed;}
+.btn-secondary{border-color:rgba(255,255,255,.4);color:rgba(255,255,255,.85);font-weight:normal;}
+.btn-print-sel{background:rgba(255,255,255,.15);}
+@media print{.header{display:none!important;}}
+
+/* ── POKÉMON SELECTOR BAR ── */
+.poke-bar{background:var(--c-poke-bar,#1b5e20);border-top:1px solid rgba(255,255,255,.1);padding:6px 14px;display:flex;align-items:center;gap:7px;flex-wrap:wrap;}
+.filter-bar{background:#fff;border-top:1px solid #d7e8d7;padding:6px 14px;display:flex;align-items:center;gap:7px;flex-wrap:wrap;border-radius:0 0 12px 12px;box-shadow:0 4px 16px rgba(0,0,0,.18);}.sticky-top{position:sticky;top:8px;z-index:20;max-width:1100px;margin:0 auto;padding:0 12px;}
+.poke-bar-label{font-size:10px;font-weight:bold;color:rgba(255,255,255,.8);white-space:nowrap;}
+.poke-chips{display:flex;flex-wrap:wrap;gap:4px;flex:1;}
+.poke-chip{display:inline-flex;align-items:center;gap:4px;background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.4);color:white;border-radius:20px;padding:2px 8px;font-size:10px;font-weight:bold;}
+.poke-chip-remove{background:none;border:none;color:rgba(255,255,255,.7);cursor:pointer;font-size:13px;line-height:1;padding:0 0 0 2px;}
+.poke-chip-remove:hover{color:white;}
+.poke-input-wrap{display:flex;gap:5px;}
+.poke-input{padding:3px 8px;border-radius:4px;border:1px solid rgba(255,255,255,.4);background:rgba(255,255,255,.12);color:white;font-size:10px;width:130px;outline:none;}
+.poke-input::placeholder{color:rgba(255,255,255,.5);}
+.poke-input:focus{border-color:rgba(255,255,255,.8);background:rgba(255,255,255,.18);}
+.poke-add-btn{padding:3px 9px;border-radius:4px;border:1px solid rgba(255,255,255,.5);background:rgba(255,255,255,.15);color:white;font-size:10px;cursor:pointer;white-space:nowrap;}
+.poke-add-btn:hover{background:rgba(255,255,255,.25);}
+.poke-suggestions{position:absolute;top:100%;left:0;background:white;border:1px solid #ccc;border-radius:4px;max-height:160px;overflow-y:auto;z-index:100;min-width:180px;box-shadow:0 4px 12px rgba(0,0,0,.15);display:none;}
+.poke-suggestions.open{display:block;}
+.poke-sug-item{padding:5px 10px;font-size:10px;cursor:pointer;color:#1a1a1a;}
+.poke-sug-item:hover{background:#e8f5e9;}
+.poke-input-container{position:relative;}
+@media print{.poke-bar{display:none!important;}}
+
+/* ── FILTER BAR ── */
+
+.filter-label{font-size:10px;font-weight:bold;color:#555;white-space:nowrap;}
+.filter-pills{display:flex;flex-wrap:wrap;gap:4px;flex:1;}
+.filter-pill{font-size:10px;font-weight:bold;padding:2px 8px;border-radius:20px;border:1.5px solid transparent;cursor:pointer;color:white;opacity:.38;transition:opacity .12s,transform .08s;user-select:none;}
+.filter-pill:hover{opacity:.7;transform:scale(1.05);}
+.filter-pill.active{opacity:1;border-color:rgba(0,0,0,.2);transform:scale(1.05);}
+.filter-clear{font-size:10px;padding:2px 9px;border:1px solid #ccc;border-radius:20px;background:white;color:#555;cursor:pointer;white-space:nowrap;}
+.filter-clear:hover{background:#f5f5f5;}
+.card.lang-hidden{display:none!important;}
+.set-block.all-hidden{display:none!important;}
+.era-label.era-hidden{display:none!important;}
+@media print{.filter-bar{display:none!important;}}
+
+/* ── MAIN ── */
+body{padding-top:8px;}main{max-width:1100px;margin:0 auto;padding:12px;}
+.era-label{font-size:10px;font-weight:bold;text-transform:uppercase;letter-spacing:1px;color:var(--c-era,#555);margin:14px 0 4px 2px;}
+
+/* ── BANNERS ── */
+.banner{border-radius:6px;padding:7px 12px;margin-bottom:8px;font-size:10px;line-height:1.5;display:flex;align-items:flex-start;gap:8px;}
+.banner-body{flex:1;}
+.banner-close{background:none;border:none;cursor:pointer;font-size:14px;line-height:1;opacity:.6;flex-shrink:0;padding:0;}
+.banner-close:hover{opacity:1;}
+.banner-blue{background:#e8f4fd;border:1px solid #90caf9;color:#0d47a1;}
+.banner-amber{background:#fff8e1;border:1px solid #ffe082;color:#e65100;}
+.banner-load{background:#f3e5f5;border:1px solid #ce93d8;color:#4a148c;animation:pulse 1.5s infinite;}
+.banner-green{background:#e8f5e9;border:1px solid #a5d6a7;color:#1b5e20;}
+.banner-error{background:#fce4ec;border:1px solid #f48fb1;color:#880e4f;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.6}}
+@media print{.banner{display:none!important;}}
+
+/* ── SET BLOCK ── */
+.set-block{background:white;border-radius:8px;margin-bottom:10px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.12);}
+.set-head{color:white;padding:5px 12px;display:flex;justify-content:space-between;align-items:center;gap:6px;}
+.set-head.c-green{background:var(--c-set-head,#2e7d32);}.set-head.c-blue{background:#1565c0;}.set-head.c-brown{background:#4e342e;}.set-head.c-orange{background:var(--c-set-head-jp,#bf360c);}
+.set-head-left{display:flex;align-items:center;gap:8px;min-width:0;}
+.set-symbol{width:24px;height:24px;object-fit:contain;flex-shrink:0;filter:brightness(0) invert(1);opacity:.9;}
+.set-name-block{display:flex;flex-direction:column;min-width:0;}
+.set-name-en{font-size:11px;font-weight:bold;white-space:normal;overflow:hidden;word-break:break-word;}
+.set-head-right{display:flex;align-items:center;gap:6px;flex-shrink:0;}
+.set-count{font-size:10px;opacity:.75;}
+.set-select-btn{font-size:9px;font-weight:bold;padding:2px 7px;border-radius:3px;border:1px solid rgba(255,255,255,.55);background:rgba(255,255,255,.12);color:white;cursor:pointer;white-space:nowrap;}
+.set-select-btn:hover{background:rgba(255,255,255,.25);}
+@media print{.set-select-btn{display:none!important;}}
+
+/* ── CARD GRID — 3 to 9 cards per row depending on viewport ── */
+.cards-grid{
+  display:grid;
+  /* Cards are min 90px, grow to fill. auto-fill means as many columns as fit.
+     At 1100px wide (~main max-width): ~10-11 cards. At 400px: ~4 cards. */
+  grid-template-columns:repeat(auto-fill,minmax(min(90px,100%),1fr));
+  gap:6px;padding:6px 8px;
+}
+
+/* Pokémon name divider inside a set block */
+.poke-divider{
+  grid-column: 1 / -1;
+  padding: 5px 2px 2px;
+  font-size: 10px; font-weight: bold; color: var(--c-divider-text,#2e7d32);
+  border-top: 1px solid var(--c-divider,#e8f5e9);
+}
+.poke-divider:first-child { border-top: none; padding-top: 2px; }
+.poke-divider-names-alt { font-weight: normal; color: var(--c-divider-alt,#81c784); }
+
+/* ── CARD — consistent size, no overflow ── */
+.card{
+  border:2px solid #e0e0e0;border-radius:7px;padding:4px;
+  display:flex;flex-direction:column;align-items:center;gap:3px;
+  cursor:pointer;background:#fafafa;
+  transition:background .1s,border-color .1s,transform .08s;
+  user-select:none;overflow:hidden;
+  /* consistent width — let grid control it */
+  min-width:0;
+}
+.card:hover{background:var(--c-card-hover,#f0f8f0);border-color:var(--c-card-hover-border,#81c784);transform:translateY(-1px);}
+.card.done{background:var(--c-card-done-bg,#e8f5e9);border-color:var(--c-card-done-border,#43a047);}
+.card.cameo{border:2px solid #c8a400;}
+.card.cameo.done{background:#e8f5e9;border-color:#43a047;}
+
+.img-wrap{width:100%;display:flex;justify-content:center;overflow:hidden;}
+/* Card image fills the cell width, maintains card aspect ratio */
+.card-img{
+  width:100%;height:auto;
+  aspect-ratio:63.5/88.9;
+  border-radius:5px;display:block;
+  object-fit:cover;
+}
+
+/* ── CUSTOM PLACEHOLDER (missing image) — fills grid cell like a real card ── */
+.custom-placeholder{
+  width:100%;
+  aspect-ratio:63.5/88.9;
+  border-radius:6px;
+  background:linear-gradient(160deg,#1a3a2a 0%,#2d5a3d 50%,#1a3a2a 100%);
+  border:2px solid #c8a400;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:2px;padding:5px 3px;text-align:center;position:relative;overflow:hidden;
+}
+.custom-placeholder::before{content:'';position:absolute;inset:2px;border-radius:4px;border:1px solid rgba(200,164,0,.35);pointer-events:none;}
+.cp-symbol{width:20px;height:20px;object-fit:contain;opacity:.5;filter:brightness(0) invert(1);margin-bottom:1px;}
+.cp-lang{font-size:7px;font-weight:bold;color:white;padding:1px 4px;border-radius:2px;}
+.cp-name{font-size:8px;font-weight:bold;color:#ffd54f;line-height:1.2;word-break:break-word;text-shadow:0 1px 2px rgba(0,0,0,.5);}
+.cp-native{font-size:8px;font-weight:bold;color:#ffe082;line-height:1.2;word-break:break-word;}
+.cp-set{font-size:7px;color:#a5d6a7;line-height:1.2;word-break:break-word;}
+.cp-num{font-size:6.5px;color:#81c784;font-style:italic;}
+.cp-note{font-size:6px;color:rgba(255,255,255,.4);margin-top:1px;line-height:1.2;}
+.img-retry-btn{margin-top:3px;padding:2px 5px;font-size:6.5px;border:1px solid rgba(200,164,0,.5);border-radius:3px;background:rgba(0,0,0,.2);color:#a5d6a7;cursor:pointer;}
+.img-retry-btn:hover{background:rgba(0,0,0,.35);}
+@media print{.img-retry-btn{display:none!important;}}
+
+/* ── CARD FOOTER ── */
+.card-footer{width:100%;display:flex;align-items:center;justify-content:space-between;}
+.card-num{font-size:9px;color:#666;}
+.lang{font-size:7.5px;font-weight:bold;padding:1px 4px;border-radius:3px;color:white;}
+.lang-EN{background:#1565c0;}.lang-DE{background:#5b4000;}.lang-FR{background:#1a237e;}
+.lang-ES{background:#b71c1c;}.lang-IT{background:#1b5e20;}.lang-PT{background:#880e4f;}
+.lang-JP{background:#4527a0;}.lang-TW{background:#c62828;}.lang-TH{background:#283593;}
+.lang-ID{background:#e65100;}.lang-KR{background:#00695c;}.lang-SC{background:#4a148c;}
+.chk{width:14px;height:14px;cursor:pointer;accent-color:#2e7d32;flex-shrink:0;}
+
+/* ── PREVIEW MODAL ── */
+.preview-overlay{
+  display:none;position:fixed;inset:0;z-index:200;
+  background:rgba(0,0,0,.8);backdrop-filter:blur(4px);
+  align-items:center;justify-content:center;padding:16px;
+}
+.preview-overlay.open{display:flex;}
+.preview-box{
+  background:#1a2a1a;border-radius:12px;
+  width:min(88vw,calc(80vh * 63.5 / 88.9));
+  max-width:500px;
+  position:relative;box-shadow:0 12px 60px rgba(0,0,0,.7);
+  display:flex;flex-direction:column;align-items:center;gap:10px;
+  padding:36px 12px 14px; /* top padding leaves room for × button */
+}
+/* preview-content must fill box width so both img and placeholder are equal size */
+#preview-content{width:100%;}
+.preview-img{
+  width:100%;display:block;
+  border-radius:8px;
+  aspect-ratio:63.5/88.9;object-fit:cover;
+}
+/* preview placeholder — scale all text elements to fill the larger card */
+.preview-placeholder .custom-placeholder{
+  width:100%!important;max-width:none!important;
+  border-radius:8px;gap:6px;padding:16px 10px;
+}
+.preview-placeholder .cp-symbol{width:clamp(32px,6vw,52px)!important;height:clamp(32px,6vw,52px)!important;margin-bottom:4px;}
+.preview-placeholder .cp-lang{font-size:clamp(12px,2.5vw,18px)!important;padding:3px 12px!important;}
+.preview-placeholder .cp-name{font-size:clamp(20px,4.5vw,36px)!important;}
+.preview-placeholder .cp-native{font-size:clamp(16px,3.5vw,28px)!important;}
+.preview-placeholder .cp-set{font-size:clamp(12px,2.5vw,18px)!important;}
+.preview-placeholder .cp-num{font-size:clamp(10px,2vw,15px)!important;}
+@media(max-width:500px){
+  .preview-box{width:min(94vw,calc(75vh * 63.5 / 88.9));}
+}
+.preview-meta{color:#a5d6a7;font-size:11px;text-align:center;line-height:1.6;}
+.preview-close{
+  position:absolute;top:8px;right:10px;background:none;border:none;
+  color:rgba(255,255,255,.6);font-size:22px;cursor:pointer;line-height:1;
+}
+.preview-close:hover{color:white;}
+.preview-btn{
+  font-size:7px;padding:1px 4px;border:1px solid rgba(200,164,0,.5);
+  border-radius:3px;background:rgba(0,0,0,.2);color:#a5d6a7;
+  cursor:pointer;margin-top:2px;
+}
+.preview-btn:hover{background:rgba(0,0,0,.35);}
+
+/* ── MOBILE ── */
+@media(max-width:600px){
+  .header h1{font-size:11px;}
+  .btn{padding:3px 7px;font-size:9px;}
+  .stats{font-size:10px;}
+  .poke-bar{top:36px;}
+  .filter-bar{top:76px;}
+  .cards-grid{grid-template-columns:repeat(auto-fill,minmax(min(80px,100%),1fr));gap:4px;padding:5px;}
+  .card{padding:3px;gap:2px;}
+  .set-name-en{font-size:10px;}
+  main{padding:6px;}
+}
+@media(max-width:380px){
+  .cards-grid{grid-template-columns:repeat(auto-fill,minmax(min(70px,100%),1fr));gap:3px;}
+}
+
+/* ── PRINT CHECKLIST ── */
+@media print{
+  body{background:white!important;}
+  main{padding:0!important;max-width:100%!important;}
+  .era-label{margin:6px 0 2px 1px;font-size:8px;}
+  .set-block{box-shadow:none!important;margin-bottom:5px!important;border:1px solid #ccc!important;break-inside:avoid;}
+  .set-head{padding:3px 8px!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  .cards-grid{grid-template-columns:repeat(6,1fr)!important;gap:3px!important;padding:5px!important;}
+  .card{border:1px solid #bbb!important;padding:3px!important;gap:2px!important;transform:none!important;}
+  .card.done{background:#e8f5e9!important;border-color:#43a047!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  .card-img{max-width:70px!important;}
+  .card-num{font-size:7px;}
+  .lang{font-size:6.5px!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  .custom-placeholder{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  .set-symbol{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  /* Compact poke-divider in print */
+  .poke-divider{font-size:7px!important;padding:1px 2px!important;border-top-color:#d0d0d0!important;}
+  .poke-divider-names-alt{display:none!important;}
+  @page{size:A4 portrait;margin:7mm;}
+}
+
+/* ── MODE TOGGLE ── */
+.mode-toggle{display:flex;gap:0;border-radius:6px;overflow:hidden;border:1.5px solid rgba(255,255,255,.45);flex-shrink:0;}
+.mode-btn{padding:4px 11px;font-size:10px;font-weight:bold;background:transparent;color:rgba(255,255,255,.65);border:none;cursor:pointer;transition:background .12s,color .12s;white-space:nowrap;}
+.mode-btn.active{background:rgba(255,255,255,.22);color:white;}
+.mode-btn:hover:not(.active){background:rgba(255,255,255,.1);color:rgba(255,255,255,.9);}
+@media print{.mode-toggle{display:none!important;}}
+
+/* ── TMS HEADER CONTROLS ── */
+#tms-header-controls{display:none;flex-wrap:wrap;gap:5px;}
+
+/* ── TMS FILTER BAR (sticky, same style as MS filter-bar) ── */
+#tms-filter-bar{background:#fff;border-top:1px solid #d7e8d7;padding:6px 14px;display:none;align-items:center;gap:7px;flex-wrap:wrap;}
+@media print{#tms-filter-bar{display:none!important;}}
+
+/* ── TMS APP ── */
+#tms-app{display:none;max-width:1100px;margin:0 auto;padding:12px;}
+.tms-toolbar{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;align-items:center;}
+.tms-gen-filter{display:flex;flex-wrap:wrap;gap:4px;}
+.tms-gen-btn{padding:3px 9px;border-radius:20px;border:1.5px solid #ccc;background:white;color:#555;font-size:10px;cursor:pointer;transition:background .12s,color .12s;}
+.tms-gen-btn.active{background:var(--c-accent2,#2e7d32);color:white;border-color:var(--c-accent2,#2e7d32);}
+.tms-gen-btn:hover:not(.active){background:#f0f0f0;}
+.tms-search{padding:4px 10px;border-radius:20px;border:1.5px solid #ccc;font-size:10px;outline:none;width:150px;}
+.tms-search:focus{border-color:var(--c-accent2,#2e7d32);}
+.tms-lang-actions{background:#fff;border-top:1px solid #d7e8d7;padding:6px 14px;display:flex;flex-wrap:wrap;gap:5px;align-items:center;margin-bottom:10px;}
+.tms-lang-lbl{font-size:10px;font-weight:bold;color:#555;white-space:nowrap;margin-right:2px;}
+.tms-lang-btn{padding:2px 6px;border-radius:3px;border:1px solid transparent;font-size:8.5px;font-weight:bold;cursor:pointer;color:white;transition:opacity .1s;opacity:.85;}
+.tms-lang-btn:hover{opacity:1;}
+.tms-lang-btn.rem{background:#9e9e9e!important;border-color:#9e9e9e!important;}
+
+/* TMS Pokémon grid */
+.tms-poke-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(95px,1fr));gap:7px;}
+.tms-poke-tile{background:white;border:2px solid #e0e0e0;border-radius:8px;padding:7px 5px;cursor:pointer;text-align:center;transition:border-color .12s,background .12s,transform .08s;position:relative;display:flex;flex-direction:column;align-items:center;gap:2px;}
+.tms-poke-tile:hover{border-color:var(--c-card-hover-border,#81c784);background:var(--c-card-hover,#f0f8f0);transform:translateY(-1px);}
+.tms-poke-tile.has-cards{border-color:var(--c-card-done-border,#43a047);background:var(--c-card-done-bg,#e8f5e9);}
+.tms-poke-name{font-size:10px;font-weight:bold;color:#1a1a1a;line-height:1.3;word-break:break-word;}
+.tms-poke-dex{font-size:8px;color:#aaa;}
+.tms-poke-count{font-size:9px;font-weight:bold;color:var(--c-accent2,#2e7d32);}
+.tms-no-results{grid-column:1/-1;padding:24px;text-align:center;color:#999;font-size:11px;}
+
+/* TMS Popup Overlay */
+.tms-overlay{display:none;position:fixed;inset:0;z-index:300;background:rgba(0,0,0,.72);backdrop-filter:blur(4px);align-items:flex-start;justify-content:center;padding:16px;overflow-y:auto;}
+.tms-overlay.open{display:flex;}
+.tms-popup{background:white;border-radius:12px;width:min(96vw,880px);margin:auto;box-shadow:0 12px 60px rgba(0,0,0,.45);display:flex;flex-direction:column;max-height:88vh;position:relative;}
+.tms-popup-head{background:linear-gradient(135deg,var(--c-accent1,#1b5e20),var(--c-accent2,#2e7d32));color:white;padding:11px 44px 11px 16px;border-radius:12px 12px 0 0;flex-shrink:0;}
+.tms-popup-title{font-size:15px;font-weight:bold;}
+.tms-popup-sub{font-size:10px;opacity:.8;margin-top:2px;}
+.tms-popup-close{position:absolute;top:9px;right:13px;background:none;border:none;color:rgba(255,255,255,.65);font-size:24px;cursor:pointer;line-height:1;z-index:1;}
+.tms-popup-close:hover{color:white;}
+.tms-popup-toolbar{padding:7px 10px;border-bottom:1px solid #eee;display:flex;flex-wrap:wrap;gap:5px;align-items:center;flex-shrink:0;background:#fafafa;border-radius:0;}
+.tms-popup-body{overflow-y:auto;padding:8px 10px;flex:1;}
+.tms-popup-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(78px,100%),1fr));gap:5px;}
+.tms-popup-card{border:2px solid #e0e0e0;border-radius:7px;padding:4px;cursor:pointer;background:#fafafa;transition:border-color .1s,background .1s;display:flex;flex-direction:column;align-items:center;gap:2px;user-select:none;}
+.tms-popup-card:hover{border-color:var(--c-card-hover-border,#81c784);background:var(--c-card-hover,#f0f8f0);}
+.tms-popup-card.tms-in{background:var(--c-card-done-bg,#e8f5e9);border-color:var(--c-card-done-border,#43a047);}
+.tms-popup-set-divider{grid-column:1/-1;padding:4px 2px 2px;font-size:9px;font-weight:bold;color:var(--c-set-head,#2e7d32);border-top:1px solid #eee;margin-top:6px;display:flex;align-items:center;gap:4px;}
+.tms-popup-set-divider:first-child{border-top:none;margin-top:0;}
+
+/* Shared action buttons for TMS popup */
+.tms-act-btn{padding:3px 9px;border-radius:4px;border:1px solid #ccc;background:white;color:#333;font-size:9px;cursor:pointer;white-space:nowrap;font-weight:bold;}
+.tms-act-btn:hover{background:#f5f5f5;}
+.tms-act-btn.success{color:#2e7d32;border-color:#a5d6a7;}
+.tms-act-btn.danger{color:#c62828;border-color:#ef9a9a;}
+.tms-toolbar-sep{width:1px;background:#ddd;height:18px;margin:0 2px;flex-shrink:0;}
+</style>
+</head>
+<body>
+
+<!-- STICKY TOP: header + pokémon selector stay fixed while scrolling -->
+<div class="sticky-top">
+<!-- HEADER -->
+<div class="header">
+  <div class="mode-toggle">
+    <button id="btn-mode-master" class="mode-btn active" onclick="setMode('master')">&#128230; Master Set</button>
+    <button id="btn-mode-tms" class="mode-btn" onclick="setMode('tms')">&#11088; True Master Set</button>
+  </div>
+  <h1 id="page-title">&#127807; Pokémon TCG Master Set Checklist</h1>
+  <span class="stats" id="stats">Loading&hellip;</span>
+  <!-- Master Set controls -->
+  <div id="master-controls" style="display:flex;flex-wrap:wrap;gap:5px;align-items:center;">
+    <button class="btn btn-print-sel" id="btn-print-sel" onclick="printSelected()">&#128424; Print Selected</button>
+    <button class="btn btn-secondary" onclick="printChecklist()">&#9776; Print Checklist</button>
+    <button class="btn btn-secondary" id="btn-select-all" onclick="selectAll()">&#9745; Select All</button>
+    <button class="btn btn-secondary" id="btn-refresh" onclick="doRefresh()">&#8634; Refresh</button>
+    <button class="btn btn-secondary" onclick="clearCache()" title="Clear cached card data and reload">&#128465; Clear Cache</button>
+    <button class="btn btn-secondary" onclick="exportData()" title="Download all your data as JSON (backup / device transfer)">&#128190; Export data</button>
+    <button class="btn btn-secondary" onclick="resetAll()">&#8634; Reset</button>
+    <button class="btn btn-secondary" id="btn-sort" onclick="toggleSort()" title="Toggle set sort order">&#8595; Newest first</button>
+  </div>
+  <!-- True Master Set controls -->
+  <div id="tms-header-controls">
+    <button class="btn btn-print-sel" id="btn-tms-print-sel" onclick="printTmsSelected()">&#128424; Print Selected (0)</button>
+    <button class="btn btn-secondary" onclick="printTmsChecklist()">&#9776; Print Checklist</button>
+    <button class="btn btn-secondary" onclick="resetTms()">&#8634; Reset</button>
+    <button class="btn btn-secondary" onclick="clearTmsCache()" title="Clear cached card data">&#128465; Clear Cache</button>
+    <button class="btn btn-secondary" onclick="exportData()" title="Download all your data as JSON (backup / device transfer)">&#128190; Export data</button>
+  <div class="palette-bar">
+    <span class="palette-label">Theme:</span>
+    <button class="palette-btn active" data-palette="" title="Forest (default)" style="background:linear-gradient(135deg,#1a3a2a,#c8a400)" onclick="setPalette(this,'')"></button>
+    <button class="palette-btn" data-palette="palette-ocean" title="Ocean" style="background:linear-gradient(135deg,#0d2137,#29b6f6)" onclick="setPalette(this,'palette-ocean')"></button>
+    <button class="palette-btn" data-palette="palette-dusk" title="Dusk" style="background:linear-gradient(135deg,#2a1a3a,#ce93d8)" onclick="setPalette(this,'palette-dusk')"></button>
+    <button class="palette-btn" data-palette="palette-fire" title="Fire" style="background:linear-gradient(135deg,#3a1a0d,#ff8f00)" onclick="setPalette(this,'palette-fire')"></button>
+    <button class="palette-btn" data-palette="palette-mono" title="Mono" style="background:linear-gradient(135deg,#1c1c1c,#9e9e9e)" onclick="setPalette(this,'palette-mono')"></button>
+  </div>
+</div>
+
+<!-- POKÉMON SELECTOR -->
+<div class="poke-bar">
+  <span class="poke-bar-label">Pokémon:</span>
+  <div class="poke-chips" id="poke-chips"></div>
+  <div class="poke-input-wrap">
+    <div class="poke-input-container">
+      <input class="poke-input" id="poke-input" placeholder="Add Pokémon…" autocomplete="off" oninput="onPokeInput(this.value)" onkeydown="onPokeKey(event)">
+      <div class="poke-suggestions" id="poke-suggestions"></div>
+    </div>
+    <button class="poke-add-btn" onclick="addPokeFromInput()">+ Add</button>
+  </div>
+</div><!-- /poke-bar -->
+
+<!-- LANGUAGE FILTER (Master Set) -->
+<div class="filter-bar" id="ms-filter-bar">
+  <span class="filter-label">Language:</span>
+  <div class="filter-pills" id="filter-pills"></div>
+  <button class="filter-clear" onclick="toggleAllFilter()">Show All</button>
+</div>
+<!-- LANGUAGE FILTER (True Master Set) -->
+<div class="filter-bar" id="tms-filter-bar" style="border-radius:0 0 12px 12px;box-shadow:0 4px 16px rgba(0,0,0,.18);">
+  <span class="filter-label">Language:</span>
+  <div class="filter-pills" id="tms-filter-pills"></div>
+  <button class="filter-clear" onclick="toggleAllTmsFilter()">Show All</button>
+</div>
+</div><!-- /sticky-top -->
+
+<main id="app">
+<div id="dyn"></div>
+<div id="tms-app"></div>
+</main>
+
+<!-- PREVIEW MODAL -->
+<div class="preview-overlay" id="preview-overlay" onclick="closePreview(event)">
+  <div class="preview-box" id="preview-box">
+    <button class="preview-close" onclick="closePreview()">×</button>
+    <div id="preview-content"></div>
+    <div class="preview-meta" id="preview-meta"></div>
+  </div>
+</div>
+
+<!-- TRUE MASTER SET POPUP -->
+<div class="tms-overlay" id="tms-overlay" onclick="closeTmsPopup(event)">
+  <div class="tms-popup" id="tms-popup">
+    <button class="tms-popup-close" onclick="closeTmsPopup()">×</button>
+    <div class="tms-popup-head">
+      <div class="tms-popup-title" id="tms-popup-title">Pokémon</div>
+      <div class="tms-popup-sub" id="tms-popup-sub"></div>
+    </div>
+    <div class="tms-popup-toolbar" id="tms-popup-toolbar"></div>
+    <div class="tms-popup-body" id="tms-popup-body"></div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+// =============================================================================
+// POKÉMON TCG MASTER SET CHECKLIST
+// =============================================================================
+//
+// Architecture:
+//   Data sources:
+//     - Bulbapedia (MediaWiki API, CORS OK) → card lists for EN + JP
+//     - pokemontcg.io (REST API, CORS OK)   → EN card metadata, images, set dates
+//     - Limitless TPCI CDN (/tpci/)         → EN/DE/FR/ES/IT/PT card images
+//     - Limitless TPC CDN  (/tpc/)          → JP card images (via JP_BULBA_SET_MAP)
+//     - TCGdex CDN (assets.tcgdex.net)      → Non-EN fallback images (partial coverage)
+//
+//   Image priority chain:
+//     EN:           Limitless TPCI → pokemontcg.io PNG → TCGdex → placeholder
+//     DE/FR/ES/IT/PT: Limitless TPCI → TCGdex → placeholder
+//     JP:           Limitless TPC (via Bulbapedia card numbers) → placeholder
+//     TW/TH/ID:     TCGdex → placeholder
+//     KR/SC:        placeholder only (no public image source)
+//
+//   Cache:          localStorage, 24h TTL, key = CACHESTORE
+//   JP data:        _bulbaData (in-memory, reset on Pokémon list change)
+//
+// =============================================================================
+
+// ── IMAGE ERROR LOGGING ───────────────────────────────────────────────────────
+// Log every failed image load with its URL so ORB errors are traceable
+document.addEventListener('error', e=>{
+  if(e.target.tagName==='IMG' && e.target.src){
+    console.warn('[IMG FAIL]', e.target.src);
+  }
+}, true);
+
+// ── CONFIG — minimal hardcoding ───────────────────────────────────────────────
+
+const LANGUAGES = [
+  // code = TCGdex image CDN prefix  apiCode = TCGdex REST API language code
+  { code:'en',      apiCode:'en',    badge:'EN', color:'#1565c0', label:'English',                     hasSetsApi:true  },
+  { code:'de',      apiCode:'de',    badge:'DE', color:'#5b4000', label:'German',                      hasSetsApi:true  },
+  { code:'fr',      apiCode:'fr',    badge:'FR', color:'#1a237e', label:'French',                      hasSetsApi:true  },
+  { code:'es',      apiCode:'es',    badge:'ES', color:'#b71c1c', label:'Spanish',                     hasSetsApi:true  },
+  { code:'it',      apiCode:'it',    badge:'IT', color:'#1b5e20', label:'Italian',                     hasSetsApi:true  },
+  { code:'pt',      apiCode:'pt',    badge:'PT', color:'#880e4f', label:'Portuguese',                  hasSetsApi:true  },
+  // JP handled as dedicated column via Limitless TPC CDN (see renderBySet JP block)
+  // NOT in LANGUAGES — EN set IDs don't map to JP CDN paths
+  { code:'zh-Hant', apiCode:'zh-tw', badge:'TW', color:'#c62828', label:'Traditional Chinese (TW/HK)', hasSetsApi:true  },
+  { code:'th',      apiCode:'th',    badge:'TH', color:'#283593', label:'Thai',                        hasSetsApi:true  },
+  { code:'id',      apiCode:'id',    badge:'ID', color:'#e65100', label:'Indonesian',                  hasSetsApi:true  },
+];
+
+const PLACEHOLDER_LANGS = [
+  { badge:'KR', color:'#00695c', label:'Korean',
+    note:'Korean cards exist but no public image database yet.',
+    sources:[{name:'KrystalKollectz',url:'https://krystalkollectz.com/pages/card-lists'}] },
+  { badge:'SC', color:'#4a148c', label:'Simplified Chinese (CN)',
+    note:'Simplified Chinese launched 2022. TCGdex support coming soon.',
+    sources:[{name:'KrystalKollectz',url:'https://krystalkollectz.com/pages/card-lists'},{name:'PokiPair',url:'https://pokipair.com/simplified-chinese-pokemon-set-list/'}] },
+];
+
+// Native Pokémon names for known languages (used on missing-image placeholder cards)
+// TH: TCGdex returns 0 results for TH card names — left empty
+//     never errors if the fetch hasn't completed yet.
+// ID: Indonesian TCG uses the same Pokémon names as English — no separate entry needed.
+const NATIVE_NAMES = {
+  TW:{ Seedot:'橡實果', Nuzleaf:'長鼻葉', Shiftry:'狡猾天狗' },
+  KR:{ Seedot:'도토링', Nuzleaf:'잎새코',  Shiftry:'다탱구'   },
+  SC:{ Seedot:'橡实果', Nuzleaf:'长鼻叶',  Shiftry:'狡猾天狗' },
+  JP:{ Seedot:'タネボー', Nuzleaf:'コノハナ', Shiftry:'ダーテング' },
+  TH:{}, // populated at runtime from TCGdex th/cards/{id} endpoint
+};
+
+const BADGE_ORDER = ['EN','DE','FR','ES','IT','PT','JP','TW','TH','ID','KR','SC'];
+
+// Mapping from international EN set ID → Japanese Limitless TPC set code.
+// Used to build fallback image URLs when TCGdex ja CDN doesn't have the scan.
+
+const ERA_MAP = {
+  sv:'Scarlet & Violet Era', swsh:'Sword & Shield Era',
+  sm:'Sun & Moon Era', xy:'XY Era', bw:'Black & White Era',
+  hgss:'HeartGold & SoulSilver Era', pl:'Platinum Era',
+  dp:'Diamond & Pearl Era', ex:'EX Series Era', base:'Original Era',
+};
+
+// Release date overrides for sets where pokemontcg.io has wrong dates
+const RELEASE_DATE_OVERRIDES = {};
+
+// ── LIMITLESS CDN URL BUILDERS ──────────────────────────────────────────────
+// Limitless TPCI CDN language codes for non-EN international cards
+// Format: /tpci/{PTCGO_CODE}/{PTCGO_CODE}_{NUM_3DIG}_R_{LANG_CODE}.png
+const LIMITLESS_LANG_CODE = {
+  EN:'EN', DE:'DE', FR:'FR', ES:'ES', IT:'IT', PT:'PT',
+};
+
+function limitlessIntlUrl(ptcgoCode, num, langBadge){
+  const langCode = LIMITLESS_LANG_CODE[langBadge];
+  if(!ptcgoCode || !langCode) return null;
+  const n = String(parseInt(num,10)).padStart(3,'0');
+  if(!n || n==='NaN') return null;
+  return `https://limitlesstcg.nyc3.cdn.digitaloceanspaces.com/tpci/${ptcgoCode}/${ptcgoCode}_${n}_R_${langCode}.png`;
+}
+
+// pokemontcg.io series name → TCGdex era code (for ERA_MAP display names)
+const PTCGIO_SERIES_ERA = {
+  'Base':'base','Gym Heroes':'base','Neo':'base','e-Card':'base','EX':'ex',
+  'Diamond & Pearl':'dp','Platinum':'pl','HeartGold & SoulSilver':'hgss',
+  'Black & White':'bw','XY':'xy','Sun & Moon':'sm',
+  'Sword & Shield':'swsh','Scarlet & Violet':'sv',
+};
+
+// pokemontcg.io setId → TCGdex CDN setId (for non-EN language image URLs)
+// Most sets match; SV and ME series need zero-padding.
+function ptcgioToTcgdexSetId(setId){
+  const svM = setId.match(/^sv(\d+)(.*)/);
+  if(svM) return `sv${svM[1].padStart(2,'0')}${svM[2]}`;
+  const meM = setId.match(/^(me)(\d+)/);
+  if(meM) return `me${meM[2].padStart(2,'0')}`;
+  return setId; // bw4, swsh11, xy9, etc. — already match
+}
+
+// pokemontcg.io card number → TCGdex CDN localId (zero-padding for newer eras)
+function ptcgioToTcgdexLocalId(num, series){
+  if(/^\d+$/.test(num) && ['swsh','sv'].includes(series))
+    return num.padStart(3,'0');
+  return num; // XY23, 97, etc. — use as-is
+}
+
+// Canonical era release order, newest first.
+// Used to sort era sections; eras not listed appear at the end.
+const ERA_ORDER_DESC = ['sv','swsh','sm','xy','bw','hgss','pl','dp','ex','base'];
+
+// Popular suggestions for the Pokémon input
+const POKEMON_CATALOG = [
+  // Gen 1
+  {name:'Bulbasaur',dex:1,gen:1},{name:'Ivysaur',dex:2,gen:1},{name:'Venusaur',dex:3,gen:1},
+  {name:'Charmander',dex:4,gen:1},{name:'Charmeleon',dex:5,gen:1},{name:'Charizard',dex:6,gen:1},
+  {name:'Squirtle',dex:7,gen:1},{name:'Wartortle',dex:8,gen:1},{name:'Blastoise',dex:9,gen:1},
+  {name:'Butterfree',dex:12,gen:1},{name:'Beedrill',dex:15,gen:1},
+  {name:'Pidgey',dex:16,gen:1},{name:'Pidgeot',dex:18,gen:1},
+  {name:'Rattata',dex:19,gen:1},{name:'Raticate',dex:20,gen:1},
+  {name:'Pikachu',dex:25,gen:1},{name:'Raichu',dex:26,gen:1},
+  {name:'Clefairy',dex:35,gen:1},{name:'Clefable',dex:36,gen:1},
+  {name:'Jigglypuff',dex:39,gen:1},{name:'Wigglytuff',dex:40,gen:1},
+  {name:'Meowth',dex:52,gen:1},{name:'Persian',dex:53,gen:1},
+  {name:'Psyduck',dex:54,gen:1},{name:'Golduck',dex:55,gen:1},
+  {name:'Growlithe',dex:58,gen:1},{name:'Arcanine',dex:59,gen:1},
+  {name:'Poliwag',dex:60,gen:1},{name:'Poliwrath',dex:62,gen:1},
+  {name:'Abra',dex:63,gen:1},{name:'Kadabra',dex:64,gen:1},{name:'Alakazam',dex:65,gen:1},
+  {name:'Machop',dex:66,gen:1},{name:'Machamp',dex:68,gen:1},
+  {name:'Geodude',dex:74,gen:1},{name:'Golem',dex:76,gen:1},
+  {name:'Ponyta',dex:77,gen:1},{name:'Rapidash',dex:78,gen:1},
+  {name:'Slowpoke',dex:79,gen:1},{name:'Slowbro',dex:80,gen:1},
+  {name:'Magnemite',dex:81,gen:1},{name:'Magneton',dex:82,gen:1},
+  {name:'Gastly',dex:92,gen:1},{name:'Haunter',dex:93,gen:1},{name:'Gengar',dex:94,gen:1},
+  {name:'Onix',dex:95,gen:1},{name:'Drowzee',dex:96,gen:1},{name:'Hypno',dex:97,gen:1},
+  {name:'Cubone',dex:104,gen:1},{name:'Marowak',dex:105,gen:1},
+  {name:'Hitmonlee',dex:106,gen:1},{name:'Hitmonchan',dex:107,gen:1},
+  {name:'Lickitung',dex:108,gen:1},
+  {name:'Chansey',dex:113,gen:1},{name:'Kangaskhan',dex:115,gen:1},
+  {name:'Scyther',dex:123,gen:1},
+  {name:'Jynx',dex:124,gen:1},{name:'Electabuzz',dex:125,gen:1},{name:'Magmar',dex:126,gen:1},
+  {name:'Pinsir',dex:127,gen:1},{name:'Tauros',dex:128,gen:1},
+  {name:'Lapras',dex:131,gen:1},{name:'Ditto',dex:132,gen:1},
+  {name:'Eevee',dex:133,gen:1},{name:'Vaporeon',dex:134,gen:1},{name:'Jolteon',dex:135,gen:1},{name:'Flareon',dex:136,gen:1},
+  {name:'Porygon',dex:137,gen:1},{name:'Aerodactyl',dex:142,gen:1},
+  {name:'Snorlax',dex:143,gen:1},
+  {name:'Articuno',dex:144,gen:1},{name:'Zapdos',dex:145,gen:1},{name:'Moltres',dex:146,gen:1},
+  {name:'Dratini',dex:147,gen:1},{name:'Dragonair',dex:148,gen:1},{name:'Dragonite',dex:149,gen:1},
+  {name:'Mewtwo',dex:150,gen:1},{name:'Mew',dex:151,gen:1},
+  // Gen 2
+  {name:'Chikorita',dex:152,gen:2},{name:'Bayleef',dex:153,gen:2},{name:'Meganium',dex:154,gen:2},
+  {name:'Cyndaquil',dex:155,gen:2},{name:'Quilava',dex:156,gen:2},{name:'Typhlosion',dex:157,gen:2},
+  {name:'Totodile',dex:158,gen:2},{name:'Croconaw',dex:159,gen:2},{name:'Feraligatr',dex:160,gen:2},
+  {name:'Furret',dex:162,gen:2},{name:'Hoothoot',dex:163,gen:2},{name:'Noctowl',dex:164,gen:2},
+  {name:'Togepi',dex:175,gen:2},{name:'Togetic',dex:176,gen:2},{name:'Pichu',dex:172,gen:2},
+  {name:'Cleffa',dex:173,gen:2},{name:'Igglybuff',dex:174,gen:2},
+  {name:'Flaaffy',dex:180,gen:2},{name:'Ampharos',dex:181,gen:2},
+  {name:'Marill',dex:183,gen:2},{name:'Azumarill',dex:184,gen:2},
+  {name:'Sudowoodo',dex:185,gen:2},{name:'Aipom',dex:190,gen:2},
+  {name:'Wooper',dex:194,gen:2},{name:'Quagsire',dex:195,gen:2},
+  {name:'Espeon',dex:196,gen:2},{name:'Umbreon',dex:197,gen:2},
+  {name:'Murkrow',dex:198,gen:2},{name:'Misdreavus',dex:200,gen:2},
+  {name:'Wobbuffet',dex:202,gen:2},{name:'Girafarig',dex:203,gen:2},
+  {name:'Heracross',dex:214,gen:2},{name:'Sneasel',dex:215,gen:2},
+  {name:'Teddiursa',dex:216,gen:2},{name:'Ursaring',dex:217,gen:2},
+  {name:'Houndour',dex:228,gen:2},{name:'Houndoom',dex:229,gen:2},
+  {name:'Kingdra',dex:230,gen:2},{name:'Porygon2',dex:233,gen:2},
+  {name:'Stantler',dex:234,gen:2},{name:'Blissey',dex:242,gen:2},
+  {name:'Raikou',dex:243,gen:2},{name:'Entei',dex:244,gen:2},{name:'Suicune',dex:245,gen:2},
+  {name:'Larvitar',dex:246,gen:2},{name:'Pupitar',dex:247,gen:2},{name:'Tyranitar',dex:248,gen:2},
+  {name:'Lugia',dex:249,gen:2},{name:'Ho-Oh',dex:250,gen:2},{name:'Celebi',dex:251,gen:2},
+  // Gen 3
+  {name:'Treecko',dex:252,gen:3},{name:'Grovyle',dex:253,gen:3},{name:'Sceptile',dex:254,gen:3},
+  {name:'Torchic',dex:255,gen:3},{name:'Combusken',dex:256,gen:3},{name:'Blaziken',dex:257,gen:3},
+  {name:'Mudkip',dex:258,gen:3},{name:'Marshtomp',dex:259,gen:3},{name:'Swampert',dex:260,gen:3},
+  {name:'Lotad',dex:270,gen:3},{name:'Lombre',dex:271,gen:3},{name:'Ludicolo',dex:272,gen:3},
+  {name:'Seedot',dex:273,gen:3},{name:'Nuzleaf',dex:274,gen:3},{name:'Shiftry',dex:275,gen:3},
+  {name:'Ralts',dex:280,gen:3},{name:'Kirlia',dex:281,gen:3},{name:'Gardevoir',dex:282,gen:3},
+  {name:'Shroomish',dex:285,gen:3},{name:'Breloom',dex:286,gen:3},
+  {name:'Slakoth',dex:287,gen:3},{name:'Slaking',dex:289,gen:3},
+  {name:'Makuhita',dex:296,gen:3},{name:'Hariyama',dex:297,gen:3},
+  {name:'Skitty',dex:300,gen:3},{name:'Delcatty',dex:301,gen:3},
+  {name:'Meditite',dex:307,gen:3},{name:'Medicham',dex:308,gen:3},
+  {name:'Electrike',dex:309,gen:3},{name:'Manectric',dex:310,gen:3},
+  {name:'Plusle',dex:311,gen:3},{name:'Minun',dex:312,gen:3},
+  {name:'Roselia',dex:315,gen:3},
+  {name:'Carvanha',dex:318,gen:3},{name:'Sharpedo',dex:319,gen:3},
+  {name:'Numel',dex:322,gen:3},{name:'Camerupt',dex:323,gen:3},
+  {name:'Zangoose',dex:335,gen:3},{name:'Seviper',dex:336,gen:3},
+  {name:'Absol',dex:359,gen:3},
+  {name:'Snorunt',dex:361,gen:3},{name:'Glalie',dex:362,gen:3},
+  {name:'Bagon',dex:371,gen:3},{name:'Shelgon',dex:372,gen:3},{name:'Salamence',dex:373,gen:3},
+  {name:'Beldum',dex:374,gen:3},{name:'Metang',dex:375,gen:3},{name:'Metagross',dex:376,gen:3},
+  {name:'Regirock',dex:377,gen:3},{name:'Regice',dex:378,gen:3},{name:'Registeel',dex:379,gen:3},
+  {name:'Latias',dex:380,gen:3},{name:'Latios',dex:381,gen:3},
+  {name:'Kyogre',dex:382,gen:3},{name:'Groudon',dex:383,gen:3},{name:'Rayquaza',dex:384,gen:3},
+  {name:'Jirachi',dex:385,gen:3},{name:'Deoxys',dex:386,gen:3},
+  // Gen 4
+  {name:'Turtwig',dex:387,gen:4},{name:'Grotle',dex:388,gen:4},{name:'Torterra',dex:389,gen:4},
+  {name:'Chimchar',dex:390,gen:4},{name:'Monferno',dex:391,gen:4},{name:'Infernape',dex:392,gen:4},
+  {name:'Piplup',dex:393,gen:4},{name:'Prinplup',dex:394,gen:4},{name:'Empoleon',dex:395,gen:4},
+  {name:'Shinx',dex:403,gen:4},{name:'Luxio',dex:404,gen:4},{name:'Luxray',dex:405,gen:4},
+  {name:'Roserade',dex:407,gen:4},
+  {name:'Lopunny',dex:428,gen:4},{name:'Mismagius',dex:429,gen:4},{name:'Honchkrow',dex:430,gen:4},
+  {name:'Glameow',dex:431,gen:4},{name:'Purugly',dex:432,gen:4},
+  {name:'Riolu',dex:447,gen:4},{name:'Lucario',dex:448,gen:4},
+  {name:'Hippopotas',dex:449,gen:4},{name:'Hippowdon',dex:450,gen:4},
+  {name:'Gible',dex:443,gen:4},{name:'Gabite',dex:444,gen:4},{name:'Garchomp',dex:445,gen:4},
+  {name:'Munchlax',dex:446,gen:4},
+  {name:'Togekiss',dex:468,gen:4},{name:'Leafeon',dex:470,gen:4},{name:'Glaceon',dex:471,gen:4},
+  {name:'Gallade',dex:475,gen:4},{name:'Rotom',dex:479,gen:4},
+  {name:'Uxie',dex:480,gen:4},{name:'Mesprit',dex:481,gen:4},{name:'Azelf',dex:482,gen:4},
+  {name:'Dialga',dex:483,gen:4},{name:'Palkia',dex:484,gen:4},{name:'Heatran',dex:485,gen:4},
+  {name:'Regigigas',dex:486,gen:4},{name:'Giratina',dex:487,gen:4},
+  {name:'Cresselia',dex:488,gen:4},{name:'Manaphy',dex:490,gen:4},
+  {name:'Darkrai',dex:491,gen:4},{name:'Shaymin',dex:492,gen:4},{name:'Arceus',dex:493,gen:4},
+  // Gen 5
+  {name:'Snivy',dex:495,gen:5},{name:'Servine',dex:496,gen:5},{name:'Serperior',dex:497,gen:5},
+  {name:'Tepig',dex:498,gen:5},{name:'Pignite',dex:499,gen:5},{name:'Emboar',dex:500,gen:5},
+  {name:'Oshawott',dex:501,gen:5},{name:'Dewott',dex:502,gen:5},{name:'Samurott',dex:503,gen:5},
+  {name:'Purrloin',dex:509,gen:5},{name:'Liepard',dex:510,gen:5},
+  {name:'Blitzle',dex:522,gen:5},{name:'Zebstrika',dex:523,gen:5},
+  {name:'Audino',dex:531,gen:5},
+  {name:'Sandile',dex:551,gen:5},{name:'Krokorok',dex:552,gen:5},{name:'Krookodile',dex:553,gen:5},
+  {name:'Scraggy',dex:559,gen:5},{name:'Scrafty',dex:560,gen:5},
+  {name:'Zorua',dex:570,gen:5},{name:'Zoroark',dex:571,gen:5},
+  {name:'Minccino',dex:572,gen:5},{name:'Cinccino',dex:573,gen:5},
+  {name:'Gothitelle',dex:576,gen:5},
+  {name:'Axew',dex:610,gen:5},{name:'Fraxure',dex:611,gen:5},{name:'Haxorus',dex:612,gen:5},
+  {name:'Cubchoo',dex:613,gen:5},{name:'Beartic',dex:614,gen:5},
+  {name:'Deino',dex:633,gen:5},{name:'Zweilous',dex:634,gen:5},{name:'Hydreigon',dex:635,gen:5},
+  {name:'Cobalion',dex:638,gen:5},{name:'Terrakion',dex:639,gen:5},{name:'Virizion',dex:640,gen:5},
+  {name:'Reshiram',dex:643,gen:5},{name:'Zekrom',dex:644,gen:5},{name:'Kyurem',dex:646,gen:5},
+  {name:'Keldeo',dex:647,gen:5},{name:'Meloetta',dex:648,gen:5},{name:'Genesect',dex:649,gen:5},
+  // Gen 6
+  {name:'Chespin',dex:650,gen:6},{name:'Quilladin',dex:651,gen:6},{name:'Chesnaught',dex:652,gen:6},
+  {name:'Fennekin',dex:653,gen:6},{name:'Braixen',dex:654,gen:6},{name:'Delphox',dex:655,gen:6},
+  {name:'Froakie',dex:656,gen:6},{name:'Frogadier',dex:657,gen:6},{name:'Greninja',dex:658,gen:6},
+  {name:'Diggersby',dex:660,gen:6},
+  {name:'Sylveon',dex:700,gen:6},{name:'Hawlucha',dex:701,gen:6},
+  {name:'Klefki',dex:707,gen:6},
+  {name:'Trevenant',dex:709,gen:6},{name:'Pumpkaboo',dex:710,gen:6},{name:'Gourgeist',dex:711,gen:6},
+  {name:'Xerneas',dex:716,gen:6},{name:'Yveltal',dex:717,gen:6},{name:'Zygarde',dex:718,gen:6},
+  {name:'Diancie',dex:719,gen:6},{name:'Hoopa',dex:720,gen:6},{name:'Volcanion',dex:721,gen:6},
+  // Gen 7
+  {name:'Rowlet',dex:722,gen:7},{name:'Dartrix',dex:723,gen:7},{name:'Decidueye',dex:724,gen:7},
+  {name:'Litten',dex:725,gen:7},{name:'Torracat',dex:726,gen:7},{name:'Incineroar',dex:727,gen:7},
+  {name:'Popplio',dex:728,gen:7},{name:'Brionne',dex:729,gen:7},{name:'Primarina',dex:730,gen:7},
+  {name:'Lycanroc',dex:745,gen:7},
+  {name:'Mimikyu',dex:778,gen:7},
+  {name:'Kommo-o',dex:784,gen:7},
+  {name:'Tapu Koko',dex:785,gen:7},{name:'Tapu Lele',dex:786,gen:7},{name:'Tapu Bulu',dex:787,gen:7},{name:'Tapu Fini',dex:788,gen:7},
+  {name:'Cosmog',dex:789,gen:7},{name:'Solgaleo',dex:791,gen:7},{name:'Lunala',dex:792,gen:7},
+  {name:'Necrozma',dex:800,gen:7},{name:'Marshadow',dex:802,gen:7},{name:'Zeraora',dex:807,gen:7},
+  // Gen 8
+  {name:'Grookey',dex:810,gen:8},{name:'Thwackey',dex:811,gen:8},{name:'Rillaboom',dex:812,gen:8},
+  {name:'Scorbunny',dex:813,gen:8},{name:'Raboot',dex:814,gen:8},{name:'Cinderace',dex:815,gen:8},
+  {name:'Sobble',dex:816,gen:8},{name:'Drizzile',dex:817,gen:8},{name:'Inteleon',dex:818,gen:8},
+  {name:'Yamper',dex:835,gen:8},{name:'Boltund',dex:836,gen:8},
+  {name:'Hatterene',dex:858,gen:8},{name:'Obstagoon',dex:862,gen:8},
+  {name:'Morpeko',dex:877,gen:8},
+  {name:'Zacian',dex:888,gen:8},{name:'Zamazenta',dex:889,gen:8},{name:'Eternatus',dex:890,gen:8},
+  {name:'Urshifu',dex:892,gen:8},
+  {name:'Regieleki',dex:894,gen:8},{name:'Regidrago',dex:895,gen:8},
+  {name:'Calyrex',dex:898,gen:8},
+  // Gen 9
+  {name:'Sprigatito',dex:906,gen:9},{name:'Floragato',dex:907,gen:9},{name:'Meowscarada',dex:908,gen:9},
+  {name:'Fuecoco',dex:909,gen:9},{name:'Crocalor',dex:910,gen:9},{name:'Skeledirge',dex:911,gen:9},
+  {name:'Quaxly',dex:912,gen:9},{name:'Quaxwell',dex:913,gen:9},{name:'Quaquaval',dex:914,gen:9},
+  {name:'Pawmot',dex:923,gen:9},
+  {name:'Garganacl',dex:962,gen:9},
+  {name:'Armarouge',dex:936,gen:9},{name:'Ceruledge',dex:937,gen:9},
+  {name:'Annihilape',dex:979,gen:9},
+  {name:'Gholdengo',dex:1000,gen:9},
+  {name:'Iron Valiant',dex:1006,gen:9},{name:'Roaring Moon',dex:1005,gen:9},
+  {name:'Koraidon',dex:1007,gen:9},{name:'Miraidon',dex:1008,gen:9},
+  {name:'Ogerpon',dex:1017,gen:9},{name:'Terapagos',dex:1024,gen:9},
+];
+
+// ── STORAGE KEYS ──────────────────────────────────────────────────────────────
+const CHKSTORE   = 'tcgChk_v1';
+const POKESTORE  = 'tcgPokemon_v1';
+const FILTERSTORE= 'tcgFilter_v1';
+const BANNERSTORE= 'tcgBannerDismissed_v1';
+const CACHESTORE = 'tcgData_v20';
+const SORTSTORE  = 'tcgSort_v1';
+const MODESTORE  = 'tcgMode_v1';
+const TMSSTORE   = 'tcgTMS_v1';
+const TMSFILTERSTORE = 'tcgTMSFilter_v1';
+const TMSCACHESTORE  = 'tcgTMSPokes_v1';
+const CACHE_TTL  = 24*60*60*1000;
+
+
+// ── STATE ─────────────────────────────────────────────────────────────────────
+let checked, pokemonList, activeLangs, dismissedBanners;
+let _bulbaData = null; // Cached Bulbapedia wikitext results shared between EN + JP fetch
+
+try { checked = new Set(JSON.parse(localStorage.getItem(CHKSTORE)||'[]')); } catch(e){ checked=new Set(); }
+try { pokemonList = JSON.parse(localStorage.getItem(POKESTORE)||'null') || ['Seedot','Nuzleaf','Shiftry']; } catch(e){ pokemonList=['Seedot','Nuzleaf','Shiftry']; }
+try { activeLangs = new Set(JSON.parse(localStorage.getItem(FILTERSTORE)||'null')||[]); } catch(e){ activeLangs=new Set(); }
+try { dismissedBanners = new Set(JSON.parse(localStorage.getItem(BANNERSTORE)||'[]')); } catch(e){ dismissedBanners=new Set(); }
+
+// ── TRUE MASTER SET STATE ─────────────────────────────────────────────────────
+let appMode = 'master';
+let tmsIncluded = new Set();
+let tmsActiveLangs = new Set(BADGE_ORDER); // persistent language filter for TMS view
+try { appMode = localStorage.getItem(MODESTORE) || 'master'; } catch(e){}
+try { tmsIncluded = new Set(JSON.parse(localStorage.getItem(TMSSTORE)||'[]')); } catch(e){}
+try {
+  const fl = JSON.parse(localStorage.getItem(TMSFILTERSTORE)||'null');
+  if(Array.isArray(fl)) tmsActiveLangs = new Set(fl);
+} catch(e){}
+const tmsPokeCache = new Map();    // pokeName → [{id,setName,setId,releaseDate,localId,lang,langColor,imgSrc,hiSrc,symSrc}]
+const _tmsCardPokemon = new Map(); // cardId → pokeName (for counting)
+// Restore tmsPokeCache from localStorage so reloads are fast
+try {
+  const pc = JSON.parse(localStorage.getItem(TMSCACHESTORE)||'null');
+  if(Array.isArray(pc)) pc.forEach(([k,v])=>{ tmsPokeCache.set(k,v); v.forEach(c=>_tmsCardPokemon.set(c.id,k)); });
+} catch(e){}
+let tmsGenFilter = 0;
+let tmsSearchQ = '';
+let _tmsOpenPoke = null;
+let _tmsPopupAllCards = [];
+let _tmsPopupActive = new Set();
+
+// Sort order: true = newest first (default), false = oldest first
+let sortDesc = localStorage.getItem(SORTSTORE) !== 'asc';
+
+// Persist state to localStorage (all wrapped in try/catch for private browsing)
+function saveChk()       { try{ localStorage.setItem(CHKSTORE,    JSON.stringify([...checked]));       }catch(e){} }
+function savePoke()      { try{ localStorage.setItem(POKESTORE,   JSON.stringify(pokemonList));         }catch(e){} }
+function saveFilter()    { try{ localStorage.setItem(FILTERSTORE, JSON.stringify([...activeLangs]));   }catch(e){} }
+function saveDismissed() { try{ localStorage.setItem(BANNERSTORE, JSON.stringify([...dismissedBanners])); }catch(e){} }
+function saveTms()       { try{ localStorage.setItem(TMSSTORE,    JSON.stringify([...tmsIncluded]));    }catch(e){} updateTmsPrintSelBtn(); }
+function saveTmsFilter() { try{ localStorage.setItem(TMSFILTERSTORE, JSON.stringify([...tmsActiveLangs])); }catch(e){} }
+function saveTmsCache()  { try{ localStorage.setItem(TMSCACHESTORE,  JSON.stringify([...tmsPokeCache.entries()])); }catch(e){} }
+
+const _meta    = new Map();
+const setBlockNamesMap = new Map();
+let totalCards = 0;
+
+function visibleCards(){
+  return [...document.querySelectorAll('.card[data-id]')].filter(c=>!c.classList.contains('lang-hidden'));
+}
+
+function updateStats(){
+  const vis = visibleCards();
+  const visChecked = vis.filter(c=>c.classList.contains('done')).length;
+  document.getElementById('stats').textContent=`${visChecked} / ${vis.length} collected`;
+  const b=document.getElementById('btn-print-sel'); if(b) b.textContent=`📄 Print Selected (${checked.size})`;
+}
+function resetAll(){
+  if(!confirm('Reset all checkboxes?')) return;
+  checked.clear(); saveChk();
+  document.querySelectorAll('.card').forEach(e=>e.classList.remove('done'));
+  document.querySelectorAll('.chk').forEach(e=>e.checked=false);
+  updateStats();
+}
+
+// ── SORT ORDER ────────────────────────────────────────────────────────────────
+function updateSortBtn(){
+  const btn=document.getElementById('btn-sort'); if(!btn) return;
+  btn.textContent = sortDesc ? '↓ Newest first' : '↑ Oldest first';
+  btn.title = sortDesc ? 'Currently: newest sets first. Click to reverse.' : 'Currently: oldest sets first. Click to reverse.';
+}
+function toggleSort(){
+  sortDesc = !sortDesc;
+  try{localStorage.setItem(SORTSTORE, sortDesc ? 'desc' : 'asc');}catch(e){}
+  updateSortBtn();
+  // Re-render from cache — no network request needed
+  const cached = loadCache();
+  if(cached && cached.cards){
+    const container = document.getElementById('dyn');
+    // Save keyed (persistent) banners; let renderBySet re-create them if needed
+    // mkBanner will skip any banner whose key already exists in the DOM
+    const persistBanners = [...container.querySelectorAll('.banner[data-key]')];
+    container.innerHTML = '';
+    persistBanners.forEach(b => container.appendChild(b));
+    setBlockNamesMap.clear(); totalCards = 0;
+    renderBySet(cached.cards, cached.setNamesAll||{}, container);
+    fetchAndInjectJPCards(container).catch(e=>console.warn('JP sort re-inject failed:',e.message));
+    buildPills(); updateStats();
+  }
+}
+
+// ── COLOUR PALETTE ────────────────────────────────────────────────────────────
+const PALETTE_KEY = 'tcgPalette_v1';
+function setPalette(btn, cls){
+  const all = ['palette-ocean','palette-dusk','palette-fire','palette-mono'];
+  document.body.classList.remove(...all);
+  if(cls) document.body.classList.add(cls);
+  document.querySelectorAll('.palette-btn').forEach(b=>b.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  try{localStorage.setItem(PALETTE_KEY,cls);}catch(e){}
+}
+(function restorePalette(){
+  try{
+    const saved=localStorage.getItem(PALETTE_KEY)||'';
+    if(saved) document.body.classList.add(saved);
+    const btn=document.querySelector(`.palette-btn[data-palette="${saved}"]`);
+    if(btn){document.querySelectorAll('.palette-btn').forEach(b=>b.classList.remove('active'));btn.classList.add('active');}
+  }catch(e){}
+})();
+
+// ── TOGGLE ────────────────────────────────────────────────────────────────────
+function attachToggle(el,id){
+  const chk=el.querySelector('.chk');
+  el.addEventListener('click',e=>{
+    // Don't toggle if clicking preview btn or checkbox
+    if(e.target.classList.contains('preview-btn')||e.target.classList.contains('chk')) return;
+    const n=!chk.checked; chk.checked=n;
+    if(n){checked.add(id);el.classList.add('done');}else{checked.delete(id);el.classList.remove('done');}
+    saveChk(); updateStats();
+  });
+  chk.addEventListener('change',e=>{
+    if(e.target.checked){checked.add(id);el.classList.add('done');}else{checked.delete(id);el.classList.remove('done');}
+    saveChk(); updateStats();
+  });
+  // Preview button
+  el.querySelector('.preview-btn')?.addEventListener('click',e=>{ e.stopPropagation(); openPreview(id); });
+}
+
+// ── SELECT ALL / SET ──────────────────────────────────────────────────────────
+function selectSet(block){
+  // Only affect visible (not lang-hidden) cards in this block
+  const cards=[...block.querySelectorAll('.card[data-id]')].filter(c=>!c.classList.contains('lang-hidden'));
+  const any=cards.some(c=>!c.classList.contains('done'));
+  cards.forEach(c=>{
+    const id=c.dataset.id; if(!id) return;
+    const chk=c.querySelector('.chk');
+    if(any){checked.add(id);c.classList.add('done');if(chk)chk.checked=true;}
+    else{checked.delete(id);c.classList.remove('done');if(chk)chk.checked=false;}
+  });
+  saveChk(); updateStats();
+}
+function selectAll(){
+  // Only affect visible (not lang-hidden) cards
+  const all=visibleCards();
+  const any=all.some(c=>!c.classList.contains('done'));
+  all.forEach(c=>{
+    const id=c.dataset.id; const chk=c.querySelector('.chk');
+    if(any){checked.add(id);c.classList.add('done');if(chk)chk.checked=true;}
+    else{checked.delete(id);c.classList.remove('done');if(chk)chk.checked=false;}
+  });
+  saveChk(); updateStats();
+  const btn=document.getElementById('btn-select-all'); if(btn) btn.textContent=any?'☐ Deselect All':'☑ Select All';
+}
+
+// ── POKÉMON SELECTOR UI ───────────────────────────────────────────────────────
+function renderPokeChips(){
+  const t=document.getElementById('page-title');
+  if(appMode==='tms'){
+    if(t) t.textContent=`⭐ True Master Set Checklist`;
+    return;
+  }
+  const c=document.getElementById('poke-chips'); if(!c) return; c.innerHTML='';
+  pokemonList.forEach(name=>{
+    const chip=document.createElement('span'); chip.className='poke-chip';
+    chip.innerHTML=`${name}<button class="poke-chip-remove" title="Remove ${name}">×</button>`;
+    chip.querySelector('button').addEventListener('click',()=>removePoke(name));
+    c.appendChild(chip);
+  });
+  // Update page title
+  if(t) t.textContent=`🌿 ${pokemonList.join(' · ')} — Master Set Checklist`;
+}
+
+function addPokeFromInput(){
+  const inp=document.getElementById('poke-input'); if(!inp) return;
+  const name=inp.value.trim();
+  if(!name){return;}
+  addPoke(name);
+  inp.value=''; hideSuggestions();
+}
+
+function addPoke(name){
+  const normalized=name.charAt(0).toUpperCase()+name.slice(1).toLowerCase();
+  if(!pokemonList.includes(normalized)){
+    pokemonList.push(normalized); savePoke(); renderPokeChips();
+    // Clear both localStorage cache AND in-memory Bulbapedia cache
+    try{localStorage.removeItem(CACHESTORE);}catch(e){}
+    _bulbaData = null;
+    buildAll(false);
+  }
+}
+
+function removePoke(name){
+  if(pokemonList.length<=1){ alert('You need at least one Pokémon.'); return; }
+  pokemonList=pokemonList.filter(p=>p!==name); savePoke(); renderPokeChips();
+  try{localStorage.removeItem(CACHESTORE);}catch(e){}
+  _bulbaData = null;
+  buildAll(false);
+}
+
+function onPokeKey(e){
+  if(e.key==='Enter'){addPokeFromInput();}
+  else if(e.key==='Escape'){hideSuggestions();}
+}
+
+function onPokeInput(val){
+  if(!val.trim()){hideSuggestions();return;}
+  const q=val.toLowerCase();
+  const matches=POKEMON_CATALOG.map(p=>p.name).filter(p=>p.toLowerCase().startsWith(q)&&!pokemonList.includes(p)).slice(0,8);
+  const sug=document.getElementById('poke-suggestions'); if(!sug) return;
+  if(!matches.length){hideSuggestions();return;}
+  sug.innerHTML=''; sug.classList.add('open');
+  matches.forEach(m=>{
+    const item=document.createElement('div'); item.className='poke-sug-item'; item.textContent=m;
+    item.addEventListener('click',()=>{addPoke(m);document.getElementById('poke-input').value='';hideSuggestions();});
+    sug.appendChild(item);
+  });
+}
+
+function hideSuggestions(){
+  const s=document.getElementById('poke-suggestions'); if(s) s.classList.remove('open');
+}
+document.addEventListener('click',e=>{
+  if(!e.target.closest('.poke-input-container')) hideSuggestions();
+});
+
+// ── DOM HELPERS ───────────────────────────────────────────────────────────────
+const JP_DEF = {badge:'JP', color:'#4527a0'};
+function langColor(badge){
+  return ([...LANGUAGES,...PLACEHOLDER_LANGS,JP_DEF].find(l=>l.badge===badge)||{}).color||'#555';
+}
+
+function mkEra(parent,text,series){
+  const e=document.createElement('div'); e.className='era-label'; e.textContent=text;
+  if(series) e.dataset.series=series;
+  parent.appendChild(e); return e;
+}
+
+// mkBanner: optional dismissKey saves dismissal to localStorage
+// Also skips creation if a banner with the same key already exists in the DOM.
+function mkBanner(parent,html,cls,dismissKey){
+  if(dismissKey && dismissedBanners.has(dismissKey)) return null;
+  if(dismissKey && document.querySelector(`.banner[data-key="${dismissKey}"]`)) return null;
+  const e=document.createElement('div'); e.className=`banner ${cls}`;
+  if(dismissKey) e.dataset.key=dismissKey;
+  const body=document.createElement('div'); body.className='banner-body'; body.innerHTML=html;
+  e.appendChild(body);
+  if(dismissKey){
+    const x=document.createElement('button'); x.className='banner-close'; x.textContent='×'; x.title='Dismiss';
+    x.addEventListener('click',()=>{ dismissedBanners.add(dismissKey); saveDismissed(); e.remove(); });
+    e.appendChild(x);
+  }
+  parent.appendChild(e); return e;
+}
+
+function mkSetBlock(nameHtml,symSrc,headClass,parent){
+  const block=document.createElement('div'); block.className='set-block';
+  const symEl=symSrc?`<img class="set-symbol" src="${symSrc}" alt="" onerror="this.style.display='none'">`:'' ;
+  block.innerHTML=`<div class="set-head ${headClass}"><div class="set-head-left">${symEl}<div class="set-name-block"><span class="set-name-en">${nameHtml}</span></div></div><div class="set-head-right"><span class="set-count">0 entries</span><button class="set-select-btn">☑ Set</button></div></div><div class="cards-grid"></div>`;
+  parent.appendChild(block);
+  block.querySelector('.set-select-btn').addEventListener('click',e=>{e.stopPropagation();selectSet(block);});
+  return block;
+}
+function updCount(block,n){ const e=block.querySelector('.set-count'); if(e) e.textContent=`${n} ${n===1?'entry':'entries'}`; }
+
+// ── IMAGE WRAP ────────────────────────────────────────────────────────────────
+// Priority chain per language:
+//   EN:     pokemontcg.io PNG  → TCGdex CDN (fallbackSrc) → placeholder
+//   Non-EN: TCGdex CDN (loSrc) → placeholder
+//   JP:     handled separately in fetchAndInjectJPCards
+//
+// fallbackSrc: optional secondary URL tried when loSrc fails (used for EN TCGdex fallback)
+function mkImgWrap(loSrc,hiSrc,cardName,localId,enSetName,symSrc,badge,bColor,cardId,fallbackSrc=null){
+  const wrap=document.createElement('div'); wrap.className='img-wrap';
+
+  function showPh(){
+    const nat=(NATIVE_NAMES[badge]||{})[cardName]||null;
+    wrap.innerHTML=buildPlaceholderHTML(symSrc,badge,bColor,cardName,nat,enSetName,localId,true);
+    wrap.querySelector('.img-retry-btn')?.addEventListener('click',e=>{e.stopPropagation();tryPrimary();});
+  }
+
+  function tryFallback(){
+    // TCGdex CDN fallback (used when primary pokemontcg.io image fails for EN)
+    if(!fallbackSrc){ showPh(); return; }
+    wrap.innerHTML='';
+    const fb=document.createElement('img');
+    fb.className='card-img'; fb.loading='lazy'; fb.alt=`${cardName} #${localId} ${badge}`;
+    fb.src=fallbackSrc;
+    fb.onload=()=>{ const m=_meta.get(cardId); if(m){ m.isCustom=false; m.imgSrc=fallbackSrc; } };
+    fb.onerror=()=>{ fb.remove(); showPh(); };
+    wrap.appendChild(fb);
+  }
+
+  function tryPrimary(){
+    wrap.className='img-wrap'; wrap.innerHTML='';
+    if(!loSrc){ showPh(); return; }
+    const img=document.createElement('img');
+    img.className='card-img'; img.loading='lazy';
+    img.alt=`${cardName} #${localId} ${badge}`; img.src=loSrc;
+    img.onload=()=>{ const m=_meta.get(cardId); if(m) m.isCustom=false; };
+    img.onerror=()=>{ img.remove(); tryFallback(); };
+    wrap.appendChild(img);
+  }
+
+  tryPrimary(); return wrap;
+}
+
+function buildPlaceholderHTML(symSrc,badge,bColor,cardName,nativeName,setName,localId,showRetry){
+  const sym=symSrc?`<img class="cp-symbol" src="${symSrc}" alt="" onerror="this.style.display='none'">`:'' ;
+  const nat=nativeName?`<span class="cp-native">${nativeName}</span>`:'';
+  const retry=showRetry?`<button class="img-retry-btn">↺ retry</button>`:'';
+  return `<div class="custom-placeholder">${sym}<span class="cp-lang" style="background:${bColor}">${badge}</span><span class="cp-name">${cardName}</span>${nat}<span class="cp-set">${setName}</span><span class="cp-num">#${localId}</span>${retry}</div>`;
+}
+
+// ── BUILD SETS MAP ────────────────────────────────────────────────────────────
+// Handles both pokemontcg.io cards (primary) and TCGdex cards (fallback).
+// pokemontcg.io card structure: { id, name, number, set:{id,name,series,releaseDate,images}, images:{small,large} }
+// TCGdex card structure:        { id, name, image:"https://assets.tcgdex.net/en/..." }
+function isPtcgioCard(card){ return !!card.set?.id; }
+
+function buildSetsMap(enCards, setNamesAll){
+  const map = new Map();
+  for(const card of enCards){
+    let ptcgioSetId, series, tcgdexSetId, localId, tcgdexLocalId,
+        enName, releaseDate, symSrc, enImgSrc, enHiImgSrc;
+
+    let era; // used for ERA_MAP display grouping (separate from TCGdex CDN series)
+    if(isPtcgioCard(card)){
+      // ── pokemontcg.io path ──
+      ptcgioSetId  = card.set.id;                         // "swsh11", "sv5", "me1"
+      // series = TCGdex CDN prefix, always derived from set ID (e.g. "me" not "xy" for me1)
+      series       = ptcgioSetId.replace(/\d.*$/,'');     // "swsh","sv","me","bw","xy"...
+      // era = display grouping, uses pokemontcg.io series name for consistent era labels
+      era          = PTCGIO_SERIES_ERA[card.set.series] || series;
+      tcgdexSetId  = ptcgioToTcgdexSetId(ptcgioSetId);   // "swsh11","sv05","me01"...
+      localId      = card.number || '';                   // "13", "003", "XY23"
+      tcgdexLocalId= ptcgioToTcgdexLocalId(localId, series);
+      enName       = card.set.name;
+      releaseDate  = RELEASE_DATE_OVERRIDES[card.set.id] || card.set.releaseDate || '1999/01/01';
+      symSrc       = card.set.images?.symbol ||
+                     `https://images.pokemontcg.io/${ptcgioSetId}/symbol.png`;
+      enImgSrc     = card.images?.small  || null;
+      enHiImgSrc   = card.images?.large  || null;
+    } else {
+      // ── TCGdex fallback path ──
+      if(!card.image) continue;
+      const stripped = card.image.replace(/^https?:\/\/assets\.tcgdex\.net\/[^/]+\//, '');
+      const parts = stripped.split('/').filter(Boolean);
+      if(parts.length < 2) continue;
+      series       = parts[0];
+      era          = PTCGIO_SERIES_ERA[series] || series;
+      tcgdexSetId  = ptcgioSetId = parts[1];
+      localId      = tcgdexLocalId = parts[2] || '';
+      releaseDate  = '1999/01/01';
+      enName       = (setNamesAll['en']||{})[tcgdexSetId] || tcgdexSetId;
+      symSrc       = `https://assets.tcgdex.net/univ/${series}/${tcgdexSetId}/symbol.webp`;
+      enImgSrc     = `${card.image}/low.webp`;
+      enHiImgSrc   = `${card.image}/high.webp`;
+    }
+
+    if(!map.has(ptcgioSetId)){
+      const namesByBadge = {};
+      for(const lang of LANGUAGES){
+        namesByBadge[lang.badge] = (setNamesAll[lang.code]||{})[tcgdexSetId] || enName;
+      }
+      for(const pl of PLACEHOLDER_LANGS) namesByBadge[pl.badge] = enName;
+      namesByBadge['JP'] = enName;
+      const allUnique = [...new Set(Object.values(namesByBadge))];
+      map.set(ptcgioSetId,{
+        setId:ptcgioSetId, tcgdexSetId, series, era, enName, releaseDate,
+        combined: allUnique.join(' | '), namesByBadge, symSrc, cards:[]
+      });
+    }
+    map.get(ptcgioSetId).cards.push({
+      localId, tcgdexLocalId, series,
+      setId:ptcgioSetId, tcgdexSetId,
+      name:card.name, id:card.id,
+      enImgSrc, enHiImgSrc,
+      ptcgoCode: card.ptcgoCode||null,
+    });
+  }
+  return map;
+}
+
+// Extract a sortable numeric key from a set ID so sets within an era sort correctly.
+// e.g. "swsh11" → 11, "sv05" → 5, "sv5M" → 5.13, "xyp" → 0
+function setOrder(setId){
+  const m = setId.match(/(\d+)([a-zA-Z]*)/);
+  if(!m) return 0;
+  const base = parseInt(m[1], 10);
+  const sub  = m[2]
+    ? m[2].toLowerCase().split('').reduce((a,ch,i)=>a+(ch.charCodeAt(0)-96)/(100**(i+1)),0)
+    : 0;
+  return base + sub;
+}
+
+// ── RENDER ALL (set-first) ────────────────────────────────────────────────────
+function renderBySet(enCards, setNamesAll, container){
+  if(!enCards.length) return;
+
+  const setsMap=buildSetsMap(enCards,setNamesAll);
+  // Group by ERA for display — use si.era so that e.g. "me" sets appear under XY Era
+  const bySeries=new Map();
+  setsMap.forEach(si=>{
+    const key=si.era||si.series;
+    if(!bySeries.has(key)) bySeries.set(key,[]);
+    bySeries.get(key).push(si);
+  });
+
+  // Placeholder lang banners (dismissible)
+  for(const pl of PLACEHOLDER_LANGS){
+    const links=pl.sources.map(s=>`<a href="${s.url}" target="_blank" style="color:inherit;font-weight:bold">${s.name}</a>`).join(' · ');
+    mkBanner(container,`<strong>${pl.label} (${pl.badge})</strong>: ${pl.note} — ${links}`,'banner-amber',`plang-${pl.badge}`);
+  }
+
+  // Sort eras and sets by actual release date from pokemontcg.io
+  function relDate(si){ return new Date(si.releaseDate||'1999/01/01').getTime(); }
+
+  const eraEntries = [...bySeries.entries()].sort((a,b)=>{
+    const aDate = Math.min(...a[1].map(relDate));
+    const bDate = Math.min(...b[1].map(relDate));
+    return sortDesc ? bDate - aDate : aDate - bDate;
+  });
+
+  eraEntries.forEach(([series, sets])=>{
+    const sortedSets = [...sets].sort((a,b)=>{
+      const diff = relDate(a) - relDate(b);
+      return sortDesc ? -diff : diff;
+    });
+
+    mkEra(container,ERA_MAP[series]||series||'Other Sets',series);
+    sortedSets.forEach(si=>{
+      try{
+      const block=mkSetBlock(si.combined,si.symSrc,'c-green',container);
+      block.dataset.releaseDate=relDate(si); // used by JP sort insertion
+      setBlockNamesMap.set(block,{namesByBadge:si.namesByBadge,enName:si.enName});
+      const grid=block.querySelector('.cards-grid');
+      let count=0;
+
+      // Group cards by Pokémon name (preserving natural order)
+      const byPokemon=new Map();
+      si.cards.forEach(card=>{
+        if(!byPokemon.has(card.name)) byPokemon.set(card.name,[]);
+        byPokemon.get(card.name).push(card);
+      });
+
+      byPokemon.forEach((cards,pokeName)=>{
+        // Pokémon name divider — all names inline
+        const altNames=[...new Set([
+          NATIVE_NAMES.JP?.[pokeName],
+          NATIVE_NAMES.TW?.[pokeName],
+          NATIVE_NAMES.KR?.[pokeName],
+        ].filter(Boolean))].join(' · ');
+        const divider=document.createElement('div');
+        divider.className='poke-divider';
+        divider.innerHTML=`${pokeName}${altNames?` <span class="poke-divider-names-alt">· ${altNames}</span>`:''}`;
+        grid.appendChild(divider);
+
+        cards.forEach(card=>{
+          // TCGdex languages
+          for(const langDef of LANGUAGES){
+            const id=`${langDef.badge}_${card.id}`, isDone=checked.has(id);
+            // All languages: Limitless TPCI CDN primary → fallback → placeholder
+            // EN fallback: pokemontcg.io PNG; non-EN fallback: TCGdex CDN
+            let loSrc, hiSrc, fallbackSrc;
+            const limitlessSrc = limitlessIntlUrl(card.ptcgoCode, card.localId, langDef.badge);
+            if(langDef.badge==='EN'){
+              loSrc = limitlessSrc || card.enImgSrc;
+              hiSrc = limitlessSrc || card.enHiImgSrc || card.enImgSrc;
+              fallbackSrc = limitlessSrc ? (card.enImgSrc||null) : `https://assets.tcgdex.net/en/${card.series}/${card.tcgdexSetId}/${card.tcgdexLocalId}/low.webp`;
+            } else {
+              const tcgdexBase=`https://assets.tcgdex.net/${langDef.code}/${card.series}/${card.tcgdexSetId}/${card.tcgdexLocalId}`;
+              loSrc = limitlessSrc || `${tcgdexBase}/low.webp`;
+              hiSrc = limitlessSrc || `${tcgdexBase}/high.webp`;
+              fallbackSrc = limitlessSrc ? `${tcgdexBase}/low.webp` : null;
+            }
+            _meta.set(id,{name:{en:card.name,native:(NATIVE_NAMES[langDef.badge]||{})[card.name]||null},setName:si.enName,num:`#${card.localId}`,lang:langDef.badge,langColor:langDef.color,imgSrc:loSrc,hiImgSrc:hiSrc,isCustom:true,symSrc:si.symSrc});
+            const el=document.createElement('div');
+            el.className='card'+(isDone?' done':''); el.dataset.id=id; el.dataset.lang=langDef.badge;
+            // EN: TCGdex fallback; non-EN: TCGdex fallback when Limitless fails
+            const enFallback = fallbackSrc;
+            const iw=mkImgWrap(loSrc,hiSrc,card.name,card.localId,si.enName,si.symSrc,langDef.badge,langDef.color,id,enFallback);
+            const footer=document.createElement('div'); footer.className='card-footer';
+            const chk=document.createElement('input'); chk.type='checkbox'; chk.className='chk';
+            if(isDone) chk.checked=true; chk.onclick=e=>e.stopPropagation();
+            footer.innerHTML=`<span class="card-num">#${card.localId}</span><span class="lang lang-${langDef.badge}">${langDef.badge}</span><button class="preview-btn" title="Preview">🔍</button>`;
+            footer.appendChild(chk); el.appendChild(iw); el.appendChild(footer);
+            attachToggle(el,id); grid.appendChild(el); count++;
+          }
+          // Placeholder langs (KR, SC)
+          for(const pl of PLACEHOLDER_LANGS){
+            const id=`${pl.badge}_${card.id}`, isDone=checked.has(id);
+            const nat=(NATIVE_NAMES[pl.badge]||{})[card.name]||null;
+            _meta.set(id,{name:{en:card.name,native:nat},setName:si.enName,num:`#${card.localId}`,lang:pl.badge,langColor:pl.color,imgSrc:null,isCustom:true,symSrc:si.symSrc});
+            const el=document.createElement('div');
+            el.className='card'+(isDone?' done':''); el.dataset.id=id; el.dataset.lang=pl.badge;
+            const phWrap=document.createElement('div'); phWrap.className='img-wrap';
+            phWrap.innerHTML=buildPlaceholderHTML(si.symSrc,pl.badge,pl.color,card.name,nat,si.enName,card.localId,false);
+            const footer=document.createElement('div'); footer.className='card-footer';
+            const chk=document.createElement('input'); chk.type='checkbox'; chk.className='chk';
+            if(isDone) chk.checked=true; chk.onclick=e=>e.stopPropagation();
+            footer.innerHTML=`<span class="card-num">#${card.localId}</span><span class="lang" style="background:${pl.color}">${pl.badge}</span><button class="preview-btn" title="Preview">🔍</button>`;
+            footer.appendChild(chk); el.appendChild(phWrap); el.appendChild(footer);
+            attachToggle(el,id); grid.appendChild(el); count++;
+          }
+        });
+      });
+
+      totalCards+=count; updCount(block,count);
+      }catch(setErr){ console.error('Error rendering set',si.setId,':',setErr); }
+    });
+  });
+  updateStats();
+}
+
+// ── LANGUAGE FILTER ───────────────────────────────────────────────────────────
+function buildPills(){
+  const c=document.getElementById('filter-pills'); if(!c) return; c.innerHTML='';
+  const present=new Set([...document.querySelectorAll('.card[data-lang]')].map(x=>x.dataset.lang));
+  // Reset activeLangs if empty OR if the saved set has no overlap with cards present
+  // (stale localStorage from a previous Pokémon selection, for example)
+  const overlap=[...activeLangs].filter(b=>present.has(b));
+  if(activeLangs.size===0||overlap.length===0) activeLangs=new Set([...present]);
+  const langLabel=badge=>{
+    const l=LANGUAGES.find(x=>x.badge===badge)||PLACEHOLDER_LANGS.find(x=>x.badge===badge);
+    if(l) return l.label;
+    if(badge==='JP') return 'Japanese';
+    return badge;
+  };
+  BADGE_ORDER.filter(b=>present.has(b)).forEach(badge=>{
+    const p=document.createElement('button');
+    p.className='filter-pill'+(activeLangs.has(badge)?' active':'');
+    p.textContent=badge; p.style.background=langColor(badge);
+    p.title=langLabel(badge);
+    p.addEventListener('click',()=>{
+      if(activeLangs.has(badge)){activeLangs.delete(badge);p.classList.remove('active');}
+      else{activeLangs.add(badge);p.classList.add('active');}
+      saveFilter(); applyFilter();
+    });
+    c.appendChild(p);
+  });
+  applyFilter();
+}
+
+function toggleAllFilter(){
+  const present=new Set([...document.querySelectorAll('.card[data-lang]')].map(x=>x.dataset.lang));
+  const allActive=[...present].every(b=>activeLangs.has(b));
+  if(allActive){
+    activeLangs.clear();
+    document.querySelectorAll('.filter-pill').forEach(p=>p.classList.remove('active'));
+  } else {
+    activeLangs=new Set([...present]);
+    document.querySelectorAll('.filter-pill').forEach(p=>p.classList.add('active'));
+  }
+  saveFilter(); applyFilter();
+}
+
+function applyFilter(){
+  document.querySelectorAll('.card[data-lang]').forEach(c=>
+    c.classList.toggle('lang-hidden',!activeLangs.has(c.dataset.lang)));
+
+  // Hide poke-dividers if every card until the next divider is hidden
+  document.querySelectorAll('.poke-divider').forEach(div=>{
+    let sib=div.nextElementSibling, allHidden=true;
+    while(sib && !sib.classList.contains('poke-divider')){
+      if(sib.classList.contains('card') && !sib.classList.contains('lang-hidden')){ allHidden=false; break; }
+      sib=sib.nextElementSibling;
+    }
+    div.style.display=allHidden?'none':'';
+  });
+
+  document.querySelectorAll('.set-block').forEach(b=>{
+    const cards=b.querySelectorAll('.card[data-lang]');
+    b.classList.toggle('all-hidden',cards.length>0&&![...cards].some(c=>!c.classList.contains('lang-hidden')));
+  });
+  document.querySelectorAll('.era-label').forEach(lbl=>{
+    let s=lbl.nextElementSibling,v=false;
+    while(s&&!s.classList.contains('era-label')){
+      if(s.classList.contains('set-block')&&!s.classList.contains('all-hidden')){v=true;break;}
+      s=s.nextElementSibling;
+    }
+    lbl.classList.toggle('era-hidden',!v);
+  });
+  // Update set headers to show only active language names
+  setBlockNamesMap.forEach(({namesByBadge,enName},block)=>{
+    const nameEl=block.querySelector('.set-name-en'); if(!nameEl) return;
+    const names=[...new Set(
+      BADGE_ORDER.filter(b=>activeLangs.has(b)&&namesByBadge[b]).map(b=>namesByBadge[b])
+    )];
+    nameEl.textContent=names.length>0?names.join(' | '):enName;
+  });
+  updateStats();
+}
+
+// ── CACHE ─────────────────────────────────────────────────────────────────────
+function loadCache(){
+  try{ const d=JSON.parse(localStorage.getItem(CACHESTORE)||'null'); return(d&&d.ts&&d.cards)?d:null; }catch(e){return null;}
+}
+function saveCache(d){ try{localStorage.setItem(CACHESTORE,JSON.stringify({ts:Date.now(),...d}));}catch(e){} }
+function cacheAge(ts){
+  const m=Math.floor((Date.now()-ts)/60000), h=Math.floor(m/60), dd=Math.floor(h/24);
+  return dd>0?`${dd}d ago` : h>0?`${h}h ago` : m>0?`${m}m ago` : 'just now';
+}
+function updRefreshBtn(ts){
+  const btn=document.getElementById('btn-refresh'); if(!btn) return;
+  btn.disabled=false;
+  btn.textContent=ts?`↺ Refresh (${cacheAge(ts)})`:'↺ Refresh';
+  btn.title=ts?`Cached ${new Date(ts).toLocaleString()} — click to re-fetch`:'Fetch data from TCGdex';
+}
+
+
+// ── FETCH ─────────────────────────────────────────────────────────────────────
+//
+// Architecture:
+//   Source of truth for card lists → Bulbapedia (CORS OK, has EN + JP)
+//   EN images   → pokemontcg.io PNG  (primary) → TCGdex CDN (fallback) → placeholder
+//   JP images   → Limitless CDN      (primary) → placeholder
+//   Other langs → TCGdex CDN         (primary) → placeholder
+//
+// Language mapping:
+//   JP is NOT hardcoded — card discovery is automatic via Bulbapedia wikitext.
+//   JP_BULBA_SET_MAP is a static data table (set names → Limitless codes + metadata)
+//   that only needs updating when new JP sets are released. The fetch/parse/inject
+//   pipeline itself is fully dynamic.
+
+// Parse EN card entries from Bulbapedia wikitext.
+// Each {{card list/release}} block yields {pokemonName, enSet, num}.
+function parseBulbaEN(wikitext, pokemonName){
+  const cards=[];
+  for(const m of wikitext.matchAll(/enset=([^|}\n]+)[^}]*?ennum=([^|}\n]+)/gs)){
+    const enSet=m[1].trim();
+    const rawNum=m[2].trim().split('/')[0].trim();
+    // Numeric numbers: strip leading zeros (pokemontcg.io stores "5" not "005")
+    // Non-numeric (promos like "XY23"): keep as-is
+    const num=/^\d+$/.test(rawNum)?String(parseInt(rawNum,10)):rawNum;
+    if(enSet&&num) cards.push({pokemonName,enSet,num});
+  }
+  return cards;
+}
+
+// Fetch Bulbapedia wikitext for all Pokémon in pokemonList.
+// Returns {enCards:[{pokemonName,enSet,num}], jpCardsData:[{jpset,jpnum,pokemonName}]}
+// Result is cached in _bulbaData so JP fetch doesn't re-fetch.
+async function fetchBulbaData(){
+  if(_bulbaData) return _bulbaData; // reuse within same session
+  const results=await Promise.allSettled(pokemonList.map(name=>
+    fetch(`https://bulbapedia.bulbagarden.net/w/api.php?action=parse&page=${encodeURIComponent(name+'_(TCG)')}&prop=wikitext&format=json&origin=*`)
+      .then(r=>r.json())
+      .then(d=>({name,text:d.parse?.wikitext?.['*']||''}))
+      .catch(()=>({name,text:''}))
+  ));
+  const enCards=[], jpCardsData=[];
+  results.forEach(r=>{
+    if(r.status!=='fulfilled') return;
+    const {name,text}=r.value;
+    if(!text) return;
+    enCards.push(...parseBulbaEN(text,name));
+    jpCardsData.push(...parseBulbaJPCards(text).map(c=>({...c,pokemonName:name})));
+  });
+  _bulbaData={enCards,jpCardsData};
+  return _bulbaData;
+}
+
+// Fetch all pokemontcg.io sets → Map<setName, setObj>
+// Used to look up set metadata (id, releaseDate, symbol) from Bulbapedia EN set names.
+async function fetchPtcgioSetsMap(){
+  try{
+    const r=await fetch('https://api.pokemontcg.io/v2/sets?pageSize=250&select=id,name,series,releaseDate,images,ptcgoCode');
+    if(!r.ok) return new Map();
+    const d=await r.json();
+    return new Map((d.data||[]).map(s=>[s.name,s]));
+  }catch(e){ return new Map(); }
+}
+
+async function fetchEnCards(){
+  // 1. Fetch Bulbapedia + pokemontcg.io sets in parallel
+  const [bulba, ptcgioSets]=await Promise.all([fetchBulbaData(), fetchPtcgioSetsMap()]);
+
+  // 2. Build EN cards: Bulbapedia supplies card list, pokemontcg.io supplies metadata+images
+  const cards=[];
+  const seen=new Set();
+  for(const {pokemonName,enSet,num} of bulba.enCards){
+    const setData=ptcgioSets.get(enSet);
+    if(!setData) continue; // set not in pokemontcg.io — will be caught by fallback
+    const cardId=`${setData.id}-${num}`;
+    if(seen.has(cardId)) continue;
+    seen.add(cardId);
+    cards.push({
+      id:cardId, name:pokemonName, number:num, set:setData, ptcgoCode:setData.ptcgoCode||null,
+      images:{
+        small:`https://images.pokemontcg.io/${setData.id}/${num}.png`,
+        large:`https://images.pokemontcg.io/${setData.id}/${num}_hires.png`,
+      }
+    });
+  }
+  if(cards.length) return cards;
+
+  // 3. Fallback A: pokemontcg.io name search (if Bulbapedia or set mapping failed)
+  console.warn('Bulbapedia→pokemontcg.io mapping failed, falling back to name search');
+  const ptcgCards=[];
+  await Promise.allSettled(pokemonList.map(async name=>{
+    try{
+      const r=await fetch(`https://api.pokemontcg.io/v2/cards?q=name:"${encodeURIComponent(name)}"&pageSize=250&select=id,name,number,set,images`);
+      if(!r.ok) return;
+      const d=await r.json();
+      if(Array.isArray(d.data)) ptcgCards.push(...d.data);
+    }catch(e){}
+  }));
+  if(ptcgCards.length) return ptcgCards;
+
+  // 4. Fallback B: TCGdex (last resort)
+  console.warn('pokemontcg.io also failed, falling back to TCGdex');
+  const tcgCards=[]; const errors=[];
+  for(const name of pokemonList){
+    const urls=[
+      `https://api.tcgdex.net/v2/en/cards?name=${encodeURIComponent(name)}`,
+      `https://api.tcgdex.net/v2/en/cards?name=${encodeURIComponent(name.toLowerCase())}`,
+    ];
+    let ok=false;
+    for(const url of urls){
+      try{
+        const r=await fetch(url); if(!r.ok) continue;
+        const d=await r.json();
+        if(Array.isArray(d)&&d.length){tcgCards.push(...d);ok=true;break;}
+        if(d?.data?.length){tcgCards.push(...d.data);ok=true;break;}
+      }catch(e){}
+    }
+    if(!ok) errors.push(`${name}:not found`);
+  }
+  if(!tcgCards.length) throw new Error(`All sources failed (${errors.slice(0,3).join('; ')})`);
+  return tcgCards;
+}
+
+async function fetchSetNames(apiCode){
+  try{
+    const r=await fetch(`https://api.tcgdex.net/v2/${apiCode}/sets`);
+    if(!r.ok) return {};
+    const s=await r.json();
+    return Array.isArray(s)?Object.fromEntries(s.map(x=>[x.id,x.name])):{};
+  }catch(e){return {};}
+}
+
+// Fetch native Pokémon names for a given language by querying one card per
+// unique species name. We use the card ID derived from the EN image URL.
+// Returns { enName: nativeName, … }  — 3 requests total (one per species).
+
+async function fetchAllSetNames(){
+  const eligible=LANGUAGES.filter(l=>l.hasSetsApi&&l.apiCode);
+  const results=await Promise.allSettled(eligible.map(l=>fetchSetNames(l.apiCode).then(n=>({code:l.code,names:n}))));
+  const map={};
+  results.forEach((r,i)=>{ map[eligible[i].code]=(r.status==='fulfilled')?r.value.names:{}; });
+  return map;
+}
+
+function detectNew(oldCards,newCards){
+  const old=new Set((oldCards||[]).map(c=>c.id));
+  return newCards.filter(c=>!old.has(c.id));
+}
+
+
+// ── JAPANESE CARDS ───────────────────────────────────────────────────────────
+//
+// Strategy:
+//   1. Fetch Bulbapedia wikitext for each Pokémon's TCG page (3 requests)
+//   2. Parse every {{card list/release}} block to extract jpset + jpnum
+//   3. Map Bulbapedia JP set name → metadata via JP_BULBA_SET_MAP
+//   4. Build Limitless CDN image URL where available (XY2+ era mostly works)
+//   5. Inject sorted set blocks into the correct era in the DOM
+//
+// Limitless image URL format:
+//   https://limitlesstcg.nyc3.cdn.digitaloceanspaces.com/tpc/{CODE}/{CODE}_{num}_R_JP_SM.png
+// Note: <img> tags load fine cross-origin; only fetch() is CORS-blocked.
+// ORB blocks some older sets (BW split, DP, PCG) — those fall back to placeholder.
+
+const JP_BULBA_SET_MAP = {
+  // ── EX / PCG era ── Limitless ORB blocked → placeholder
+  'Movie Commemoration VS Pack':      {code:null,  era:'ex',   date:'2003-07-01', sym:'https://images.pokemontcg.io/ex2/symbol.png'},
+  'Miracle of the Desert':            {code:null,  era:'ex',   date:'2004-01-16', sym:'https://images.pokemontcg.io/ex2/symbol.png'},
+  'Latios ex Half Deck':              {code:null,  era:'ex',   date:'2004-01-16', sym:'https://images.pokemontcg.io/ex2/symbol.png'},
+  'Undone Seal':                      {code:null,  era:'ex',   date:'2004-08-20', sym:'https://images.pokemontcg.io/ex5/symbol.png'},
+  'Deoxys Constructed Starter Deck':  {code:null,  era:'ex',   date:'2004-11-01', sym:'https://images.pokemontcg.io/ex8/symbol.png'},
+  'Mirage Forest':                    {code:null,  era:'ex',   date:'2004-10-22', sym:'https://images.pokemontcg.io/ex12/symbol.png'},
+  'Miracle Crystal':                  {code:null,  era:'ex',   date:'2005-11-25', sym:'https://images.pokemontcg.io/ex14/symbol.png'},
+  'World Champions Pack':             {code:null,  era:'ex',   date:'2006-08-20', sym:'https://images.pokemontcg.io/ex16/symbol.png'},
+  // ── DP era ── Limitless ORB blocked → placeholder
+  'Bonds to the End of Time':         {code:null,  era:'dp',   date:'2008-07-10', sym:'https://images.pokemontcg.io/dp5/symbol.png'},
+  // ── BW era ── Limitless ORB blocked → placeholder
+  'Psycho Drive':                     {code:null,  era:'bw',   date:'2011-09-16', sym:'https://images.pokemontcg.io/bw3/symbol.png'},
+  // ── XY era ── mixed (split sets ORB-blocked)
+  'Wild Blaze':                       {code:'XY2', era:'xy',   date:'2014-02-08', sym:'https://images.pokemontcg.io/xy2/symbol.png'},
+  'Fever-Burst Fighter':              {code:null,  era:'xy',   date:'2014-10-25', sym:'https://images.pokemontcg.io/xy5/symbol.png'},
+  'XY-P Promotional cards':           {code:'XYP', era:'xy',   date:'2013-10-12', sym:'https://images.pokemontcg.io/xyp/symbol.png'},
+  'Rage of the Broken Heavens':       {code:'XY9', era:'xy',   date:'2016-01-09', sym:'https://images.pokemontcg.io/xy9/symbol.png'},
+  // ── SM era ── all load ✅
+  'Sky-Splitting Charisma':           {code:'SM7', era:'sm',   date:'2018-05-03', sym:'https://images.pokemontcg.io/sm7/symbol.png'},
+  'SM-P Promotional cards':           {code:'SMP', era:'sm',   date:'2017-01-27', sym:'https://assets.tcgdex.net/univ/sm/smp/symbol.webp'},
+  // ── S era (Sword & Shield JP) ── all load ✅
+  'Amazing Volt Tackle':              {code:'S4',  era:'swsh', date:'2020-10-16', sym:'https://images.pokemontcg.io/swsh4/symbol.png'},
+  'Jet-Black Spirit':                 {code:'S6K', era:'swsh', date:'2021-09-24', sym:'https://images.pokemontcg.io/swsh6/symbol.png'},
+  'Lost Abyss':                       {code:'S11', era:'swsh', date:'2022-07-15', sym:'https://images.pokemontcg.io/swsh11/symbol.png'},
+  // ── SV era ── all load ✅
+  'Cyber Judge':                      {code:'SV5M',era:'sv',   date:'2024-01-26', sym:'https://images.pokemontcg.io/sv5/symbol.png'},
+  // ── M era (Mega expansions) ── load ✅
+  'Mega Brave':                       {code:'M1L', era:'sv',   date:'2025-08-01', sym:null},
+};
+
+// Build a Limitless image URL from a set code + card number string ("005/071")
+function limitlessJpUrl(code, jpnum){
+  if(!code||!jpnum) return null;
+  const num=parseInt(jpnum.split('/')[0],10);
+  if(isNaN(num)) return null;
+  return `https://limitlesstcg.nyc3.cdn.digitaloceanspaces.com/tpc/${code}/${code}_${num}_R_JP_SM.png`;
+}
+
+// Parse all JP card entries from a Bulbapedia TCG wikitext string.
+// Returns [{jpset, jpnum}] — one entry per {{card list/release}} block.
+function parseBulbaJPCards(wikitext){
+  const results=[];
+  // Match each release block — jpset always comes before jpnum in the template
+  for(const m of wikitext.matchAll(/jpset=([^|}\n]+)[^}]*?jpnum=([^|}\n]+)/gs)){
+    results.push({jpset:m[1].trim(), jpnum:m[2].trim()});
+  }
+  return results;
+}
+
+async function fetchAndInjectJPCards(container){
+  // 1. Reuse Bulbapedia data already fetched by fetchEnCards (or fetch fresh if needed)
+  const bulba = await fetchBulbaData();
+
+  // 2. Parse all JP card entries grouped by JP set name
+  // jpSets: Map<bulbaSetName, {meta, cards:[{enName,jpnum,cardId}]}>
+  const jpSets=new Map();
+  let cardIndex=0;
+  bulba.jpCardsData.forEach(({jpset,jpnum,pokemonName})=>{
+    const meta=JP_BULBA_SET_MAP[jpset];
+    if(!meta) return; // unknown set — not in our map, skip
+    if(!jpSets.has(jpset)) jpSets.set(jpset,{...meta, bulbaName:jpset, cards:[]});
+    jpSets.get(jpset).cards.push({enName:pokemonName, jpnum, cardId:`jp_${pokemonName}_${jpset}_${cardIndex++}`});
+  });
+
+  if(!jpSets.size) return;
+
+  // 3. Sort sets by release date, respecting sortDesc
+  const sortedSets=[...jpSets.values()].sort((a,b)=>{
+    const diff=new Date(a.date)-new Date(b.date);
+    return sortDesc?-diff:diff;
+  });
+
+  // 4. Inject each JP set block into the correct era
+  sortedSets.forEach(si=>{
+    // Find era label in DOM
+    const eraLabel=container.querySelector(`.era-label[data-series="${si.era}"]`);
+    let insertBefore=null;
+    if(eraLabel){
+      // Find correct insertion point by comparing JP set date vs EN set dates in this era
+      const jpDate=new Date(si.date).getTime();
+      let sib=eraLabel.nextElementSibling;
+      while(sib&&!sib.classList.contains('era-label')){
+        if(sib.classList.contains('set-block')){
+          const sibDate=parseInt(sib.dataset.releaseDate||'0',10);
+          if(sortDesc ? sibDate < jpDate : sibDate > jpDate){ insertBefore=sib; break; }
+        }
+        sib=sib.nextElementSibling;
+      }
+      // If no insertion point found within era, insert before next era
+      if(!insertBefore){
+        let s2=eraLabel.nextElementSibling;
+        while(s2&&!s2.classList.contains('era-label')) s2=s2.nextElementSibling;
+        insertBefore=s2;
+      }
+    }
+
+    const block=document.createElement('div'); block.className='set-block';
+    const symEl=si.sym?`<img class="set-symbol" src="${si.sym}" alt="" onerror="this.style.display='none'">`:'' ;
+    block.innerHTML=`<div class="set-head c-orange"><div class="set-head-left">${symEl}<div class="set-name-block"><span class="set-name-en">${si.bulbaName} <span style="font-size:9px;opacity:.7">(JP)</span></span></div></div><div class="set-head-right"><span class="set-count">0 entries</span><button class="set-select-btn">☑ Set</button></div></div><div class="cards-grid"></div>`;
+    if(insertBefore) container.insertBefore(block,insertBefore);
+    else container.appendChild(block);
+    block.querySelector('.set-select-btn').addEventListener('click',e=>{e.stopPropagation();selectSet(block);});
+    setBlockNamesMap.set(block,{namesByBadge:{JP:si.bulbaName},enName:si.bulbaName});
+
+    const grid=block.querySelector('.cards-grid');
+    let count=0;
+
+    // Group cards by Pokémon
+    const byPokemon=new Map();
+    si.cards.forEach(c=>{
+      if(!byPokemon.has(c.enName)) byPokemon.set(c.enName,[]);
+      byPokemon.get(c.enName).push(c);
+    });
+
+    byPokemon.forEach((cards,enName)=>{
+      const jpNat=NATIVE_NAMES.JP?.[enName]||'';
+      const divider=document.createElement('div'); divider.className='poke-divider';
+      divider.innerHTML=`${enName}${jpNat?` <span class="poke-divider-names-alt">· ${jpNat}</span>`:''}`;
+      grid.appendChild(divider);
+
+      cards.forEach(({enName,jpnum,cardId})=>{
+        const localId=jpnum.split('/')[0]; // "005" from "005/071"
+        const id=`JP_${cardId}`, isDone=checked.has(id);
+        const imgSrc=limitlessJpUrl(si.code,jpnum);
+        const jpNatName=NATIVE_NAMES.JP?.[enName]||null;
+
+        _meta.set(id,{
+          name:{en:enName,native:jpNatName},
+          setName:si.bulbaName, num:`#${localId}`,
+          lang:'JP', langColor:'#4527a0',
+          imgSrc, hiImgSrc:imgSrc, isCustom:true, symSrc:si.sym,
+        });
+
+        const el=document.createElement('div');
+        el.className='card'+(isDone?' done':''); el.dataset.id=id; el.dataset.lang='JP';
+
+        const wrap=document.createElement('div'); wrap.className='img-wrap';
+        if(imgSrc){
+          const img=document.createElement('img');
+          img.className='card-img'; img.loading='lazy';
+          img.alt=`${enName} JP #${localId}`; img.src=imgSrc;
+          img.onload=()=>{ const mm=_meta.get(id); if(mm) mm.isCustom=false; };
+          img.onerror=()=>{
+            img.remove();
+            wrap.innerHTML=buildPlaceholderHTML(si.sym,'JP','#4527a0',enName,jpNatName,si.bulbaName,localId,false);
+          };
+          wrap.appendChild(img);
+        } else {
+          wrap.innerHTML=buildPlaceholderHTML(si.sym,'JP','#4527a0',enName,jpNatName,si.bulbaName,localId,false);
+        }
+
+        const footer=document.createElement('div'); footer.className='card-footer';
+        const chk=document.createElement('input'); chk.type='checkbox'; chk.className='chk';
+        if(isDone) chk.checked=true; chk.onclick=e=>e.stopPropagation();
+        footer.innerHTML=`<span class="card-num">#${localId}</span><span class="lang lang-JP">JP</span><button class="preview-btn" title="Preview">🔍</button>`;
+        footer.appendChild(chk); el.appendChild(wrap); el.appendChild(footer);
+        attachToggle(el,id); grid.appendChild(el); count++;
+      });
+    });
+    totalCards+=count; updCount(block,count);
+  });
+
+  activeLangs.add('JP'); saveFilter();
+  buildPills(); updateStats();
+}
+async function buildAll(forceRefresh){
+  const container=document.getElementById('dyn');
+  container.innerHTML=''; totalCards=0; setBlockNamesMap.clear();
+
+  const loadBanner=mkBanner(container,'⏳ Loading…','banner-load',null);
+  const btn=document.getElementById('btn-refresh');
+  if(btn){btn.disabled=true;btn.textContent='⏳ Loading…';}
+
+  try{
+    const cached=loadCache();
+    const fresh=forceRefresh||!cached||(Date.now()-cached.ts)>CACHE_TTL;
+    let cards,setNamesAll;
+
+    if(!fresh){
+      cards=cached.cards; setNamesAll=cached.setNamesAll||{};
+      loadBanner.remove();
+      mkBanner(container,`✅ Loaded from cache (${cacheAge(cached.ts)}). Click Refresh to check for new cards.`,'banner-blue',null);
+    } else {
+      loadBanner.querySelector('.banner-body').textContent='⏳ Fetching cards, set names and translations from TCGdex…';
+      [cards,setNamesAll]=await Promise.all([fetchEnCards(),fetchAllSetNames()]);
+
+      // TH/ID TCGdex endpoints return 0 results — no native names available via API
+      if(forceRefresh&&cached){
+        const nc=detectNew(cached.cards,cards);
+        loadBanner.remove();
+        if(nc.length){
+          mkBanner(container,`🆕 <strong>${nc.length} new card(s) found</strong>: ${[...new Set(nc.map(c=>c.name))].join(', ')}`,'banner-load',null);
+        } else {
+          mkBanner(container,'✅ No new cards since last check.','banner-green',null);
+        }
+      } else { loadBanner.remove(); }
+
+      saveCache({cards,setNamesAll});
+    }
+
+    // Clear any remaining loading banner before rendering
+    loadBanner?.remove?.();
+    renderBySet(cards,setNamesAll,container);
+
+    // JP: fetch all JP cards, filter by name, inject as own sets with images
+    fetchAndInjectJPCards(container).catch(e=>console.warn('JP fetch failed:',e.message));
+
+    updRefreshBtn(loadCache()?.ts);
+    buildPills(); updateStats();
+
+  }catch(err){
+    if(loadBanner.parentNode) loadBanner.className='banner banner-error';
+    if(loadBanner.parentNode) loadBanner.querySelector('.banner-body').innerHTML=`⚠️ Failed: ${err.message} <button id="retry-btn" style="margin-left:8px;padding:2px 8px;cursor:pointer;border-radius:3px;border:1px solid #880e4f;background:#fff;color:#880e4f;font-size:10px;">↺ Retry</button>`;
+    loadBanner.querySelector('#retry-btn')?.addEventListener('click',()=>doRefresh());
+    if(btn){btn.disabled=false;btn.textContent='↺ Refresh';}
+  }
+}
+
+function doRefresh(){buildAll(true);}
+function clearCache(){
+  if(!confirm('Clear all cached card data and reload?')) return;
+  // Remove all tcgData cache keys (any version)
+  Object.keys(localStorage).filter(k=>k.startsWith('tcgData')).forEach(k=>localStorage.removeItem(k));
+  _bulbaData=null;
+  location.reload();
+}
+
+// ── DATA EXPORT (Phase 0: backup / device-transfer for the modular-site rebuild)
+// Dumps every localStorage key beginning with "tcg" (MS checklist, TMS includes,
+// settings, caches) into one JSON file. The envelope carries a schemaVersion and
+// an ISO timestamp so the future static-site import screen can validate the blob
+// and run the old-ID → TCGdex-ID migration. Additive only; reads localStorage,
+// writes a download, mutates nothing in the running tool.
+const EXPORT_SCHEMA_VERSION = 1;
+function exportData(){
+  const data = {};
+  Object.keys(localStorage)
+    .filter(k => k.startsWith('tcg'))
+    .forEach(k => { data[k] = localStorage.getItem(k); });
+  const payload = {
+    tool: 'pokemon-master-set-tool',
+    schemaVersion: EXPORT_SCHEMA_VERSION,
+    exportedAt: new Date().toISOString(),
+    keys: data
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type:'application/json' });
+  const url  = URL.createObjectURL(blob);
+  const stamp = payload.exportedAt.slice(0,10); // YYYY-MM-DD
+  const a = document.createElement('a');
+  a.href = url; a.download = `tcg-export-${stamp}.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+
+// ── PREVIEW MODAL ─────────────────────────────────────────────────────────────
+function showPlaceholderInPreview(content, m, en, nat){
+  const ph = buildPlaceholderHTML(m.symSrc, m.lang, m.langColor, en, nat, m.setName, m.num.replace('#',''), false);
+  content.innerHTML = `<div class="preview-placeholder">${ph}</div>`;
+}
+
+function openPreview(id){
+  const m=_meta.get(id); if(!m) return;
+  const overlay=document.getElementById('preview-overlay');
+  const content=document.getElementById('preview-content');
+  const meta=document.getElementById('preview-meta');
+  if(!overlay||!content||!meta) return;
+
+  const en=typeof m.name==='object'?m.name.en:m.name;
+  const nat=typeof m.name==='object'?m.name.native:null;
+
+  // Try to show a real image: hi → lo → placeholder
+  const hiSrc = m.hiImgSrc || m.imgSrc;
+  const loSrc = m.imgSrc || m.hiImgSrc;
+
+  if(hiSrc){
+    content.innerHTML='';
+    const img=document.createElement('img');
+    img.className='preview-img'; img.alt=en;
+
+    function tryLo(){
+      if(loSrc && loSrc!==hiSrc){
+        img.onerror=()=>{ img.remove(); showPlaceholderInPreview(content,m,en,nat); };
+        img.src=loSrc;
+      } else {
+        img.remove(); showPlaceholderInPreview(content,m,en,nat);
+      }
+    }
+
+    img.onerror=tryLo;
+    img.src=hiSrc;
+    content.appendChild(img);
+  } else {
+    showPlaceholderInPreview(content,m,en,nat);
+  }
+
+  meta.innerHTML=`
+    <strong>${en}</strong>${nat?` · ${nat}`:''}
+    <br>${m.setName} &middot; ${m.num} &middot;
+    <span style="background:${m.langColor};color:white;padding:0 5px;border-radius:3px;font-size:10px">${m.lang}</span>
+  `.trim();
+
+  overlay.classList.add('open');
+}
+
+function closePreview(e){
+  if(e && e.target!==document.getElementById('preview-overlay') && !e.target.classList.contains('preview-close')) return;
+  document.getElementById('preview-overlay')?.classList.remove('open');
+}
+
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') document.getElementById('preview-overlay')?.classList.remove('open'); });
+
+// ── PRINT SELECTED ────────────────────────────────────────────────────────────
+// Uses buildPlaceholderHTML (same as main page) so print placeholders match exactly.
+// Placeholder CSS is inlined into the print window.
+const PLACEHOLDER_PRINT_CSS = [
+  '.custom-placeholder{width:100%;aspect-ratio:63.5/88.9;border-radius:6px;' +
+  'background:linear-gradient(160deg,#1a3a2a 0%,#2d5a3d 50%,#1a3a2a 100%);' +
+  'border:2.5px solid #c8a400;display:flex;flex-direction:column;' +
+  'align-items:center;justify-content:center;gap:3px;padding:8px 5px;' +
+  'text-align:center;position:relative;overflow:hidden;box-sizing:border-box;}',
+  '.custom-placeholder::before{content:"";position:absolute;inset:3px;' +
+  'border-radius:4px;border:1px solid rgba(200,164,0,.35);pointer-events:none;}',
+  '.cp-symbol{width:24px;height:24px;object-fit:contain;opacity:.5;' +
+  'filter:brightness(0) invert(1);margin-bottom:2px;}',
+  '.cp-lang{font-size:8px;font-weight:bold;color:white;padding:1px 5px;border-radius:2px;}',
+  '.cp-name{font-size:11px;font-weight:bold;color:#ffd54f;line-height:1.2;' +
+  'word-break:break-word;text-shadow:0 1px 2px rgba(0,0,0,.5);}',
+  '.cp-native{font-size:10px;font-weight:bold;color:#ffe082;line-height:1.2;}',
+  '.cp-set{font-size:8px;color:#a5d6a7;line-height:1.2;}',
+  '.cp-num{font-size:7px;color:#81c784;font-style:italic;}',
+  '.pw .custom-placeholder{width:63.5mm!important;height:88.9mm!important;border-radius:3.5mm!important;}',
+].join('');
+
+function printPlaceholderCard(m){
+  const en  = typeof m.name==='object' ? m.name.en     : m.name;
+  const nat = typeof m.name==='object' ? m.name.native : null;
+  const localId = (m.num||'').replace('#','');
+  return buildPlaceholderHTML(m.symSrc,m.lang,m.langColor,en,nat,m.setName,localId,false);
+}
+
+function printSelected(){
+  if(!checked.size){ alert('No cards selected.'); return; }
+  const cards = [...checked].map(id=>_meta.get(id)).filter(Boolean);
+  if(!cards.length){ alert('No printable card data found.'); return; }
+
+  function safeImgUrl(url, quality){
+    if(!url) return null;
+    return /\.(webp|png|jpg|jpeg)$/i.test(url) ? url : `${url}/${quality}.webp`;
+  }
+
+  const cells = cards.map(m => {
+    const imgUrl = safeImgUrl(m.hiImgSrc,'high') || safeImgUrl(m.imgSrc,'low');
+    const ph  = printPlaceholderCard(m);
+    const img = imgUrl
+      ? `<img src="${imgUrl}" class="pi pi-ov" style="display:none" onload="this.style.display='block'" onerror="this.remove()">`
+      : '';
+    return `<div class="pw">${ph}${img}</div>`;
+  }).join('');
+
+  // A4 portrait: 5mm margins = 200mm × 287mm usable
+  // 3 × 63.5mm + 2 × 2mm gaps = 194.5mm wide ✓
+  // 3 × 88.9mm + 2 × 2mm gaps = 270.7mm tall ✓ → 9 cards per page
+  const html = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Print</title><style>'
+    + '*{box-sizing:border-box;margin:0;padding:0;}'
+    + 'body{background:white;}'
+    + '.pg{display:grid;grid-template-columns:repeat(3,63.5mm);gap:3mm;padding:0;}'
+    + '.pw{width:63.5mm;height:88.9mm;border-radius:3.5mm;overflow:hidden;position:relative;}'
+    + '.pi{width:63.5mm;height:88.9mm;display:block;object-fit:cover;}'
+    + '.pi-ov{position:absolute;inset:0;width:100%!important;height:100%!important;}'
+    + PLACEHOLDER_PRINT_CSS
+    + '@media print{-webkit-print-color-adjust:exact;print-color-adjust:exact;@page{size:A4 portrait;margin:5mm;}}'
+    + '</style></head><body>'
+    + '<div class="pg">' + cells + '</div>'
+    + '<script>const i=document.querySelectorAll("img");let p=i.length;function t(){if(--p<=0)window.print();}if(!p)window.print();else i.forEach(x=>{if(x.complete)t();else{x.onload=t;x.onerror=t;}})<\/script>'
+    + '</body></html>';
+
+  const blob = new Blob([html], {type:'text/html'});
+  const url  = URL.createObjectURL(blob);
+  const win  = window.open(url, '_blank');
+  if(!win) alert('Pop-up blocked — please allow pop-ups.');
+  setTimeout(()=>URL.revokeObjectURL(url), 60000);
+}
+
+// ── PRINT CHECKLIST ───────────────────────────────────────────────────────────
+// Prints a text list of selected cards grouped by set, with checkboxes.
+// One row per card: [ ] CardName · Lang · #Num
+function printChecklist(){
+  if(!checked.size){ alert('No cards selected.'); return; }
+  const cards = [...checked].map(id=>_meta.get(id)).filter(Boolean);
+  if(!cards.length){ alert('No card data found.'); return; }
+
+  // Group by set name
+  const bySet = new Map();
+  cards.forEach(m=>{
+    if(!bySet.has(m.setName)) bySet.set(m.setName,[]);
+    bySet.get(m.setName).push(m);
+  });
+
+  // Build rows: 2 cards side-by-side per table row for compactness
+  const rows = [...bySet.entries()].map(([setName, items])=>{
+    const sym = items[0]?.symSrc
+      ? `<img src="${items[0].symSrc}" style="width:10px;height:10px;object-fit:contain;vertical-align:middle;margin-right:2px;filter:brightness(0);opacity:.5" onerror="this.style.display='none'">`
+      : '';
+    let setRows = '';
+    for(let i=0; i<items.length; i+=2){
+      const cell = m => {
+        if(!m) return '<td colspan="3"></td>';
+        const en  = typeof m.name==='object' ? m.name.en : m.name;
+        const nat = typeof m.name==='object' && m.name.native ? ` <span style="color:#999">${m.name.native}</span>` : '';
+        return `<td class="chk-col"><input type="checkbox" disabled></td>`
+             + `<td class="name-col">${en}${nat} <span class="badge" style="background:${m.langColor}">${m.lang}</span></td>`
+             + `<td class="num-col">${m.num}</td>`;
+      };
+      setRows += `<tr>${cell(items[i])}${cell(items[i+1]||null)}</tr>`;
+    }
+    return `<tr class="set-row"><td colspan="6">${sym}${setName}</td></tr>${setRows}`;
+  }).join('');
+
+  const html = `<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Card Checklist</title><style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:Arial,sans-serif;font-size:7pt;padding:5mm;}
+h1{font-size:8pt;margin-bottom:2mm;color:#333;}
+table{width:100%;border-collapse:collapse;}
+.set-row td{font-weight:bold;font-size:6.5pt;background:#ebebeb;padding:.8mm 1.5mm;border-top:.5px solid #bbb;color:#444;text-transform:uppercase;letter-spacing:.3px;} .name-col{max-width:60mm;}
+tr:not(.set-row) td{padding:.35mm 1.5mm;border-bottom:.15mm solid #f2f2f2;vertical-align:middle;line-height:1.3;}
+.chk-col{width:4mm;text-align:center;}.sep{width:1.5mm;border-left:.2mm solid #ddd;}
+.lang-col{width:9mm;text-align:center;}
+.num-col{width:9mm;text-align:right;color:#999;}
+.badge{color:white;padding:0 2px;border-radius:2px;font-size:6pt;font-weight:bold;}
+@media print{@page{size:A4 portrait;margin:5mm;}-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+</style></head>
+<body>
+<h1>${pokemonList.join(' · ')} — ${cards.length} card${cards.length===1?'':'s'}</h1>
+<table><tbody>${rows}</tbody></table>
+<\x73cript>window.print();<\/script>
+</body></html>`;
+
+  const blob = new Blob([html], {type:'text/html'});
+  const url  = URL.createObjectURL(blob);
+  const win  = window.open(url, '_blank');
+  if(!win) alert('Pop-up blocked — please allow pop-ups.');
+  setTimeout(()=>URL.revokeObjectURL(url), 60000);
+}
+
+// =============================================================================
+// TRUE MASTER SET
+// =============================================================================
+
+function setMode(mode){
+  appMode=mode;
+  try{localStorage.setItem(MODESTORE,mode);}catch(e){}
+  const isTms=mode==='tms';
+  document.getElementById('btn-mode-master').classList.toggle('active',!isTms);
+  document.getElementById('btn-mode-tms').classList.toggle('active',isTms);
+  const mc=document.getElementById('master-controls');
+  const tc=document.getElementById('tms-header-controls');
+  const msf=document.getElementById('ms-filter-bar');
+  const tmsf=document.getElementById('tms-filter-bar');
+  const pbar=document.querySelector('.poke-bar');
+  const dyn=document.getElementById('dyn');
+  const tapp=document.getElementById('tms-app');
+  if(mc)  mc.style.display  =isTms?'none':'flex';
+  if(tc)  tc.style.display  =isTms?'flex':'none';
+  if(pbar) pbar.style.display=isTms?'none':'';
+  if(msf) msf.style.display =isTms?'none':'';
+  if(tmsf){ tmsf.style.display=isTms?'flex':'none'; if(isTms) buildTmsPillsTms(); }
+  if(dyn) dyn.style.display =isTms?'none':'';
+  if(tapp) tapp.style.display=isTms?'block':'none';
+  renderPokeChips();
+  if(isTms){ renderTMS(); updateTmsPrintSelBtn(); }
+  else updateStats();
+}
+
+// ── TMS: Count included cards for a Pokémon ──────────────────────────────────
+function tmsCountForPoke(pokeName){
+  let n=0;
+  tmsIncluded.forEach(id=>{ if(_tmsCardPokemon.get(id)===pokeName) n++; });
+  return n;
+}
+
+// ── TMS: Render the Pokémon catalog browser ───────────────────────────────────
+function renderTMS(){
+  const app=document.getElementById('tms-app'); if(!app) return;
+  app.innerHTML='';
+
+  // Update header stats badge
+  _updateTmsStats();
+
+  // Toolbar: gen filter + search
+  const toolbar=document.createElement('div'); toolbar.className='tms-toolbar';
+  const genDiv=document.createElement('div'); genDiv.className='tms-gen-filter';
+  [0,1,2,3,4,5,6,7,8,9].forEach((g,i)=>{
+    const lbl=['All','Gen 1','Gen 2','Gen 3','Gen 4','Gen 5','Gen 6','Gen 7','Gen 8','Gen 9'][i];
+    const btn=document.createElement('button'); btn.className='tms-gen-btn'+(tmsGenFilter===g?' active':'');
+    btn.textContent=lbl; btn.onclick=()=>{tmsGenFilter=g; renderTMS();};
+    genDiv.appendChild(btn);
+  });
+  toolbar.appendChild(genDiv);
+  const srch=document.createElement('input'); srch.type='text'; srch.className='tms-search';
+  srch.placeholder='Search Pokémon…'; srch.value=tmsSearchQ;
+  srch.oninput=e=>{tmsSearchQ=e.target.value.trim().toLowerCase(); renderTMS();};
+  toolbar.appendChild(srch);
+  app.appendChild(toolbar);
+
+  // Global language add/remove — styled like filter-bar
+  const langRow=document.createElement('div'); langRow.className='tms-lang-actions';
+  const lbl=document.createElement('span'); lbl.className='tms-lang-lbl'; lbl.textContent='Global language:';
+  langRow.appendChild(lbl);
+  const allL=[...LANGUAGES,...PLACEHOLDER_LANGS,{badge:'JP',color:'#4527a0',label:'Japanese'}];
+  allL.forEach(l=>{
+    const add=document.createElement('button'); add.className='tms-lang-btn';
+    add.style.background=l.color; add.style.borderColor=l.color;
+    add.textContent=`+ ${l.badge}`; add.title=`Add all ${l.label||l.badge} cards to TMS (for Pokémon already opened)`;
+    add.onclick=()=>tmsGlobalLang(l.badge,true);
+    langRow.appendChild(add);
+    const rem=document.createElement('button'); rem.className='tms-lang-btn rem';
+    rem.textContent=`– ${l.badge}`; rem.title=`Remove all ${l.label||l.badge} cards from TMS`;
+    rem.onclick=()=>tmsGlobalLang(l.badge,false);
+    langRow.appendChild(rem);
+  });
+  app.appendChild(langRow);
+
+  // Pokémon grid
+  const grid=document.createElement('div'); grid.className='tms-poke-grid';
+  const filtered=POKEMON_CATALOG.filter(p=>{
+    if(tmsGenFilter!==0&&p.gen!==tmsGenFilter) return false;
+    if(tmsSearchQ&&!p.name.toLowerCase().includes(tmsSearchQ)) return false;
+    return true;
+  });
+  if(!filtered.length){
+    const empty=document.createElement('div'); empty.className='tms-no-results';
+    empty.textContent='No Pokémon match the current filter.'; grid.appendChild(empty);
+  }
+  filtered.forEach(p=>{
+    const cnt=tmsCountForPoke(p.name);
+    const tile=document.createElement('div');
+    tile.className='tms-poke-tile'+(cnt>0?' has-cards':'');
+    tile.dataset.pokeName=p.name;
+    const dexEl=document.createElement('div'); dexEl.className='tms-poke-dex';
+    dexEl.textContent='#'+String(p.dex).padStart(3,'0');
+    const nameEl=document.createElement('div'); nameEl.className='tms-poke-name';
+    nameEl.textContent=p.name;
+    tile.appendChild(dexEl); tile.appendChild(nameEl);
+    if(cnt>0){
+      const cntEl=document.createElement('div'); cntEl.className='tms-poke-count';
+      cntEl.textContent=`${cnt} card${cnt===1?'':'s'}`; tile.appendChild(cntEl);
+    }
+    tile.onclick=()=>openTmsPopup(p.name);
+    grid.appendChild(tile);
+  });
+  app.appendChild(grid);
+}
+
+// ── TMS: Open popup for a Pokémon ─────────────────────────────────────────────
+async function openTmsPopup(pokeName){
+  _tmsOpenPoke=pokeName;
+  _tmsPopupActive=new Set([...tmsActiveLangs]); // inherit global language filter
+  const overlay=document.getElementById('tms-overlay');
+  const titleEl=document.getElementById('tms-popup-title');
+  const subEl=document.getElementById('tms-popup-sub');
+  const toolbar=document.getElementById('tms-popup-toolbar');
+  const body=document.getElementById('tms-popup-body');
+  titleEl.textContent=pokeName;
+  subEl.textContent='Loading cards…';
+  toolbar.innerHTML=''; body.innerHTML='<div style="padding:24px;text-align:center;color:#999;font-size:11px">Fetching card data…</div>';
+  overlay.classList.add('open');
+  try{
+    const cards=await fetchTmsCardsForPoke(pokeName);
+    _tmsPopupAllCards=cards;
+    renderTmsPopup(pokeName);
+  }catch(e){
+    body.innerHTML=`<div style="padding:20px;color:#c62828;font-size:11px">Error: ${e.message}</div>`;
+    subEl.textContent='Error loading cards';
+  }
+}
+
+// ── TMS: Fetch card data for one Pokémon ─────────────────────────────────────
+async function fetchTmsCardsForPoke(pokeName){
+  if(tmsPokeCache.has(pokeName)) return tmsPokeCache.get(pokeName);
+
+  // Fetch Bulbapedia wikitext + ptcgio sets map in parallel
+  const [bulbaResp, ptcgioSets]=await Promise.all([
+    fetch(`https://bulbapedia.bulbagarden.net/w/api.php?action=parse&page=${encodeURIComponent(pokeName+'_(TCG)')}&prop=wikitext&format=json&origin=*`)
+      .then(r=>r.json()).catch(()=>null),
+    fetchPtcgioSetsMap()
+  ]);
+  const wikitext=bulbaResp?.parse?.wikitext?.['*']||'';
+  const enEntries=wikitext?parseBulbaEN(wikitext,pokeName):[];
+  const jpEntries=wikitext?parseBulbaJPCards(wikitext).map(c=>({...c,pokemonName:pokeName})):[];
+
+  const cards=[]; const seen=new Set();
+
+  // EN + international cards
+  for(const {enSet,num} of enEntries){
+    const setData=ptcgioSets.get(enSet); if(!setData) continue;
+    const cardId=`${setData.id}-${num}`; if(seen.has(cardId)) continue; seen.add(cardId);
+    const series=setData.id.replace(/\d.*$/,'');
+    const tcgdexSetId=ptcgioToTcgdexSetId(setData.id);
+    const tcgdexLocalId=ptcgioToTcgdexLocalId(num,series);
+    const symSrc=setData.images?.symbol||`https://images.pokemontcg.io/${setData.id}/symbol.png`;
+    const releaseDate=setData.releaseDate||'1999/01/01';
+    for(const langDef of LANGUAGES){
+      const id=`${langDef.badge}_${cardId}`;
+      const lim=limitlessIntlUrl(setData.ptcgoCode||null,num,langDef.badge);
+      const tcgdexBase=`https://assets.tcgdex.net/${langDef.code}/${series}/${tcgdexSetId}/${tcgdexLocalId}`;
+      let imgSrc,hiSrc;
+      if(langDef.badge==='EN'){
+        imgSrc=lim||`https://images.pokemontcg.io/${setData.id}/${num}.png`;
+        hiSrc=lim||`https://images.pokemontcg.io/${setData.id}/${num}_hires.png`;
+      }else{
+        imgSrc=lim||`${tcgdexBase}/low.webp`;
+        hiSrc=lim||`${tcgdexBase}/high.webp`;
+      }
+      _tmsCardPokemon.set(id,pokeName);
+      cards.push({id,pokeName,setId:setData.id,setName:setData.name,releaseDate,localId:num,lang:langDef.badge,langColor:langDef.color,imgSrc,hiSrc,symSrc});
+    }
+    for(const pl of PLACEHOLDER_LANGS){
+      const id=`${pl.badge}_${cardId}`;
+      _tmsCardPokemon.set(id,pokeName);
+      cards.push({id,pokeName,setId:setData.id,setName:setData.name,releaseDate,localId:num,lang:pl.badge,langColor:pl.color,imgSrc:null,hiSrc:null,symSrc});
+    }
+  }
+
+  // JP cards
+  for(const {jpset,jpnum} of jpEntries){
+    const meta=JP_BULBA_SET_MAP[jpset]; if(!meta) continue;
+    const localId=jpnum.split('/')[0];
+    const uid=`JP_${meta.code||jpset}_${localId}`;
+    if(seen.has(uid)) continue; seen.add(uid);
+    const imgSrc=meta.code?limitlessJpUrl(meta.code,jpnum):null;
+    _tmsCardPokemon.set(uid,pokeName);
+    cards.push({id:uid,pokeName,setId:meta.code||jpset,setName:jpset,releaseDate:meta.date||'1999/01/01',localId,lang:'JP',langColor:'#4527a0',imgSrc,hiSrc:null,symSrc:meta.sym||null});
+  }
+
+  tmsPokeCache.set(pokeName,cards);
+  saveTmsCache();
+  return cards;
+}
+
+// ── TMS: Render the popup content ─────────────────────────────────────────────
+function renderTmsPopup(pokeName){
+  const subEl=document.getElementById('tms-popup-sub');
+  const toolbar=document.getElementById('tms-popup-toolbar');
+  toolbar.innerHTML='';
+
+  // Language pills — same filter-pill style as MS
+  const present=[...new Set(_tmsPopupAllCards.map(c=>c.lang))];
+  const ordered=BADGE_ORDER.filter(b=>present.includes(b));
+  ordered.forEach(badge=>{
+    const pill=document.createElement('button'); pill.className='filter-pill'+(_tmsPopupActive.has(badge)?' active':'');
+    pill.textContent=badge; pill.style.background=langColor(badge);
+    const l=LANGUAGES.find(x=>x.badge===badge)||PLACEHOLDER_LANGS.find(x=>x.badge===badge);
+    pill.title=(l?l.label:badge==='JP'?'Japanese':badge);
+    pill.onclick=()=>{
+      _tmsPopupActive.has(badge)?_tmsPopupActive.delete(badge):_tmsPopupActive.add(badge);
+      pill.classList.toggle('active',_tmsPopupActive.has(badge));
+      renderTmsPopupCards(pokeName);
+    };
+    toolbar.appendChild(pill);
+  });
+  // Separator
+  const sep=document.createElement('span'); sep.className='tms-toolbar-sep'; toolbar.appendChild(sep);
+  // Action buttons
+  const incAll=document.createElement('button'); incAll.className='tms-act-btn success';
+  incAll.textContent='+ Include All Visible'; incAll.onclick=()=>tmsPopupBulk(true);
+  toolbar.appendChild(incAll);
+  const excAll=document.createElement('button'); excAll.className='tms-act-btn danger';
+  excAll.textContent='− Exclude All Visible'; excAll.onclick=()=>tmsPopupBulk(false);
+  toolbar.appendChild(excAll);
+
+  renderTmsPopupCards(pokeName);
+}
+
+function renderTmsPopupCards(pokeName){
+  const subEl=document.getElementById('tms-popup-sub');
+  const body=document.getElementById('tms-popup-body');
+  body.innerHTML='';
+
+  const visible=_tmsPopupAllCards.filter(c=>_tmsPopupActive.has(c.lang));
+
+  // Group by set, sorted by release date
+  const bySet=new Map();
+  visible.forEach(c=>{
+    const key=c.releaseDate+'|'+c.setId;
+    if(!bySet.has(key)) bySet.set(key,{setName:c.setName,releaseDate:c.releaseDate,symSrc:c.symSrc,cards:[]});
+    bySet.get(key).cards.push(c);
+  });
+  const sorted=[...bySet.values()].sort((a,b)=>new Date(a.releaseDate)-new Date(b.releaseDate));
+
+  const grid=document.createElement('div'); grid.className='tms-popup-grid';
+
+  if(!visible.length){
+    const e=document.createElement('div'); e.style.cssText='grid-column:1/-1;padding:20px;text-align:center;color:#999;font-size:11px;';
+    e.textContent='No cards match the selected languages.'; grid.appendChild(e);
+  }
+
+  sorted.forEach(si=>{
+    // Set divider
+    const div=document.createElement('div'); div.className='tms-popup-set-divider';
+    if(si.symSrc){
+      const sym=document.createElement('img'); sym.src=si.symSrc;
+      sym.style.cssText='width:12px;height:12px;object-fit:contain;filter:brightness(0.3);';
+      sym.onerror=()=>sym.remove(); div.appendChild(sym);
+    }
+    div.appendChild(document.createTextNode(si.setName));
+    grid.appendChild(div);
+
+    si.cards.forEach(c=>{
+      const isIn=tmsIncluded.has(c.id);
+      const el=document.createElement('div'); el.className='tms-popup-card'+(isIn?' tms-in':''); el.dataset.id=c.id;
+      // Image
+      const wrap=document.createElement('div'); wrap.className='img-wrap';
+      if(c.imgSrc){
+        const img=document.createElement('img'); img.className='card-img'; img.loading='lazy'; img.src=c.imgSrc;
+        img.alt=`${pokeName} #${c.localId} ${c.lang}`;
+        img.onerror=()=>{ const nat=(NATIVE_NAMES[c.lang]||{})[pokeName]||null; wrap.innerHTML=buildPlaceholderHTML(c.symSrc,c.lang,c.langColor,pokeName,nat,c.setName,c.localId,false); };
+        wrap.appendChild(img);
+      }else{
+        const nat=(NATIVE_NAMES[c.lang]||{})[pokeName]||null;
+        wrap.innerHTML=buildPlaceholderHTML(c.symSrc,c.lang,c.langColor,pokeName,nat,c.setName,c.localId,false);
+      }
+      const footer=document.createElement('div'); footer.className='card-footer';
+      footer.innerHTML=`<span class="card-num">#${c.localId}</span><span class="lang" style="background:${c.langColor}">${c.lang}</span>`;
+      el.appendChild(wrap); el.appendChild(footer);
+      el.onclick=()=>toggleTmsCard(c.id,el,pokeName);
+      grid.appendChild(el);
+    });
+  });
+
+  body.appendChild(grid);
+
+  // Update subtitle
+  const inc=tmsCountForPoke(pokeName);
+  if(subEl) subEl.textContent=`${inc} card${inc===1?'':'s'} in TMS · ${visible.length} visible`;
+}
+
+// ── TMS: Toggle a single card in/out of TMS ───────────────────────────────────
+function toggleTmsCard(cardId,el,pokeName){
+  if(tmsIncluded.has(cardId)){ tmsIncluded.delete(cardId); el.classList.remove('tms-in'); }
+  else{ tmsIncluded.add(cardId); el.classList.add('tms-in'); _tmsCardPokemon.set(cardId,pokeName||_tmsOpenPoke); }
+  saveTms();
+  // Update subtitle + tile count
+  const sub=document.getElementById('tms-popup-sub');
+  if(sub&&_tmsOpenPoke){
+    const inc=tmsCountForPoke(_tmsOpenPoke);
+    const vis=_tmsPopupAllCards.filter(c=>_tmsPopupActive.has(c.lang)).length;
+    sub.textContent=`${inc} card${inc===1?'':'s'} in TMS · ${vis} visible`;
+  }
+  _updateTmsTile(_tmsOpenPoke);
+  _updateTmsStats();
+}
+
+// ── TMS: Bulk include/exclude all visible popup cards ─────────────────────────
+function tmsPopupBulk(include){
+  const visible=_tmsPopupAllCards.filter(c=>_tmsPopupActive.has(c.lang));
+  visible.forEach(c=>{
+    if(include){ tmsIncluded.add(c.id); _tmsCardPokemon.set(c.id,_tmsOpenPoke); }
+    else tmsIncluded.delete(c.id);
+  });
+  saveTms();
+  renderTmsPopupCards(_tmsOpenPoke);
+  _updateTmsTile(_tmsOpenPoke);
+  _updateTmsStats();
+}
+
+// ── TMS: Global add/remove a language across all cached Pokémon ───────────────
+function tmsGlobalLang(badge,add){
+  tmsPokeCache.forEach((cards,pokeName)=>{
+    cards.filter(c=>c.lang===badge).forEach(c=>{
+      if(add){ tmsIncluded.add(c.id); _tmsCardPokemon.set(c.id,pokeName); }
+      else tmsIncluded.delete(c.id);
+    });
+  });
+  saveTms();
+  renderTMS();
+}
+
+// ── TMS: Update a Pokémon tile count in the grid ──────────────────────────────
+function _updateTmsTile(pokeName){
+  if(!pokeName) return;
+  const tile=document.querySelector(`.tms-poke-tile[data-poke-name="${CSS.escape(pokeName)}"]`);
+  if(!tile) return;
+  const cnt=tmsCountForPoke(pokeName);
+  let cntEl=tile.querySelector('.tms-poke-count');
+  if(cnt>0){
+    if(!cntEl){ cntEl=document.createElement('div'); cntEl.className='tms-poke-count'; tile.appendChild(cntEl); }
+    cntEl.textContent=`${cnt} card${cnt===1?'':'s'}`; tile.classList.add('has-cards');
+  }else{
+    cntEl?.remove(); tile.classList.remove('has-cards');
+  }
+}
+
+function _updateTmsStats(){
+  const t=tmsIncluded.size;
+  const el=document.getElementById('stats');
+  if(el&&appMode==='tms') el.textContent=`⭐ ${t} card${t===1?'':'s'} in TMS`;
+}
+
+// ── TMS: Close popup ──────────────────────────────────────────────────────────
+function closeTmsPopup(e){
+  if(e&&e.target!==document.getElementById('tms-overlay')) return;
+  document.getElementById('tms-overlay').classList.remove('open');
+  _tmsOpenPoke=null; _tmsPopupAllCards=[];
+}
+
+// ── TMS: Print the TMS as a checklist ─────────────────────────────────────────
+function printTmsChecklist(){
+  if(!tmsIncluded.size){ alert('No cards in your True Master Set yet.\nOpen some Pokémon and include cards first.'); return; }
+  const cards=[];
+  tmsIncluded.forEach(id=>{
+    const poke=_tmsCardPokemon.get(id); if(!poke) return;
+    const pc=tmsPokeCache.get(poke); if(!pc) return;
+    const c=pc.find(x=>x.id===id); if(!c) return;
+    const nat=(NATIVE_NAMES[c.lang]||{})[poke]||null;
+    cards.push({name:{en:poke,native:nat},setName:c.setName,num:`#${c.localId}`,lang:c.lang,langColor:c.langColor,symSrc:c.symSrc});
+  });
+  if(!cards.length){ alert('Card data not loaded yet.\nPlease open each Pokémon\'s popup first, then try again.'); return; }
+  const bySet=new Map();
+  cards.forEach(m=>{ if(!bySet.has(m.setName)) bySet.set(m.setName,[]); bySet.get(m.setName).push(m); });
+  const rows=[...bySet.entries()].map(([setName,items])=>{
+    const sym=items[0]?.symSrc?`<img src="${items[0].symSrc}" style="width:10px;height:10px;object-fit:contain;vertical-align:middle;margin-right:2px;filter:brightness(0);opacity:.5" onerror="this.style.display='none'">`:'';
+    let setRows='';
+    for(let i=0;i<items.length;i+=2){
+      const cell=m=>{ if(!m) return '<td colspan="3"></td>'; const en=typeof m.name==='object'?m.name.en:m.name; const nat=typeof m.name==='object'&&m.name.native?` <span style="color:#999">${m.name.native}</span>`:''; return `<td class="chk-col"><input type="checkbox" disabled></td><td class="name-col">${en}${nat} <span class="badge" style="background:${m.langColor}">${m.lang}</span></td><td class="num-col">${m.num}</td>`; };
+      setRows+=`<tr>${cell(items[i])}${cell(items[i+1]||null)}</tr>`;
+    }
+    return `<tr class="set-row"><td colspan="6">${sym}${setName}</td></tr>${setRows}`;
+  }).join('');
+  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>True Master Set Checklist</title><style>*{box-sizing:border-box;margin:0;padding:0;}body{font-family:Arial,sans-serif;font-size:7pt;padding:5mm;}h1{font-size:8pt;margin-bottom:2mm;color:#333;}table{width:100%;border-collapse:collapse;}.set-row td{font-weight:bold;font-size:6.5pt;background:#ebebeb;padding:.8mm 1.5mm;border-top:.5px solid #bbb;color:#444;text-transform:uppercase;letter-spacing:.3px;}.name-col{max-width:60mm;}tr:not(.set-row) td{padding:.35mm 1.5mm;border-bottom:.15mm solid #f2f2f2;vertical-align:middle;line-height:1.3;}.chk-col{width:4mm;text-align:center;}.num-col{width:9mm;text-align:right;color:#999;}.badge{color:white;padding:0 2px;border-radius:2px;font-size:6pt;font-weight:bold;}@media print{@page{size:A4 portrait;margin:5mm;}-webkit-print-color-adjust:exact;print-color-adjust:exact;}</style></head><body><h1>⭐ True Master Set — ${cards.length} card${cards.length===1?'':'s'}</h1><table><tbody>${rows}</tbody></table><script>window.print();<\/script></body></html>`;
+  const blob=new Blob([html],{type:'text/html'});
+  const url=URL.createObjectURL(blob);
+  const win=window.open(url,'_blank');
+  if(!win) alert('Pop-up blocked — please allow pop-ups.');
+  setTimeout(()=>URL.revokeObjectURL(url),60000);
+}
+
+// ── TMS: Reset selections only (keep cache) ───────────────────────────────────
+function resetTms(){
+  if(!tmsIncluded.size){ alert('No cards selected.'); return; }
+  if(!confirm('Reset all TMS selections? Card data cache is kept.')) return;
+  tmsIncluded.clear(); saveTms();
+  renderTMS(); updateTmsPrintSelBtn();
+}
+
+// ── TMS: Clear card data cache (keep selections) ──────────────────────────────
+function clearTmsCache(){
+  if(!confirm('Clear TMS card data cache? Selections are kept, but card images/data will need to reload.')) return;
+  tmsPokeCache.clear();
+  try{ localStorage.removeItem(TMSCACHESTORE); }catch(e){}
+  renderTMS();
+}
+
+// ── TMS: Update Print Selected button count ───────────────────────────────────
+function updateTmsPrintSelBtn(){
+  const btn=document.getElementById('btn-tms-print-sel'); if(!btn) return;
+  btn.textContent=`📄 Print Selected (${tmsIncluded.size})`;
+}
+
+// ── TMS: Language filter pills (sticky bar) ───────────────────────────────────
+function buildTmsPillsTms(){
+  const c=document.getElementById('tms-filter-pills'); if(!c) return;
+  c.innerHTML='';
+  BADGE_ORDER.forEach(badge=>{
+    const p=document.createElement('button');
+    p.className='filter-pill'+(tmsActiveLangs.has(badge)?' active':'');
+    p.textContent=badge; p.style.background=langColor(badge);
+    const l=LANGUAGES.find(x=>x.badge===badge)||PLACEHOLDER_LANGS.find(x=>x.badge===badge);
+    p.title=l?l.label:badge==='JP'?'Japanese':badge;
+    p.addEventListener('click',()=>{
+      if(tmsActiveLangs.has(badge)){tmsActiveLangs.delete(badge);p.classList.remove('active');}
+      else{tmsActiveLangs.add(badge);p.classList.add('active');}
+      saveTmsFilter();
+    });
+    c.appendChild(p);
+  });
+}
+
+function toggleAllTmsFilter(){
+  const allActive=BADGE_ORDER.every(b=>tmsActiveLangs.has(b));
+  if(allActive){
+    tmsActiveLangs.clear();
+    document.querySelectorAll('#tms-filter-pills .filter-pill').forEach(p=>p.classList.remove('active'));
+  }else{
+    tmsActiveLangs=new Set(BADGE_ORDER);
+    document.querySelectorAll('#tms-filter-pills .filter-pill').forEach(p=>p.classList.add('active'));
+  }
+  saveTmsFilter();
+}
+
+// ── TMS: Print Selected (card images, same layout as MS printSelected) ─────────
+function printTmsSelected(){
+  if(!tmsIncluded.size){ alert('No cards in your True Master Set yet.'); return; }
+  const metas=[];
+  tmsIncluded.forEach(id=>{
+    const poke=_tmsCardPokemon.get(id); if(!poke) return;
+    const pc=tmsPokeCache.get(poke); if(!pc) return;
+    const c=pc.find(x=>x.id===id); if(!c) return;
+    const nat=(NATIVE_NAMES[c.lang]||{})[poke]||null;
+    metas.push({name:{en:poke,native:nat},setName:c.setName,num:`#${c.localId}`,lang:c.lang,langColor:c.langColor,symSrc:c.symSrc,imgSrc:c.imgSrc,hiImgSrc:c.hiSrc,isCustom:true});
+  });
+  if(!metas.length){ alert('Card data not loaded yet — open each Pokémon\'s popup first.'); return; }
+  function safeImgUrl(url){ return url&&/\.(webp|png|jpg|jpeg)$/i.test(url)?url:url?`${url}/low.webp`:null; }
+  const cells=metas.map(m=>{
+    const imgUrl=safeImgUrl(m.hiImgSrc)||safeImgUrl(m.imgSrc);
+    const ph=printPlaceholderCard(m);
+    const img=imgUrl?`<img src="${imgUrl}" class="pi pi-ov" style="display:none" onload="this.style.display='block'" onerror="this.remove()">`: '';
+    return `<div class="pw">${ph}${img}</div>`;
+  }).join('');
+  const html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Print</title><style>'
+    +'*{box-sizing:border-box;margin:0;padding:0;}body{background:white;}'
+    +'.pg{display:grid;grid-template-columns:repeat(3,63.5mm);gap:3mm;padding:0;}'
+    +'.pw{width:63.5mm;height:88.9mm;border-radius:3.5mm;overflow:hidden;position:relative;}'
+    +'.pi{width:63.5mm;height:88.9mm;display:block;object-fit:cover;}'
+    +'.pi-ov{position:absolute;inset:0;width:100%!important;height:100%!important;}'
+    +PLACEHOLDER_PRINT_CSS
+    +'@media print{-webkit-print-color-adjust:exact;print-color-adjust:exact;@page{size:A4 portrait;margin:5mm;}}'
+    +'</style></head><body><div class="pg">'+cells+'</div>'
+    +'<script>const i=document.querySelectorAll("img");let p=i.length;function t(){if(--p<=0)window.print();}if(!p)window.print();else i.forEach(x=>{if(x.complete)t();else{x.onload=t;x.onerror=t;}})<\/script>'
+    +'</body></html>';
+  const blob=new Blob([html],{type:'text/html'});
+  const url=URL.createObjectURL(blob);
+  const win=window.open(url,'_blank');
+  if(!win) alert('Pop-up blocked — please allow pop-ups.');
+  setTimeout(()=>URL.revokeObjectURL(url),60000);
+}
+
+// ── TMS: Auto-populate default card on first load ─────────────────────────────
+// Finds the latest-set, highest-number EN card for pokemonList[0] and pre-includes it.
+async function tmsAutoPopulate(){
+  const poke=pokemonList[0]; if(!poke) return;
+  try{
+    const cards=await fetchTmsCardsForPoke(poke);
+    const enCards=cards.filter(c=>c.lang==='EN');
+    if(!enCards.length) return;
+    enCards.sort((a,b)=>{
+      const dd=new Date(b.releaseDate)-new Date(a.releaseDate); if(dd!==0) return dd;
+      return (parseInt(b.localId,10)||0)-(parseInt(a.localId,10)||0);
+    });
+    const best=enCards[0];
+    tmsIncluded.add(best.id); _tmsCardPokemon.set(best.id,poke);
+    saveTms();
+    renderTMS(); updateTmsPrintSelBtn();
+  }catch(e){ console.warn('TMS auto-populate failed:',e.message); }
+}
+
+
+renderPokeChips();
+updateSortBtn();
+// Apply saved mode before buildAll so visibility is set immediately
+(function initMode(){
+  const isTms=appMode==='tms';
+  const mc=document.getElementById('master-controls');
+  const tc=document.getElementById('tms-header-controls');
+  const msf=document.getElementById('ms-filter-bar');
+  const tmsf=document.getElementById('tms-filter-bar');
+  const pbar=document.querySelector('.poke-bar');
+  const dyn=document.getElementById('dyn');
+  const tapp=document.getElementById('tms-app');
+  if(mc)  mc.style.display  =isTms?'none':'flex';
+  if(tc)  tc.style.display  =isTms?'flex':'none';
+  if(pbar) pbar.style.display=isTms?'none':'';
+  if(msf) msf.style.display =isTms?'none':'';
+  if(tmsf){ tmsf.style.display=isTms?'flex':'none'; if(isTms) buildTmsPillsTms(); }
+  if(dyn) dyn.style.display =isTms?'none':'';
+  if(tapp) tapp.style.display=isTms?'block':'none';
+  document.getElementById('btn-mode-master')?.classList.toggle('active',!isTms);
+  document.getElementById('btn-mode-tms')?.classList.toggle('active',isTms);
+  if(isTms){
+    renderTMS();
+    updateTmsPrintSelBtn();
+    // Auto-populate the first Pokémon's latest EN card on very first use
+    if(tmsIncluded.size===0) tmsAutoPopulate();
+  }
+})();
+buildAll(false);
+</script>
+</body>
+</html>

@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pokémon TCG Master Set Checklist</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- STICKY TOP: header + pokémon selector stay fixed while scrolling -->
+<div class="sticky-top">
+<!-- HEADER -->
+<div class="header">
+  <div class="mode-toggle">
+    <button id="btn-mode-master" class="mode-btn active" onclick="setMode('master')">&#128230; Master Set</button>
+    <button id="btn-mode-tms" class="mode-btn" onclick="setMode('tms')">&#11088; True Master Set</button>
+  </div>
+  <h1 id="page-title">&#127807; Pokémon TCG Master Set Checklist</h1>
+  <span class="stats" id="stats">Loading&hellip;</span>
+  <!-- Master Set controls -->
+  <div id="master-controls" style="display:flex;flex-wrap:wrap;gap:5px;align-items:center;">
+    <button class="btn btn-print-sel" id="btn-print-sel" onclick="printSelected()">&#128424; Print Selected</button>
+    <button class="btn btn-secondary" onclick="printChecklist()">&#9776; Print Checklist</button>
+    <button class="btn btn-secondary" id="btn-select-all" onclick="selectAll()">&#9745; Select All</button>
+    <button class="btn btn-secondary" id="btn-refresh" onclick="doRefresh()">&#8634; Refresh</button>
+    <button class="btn btn-secondary" onclick="clearCache()" title="Clear cached card data and reload">&#128465; Clear Cache</button>
+    <button class="btn btn-secondary" onclick="exportData()" title="Download all your data as JSON (backup / device transfer)">&#128190; Export data</button>
+    <label class="btn btn-secondary" title="Restore data from a JSON backup file">&#128229; Import data<input type="file" accept="application/json,.json" style="display:none" onchange="importData(this)"></label>
+    <button class="btn btn-secondary" onclick="shareSession()" title="Copy a shareable link to your current view (mode, filters, Pokémon, sort, theme)">&#128279; Share view</button>
+    <button class="btn btn-secondary" onclick="restoreSession()" title="Apply a shared view link/code, or restore your last saved view">&#8617; Restore view</button>
+    <button class="btn btn-secondary" onclick="resetAll()">&#8634; Reset</button>
+    <button class="btn btn-secondary" id="btn-sort" onclick="toggleSort()" title="Toggle set sort order">&#8595; Newest first</button>
+  </div>
+  <!-- True Master Set controls -->
+  <div id="tms-header-controls">
+    <button class="btn btn-print-sel" id="btn-tms-print-sel" onclick="printTmsSelected()">&#128424; Print Selected (0)</button>
+    <button class="btn btn-secondary" onclick="printTmsChecklist()">&#9776; Print Checklist</button>
+    <button class="btn btn-secondary" onclick="resetTms()">&#8634; Reset</button>
+    <button class="btn btn-secondary" onclick="clearTmsCache()" title="Clear cached card data">&#128465; Clear Cache</button>
+    <button class="btn btn-secondary" onclick="exportData()" title="Download all your data as JSON (backup / device transfer)">&#128190; Export data</button>
+    <label class="btn btn-secondary" title="Restore data from a JSON backup file">&#128229; Import data<input type="file" accept="application/json,.json" style="display:none" onchange="importData(this)"></label>
+    <button class="btn btn-secondary" onclick="shareSession()" title="Copy a shareable link to your current view (mode, filters, Pokémon, sort, theme)">&#128279; Share view</button>
+    <button class="btn btn-secondary" onclick="restoreSession()" title="Apply a shared view link/code, or restore your last saved view">&#8617; Restore view</button>
+  <div class="palette-bar">
+    <span class="palette-label">Theme:</span>
+    <button class="palette-btn active" data-palette="" title="Forest (default)" style="background:linear-gradient(135deg,#1a3a2a,#c8a400)" onclick="setPalette(this,'')"></button>
+    <button class="palette-btn" data-palette="palette-ocean" title="Ocean" style="background:linear-gradient(135deg,#0d2137,#29b6f6)" onclick="setPalette(this,'palette-ocean')"></button>
+    <button class="palette-btn" data-palette="palette-dusk" title="Dusk" style="background:linear-gradient(135deg,#2a1a3a,#ce93d8)" onclick="setPalette(this,'palette-dusk')"></button>
+    <button class="palette-btn" data-palette="palette-fire" title="Fire" style="background:linear-gradient(135deg,#3a1a0d,#ff8f00)" onclick="setPalette(this,'palette-fire')"></button>
+    <button class="palette-btn" data-palette="palette-mono" title="Mono" style="background:linear-gradient(135deg,#1c1c1c,#9e9e9e)" onclick="setPalette(this,'palette-mono')"></button>
+  </div>
+</div>
+
+<!-- POKÉMON SELECTOR -->
+<div class="poke-bar">
+  <span class="poke-bar-label">Pokémon:</span>
+  <div class="poke-chips" id="poke-chips"></div>
+  <div class="poke-input-wrap">
+    <div class="poke-input-container">
+      <input class="poke-input" id="poke-input" placeholder="Add Pokémon…" autocomplete="off" oninput="onPokeInput(this.value)" onkeydown="onPokeKey(event)">
+      <div class="poke-suggestions" id="poke-suggestions"></div>
+    </div>
+    <button class="poke-add-btn" onclick="addPokeFromInput()">+ Add</button>
+  </div>
+</div><!-- /poke-bar -->
+
+<!-- LANGUAGE FILTER (Master Set) -->
+<div class="filter-bar" id="ms-filter-bar">
+  <span class="filter-label">Language:</span>
+  <div class="filter-pills" id="filter-pills"></div>
+  <button class="filter-clear" onclick="toggleAllFilter()">Show All</button>
+</div>
+<!-- LANGUAGE FILTER (True Master Set) -->
+<div class="filter-bar" id="tms-filter-bar" style="border-radius:0 0 12px 12px;box-shadow:0 4px 16px rgba(0,0,0,.18);">
+  <span class="filter-label">Language:</span>
+  <div class="filter-pills" id="tms-filter-pills"></div>
+  <button class="filter-clear" onclick="toggleAllTmsFilter()">Show All</button>
+</div>
+</div><!-- /sticky-top -->
+
+<main id="app">
+<div id="dyn"></div>
+<div id="tms-app"></div>
+</main>
+
+<!-- PREVIEW MODAL -->
+<div class="preview-overlay" id="preview-overlay" onclick="closePreview(event)">
+  <div class="preview-box" id="preview-box">
+    <button class="preview-close" onclick="closePreview()">×</button>
+    <div id="preview-content"></div>
+    <div class="preview-meta" id="preview-meta"></div>
+  </div>
+</div>
+
+<!-- TRUE MASTER SET POPUP -->
+<div class="tms-overlay" id="tms-overlay" onclick="closeTmsPopup(event)">
+  <div class="tms-popup" id="tms-popup">
+    <button class="tms-popup-close" onclick="closeTmsPopup()">×</button>
+    <div class="tms-popup-head">
+      <div class="tms-popup-title" id="tms-popup-title">Pokémon</div>
+      <div class="tms-popup-sub" id="tms-popup-sub"></div>
+    </div>
+    <div class="tms-popup-toolbar" id="tms-popup-toolbar"></div>
+    <div class="tms-popup-body" id="tms-popup-body"></div>
+  </div>
+</div>
+
+
+<!-- App boot. ES modules require http(s):// — use dev.sh / dev.bat (python http.server),
+     they do NOT load from a file:// path opened directly in the browser. -->
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,28 @@
+# Dependencies (none currently, but future-proof for tooling)
+node_modules/
+
+# OS files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Editor/IDE
+.vscode/
+.idea/
+*.swp
+
+# Logs
+*.log
+npm-debug.log*
+
+# Env/secrets
+.env
+.env.local
+
+# Claude Code tooling (local-only, not shared with the team)
+.claude
+
+# Dev/session scratch notes, not project documentation
+PROGRESS.md
