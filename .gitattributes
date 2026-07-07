@@ -1,2 +1,6 @@
 # Auto detect text files and perform LF normalization
 * text=auto
+
+# Not representative of the project's code — exclude from GitHub language stats
+reference/* linguist-vendored
+diagnostics/* linguist-vendored

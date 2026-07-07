@@ -17,7 +17,7 @@
 
 import { state, saveMode } from './state.js';
 import * as storage from './storage.js';
-import { PALETTE_KEY } from './config.js';
+import { PALETTE_KEY, POKESTORE } from './config.js';
 import {
   buildAll, renderPokeChips, updateSortBtn, updateStats,
   addPokeFromInput, clearCache, closePreview, doRefresh,
@@ -35,6 +35,7 @@ import {
   exportData, importData, shareSession, restoreSession,
   sessionFromUrl, applySession, saveSession, migrateCheckedOnBoot,
 } from './ui/io.js';
+import { showFirstRunModal } from './ui/onboarding.js';
 
 const PALETTES = ['palette-ocean', 'palette-dusk', 'palette-fire', 'palette-mono'];
 
@@ -106,21 +107,33 @@ installStorageQuotaHandler();   // route storage-quota failures to a visible ban
 const urlSession = sessionFromUrl();
 if (urlSession) applySession(urlSession);
 migrateCheckedOnBoot();   // one-time: upgrade any old pokemontcg.io checklist ids → TCGdex
-restorePalette();
-renderPokeChips();
-updateSortBtn();
-applyModeUI(state.appMode);
-// TMS init: render the catalog and, on very first use, seed one default card.
-if (state.appMode === 'tms') {
-  renderTMS();
-  updateTmsPrintSelBtn();
-  if (state.tmsIncluded.size === 0) tmsAutoPopulate();
+
+/**
+ * Second half of boot: palette, chrome, initial render. Runs immediately for a
+ * returning visitor (or one arriving via a shared #s= link — applySession
+ * already persisted its own Pokémon list above). For a first-time visitor with
+ * no saved Pokémon list, showFirstRunModal() runs this once a choice is made.
+ */
+function finishBoot() {
+  restorePalette();
+  renderPokeChips();
+  updateSortBtn();
+  applyModeUI(state.appMode);
+  // TMS init: render the catalog and, on very first use, seed one default card.
+  if (state.appMode === 'tms') {
+    renderTMS();
+    updateTmsPrintSelBtn();
+    if (state.tmsIncluded.size === 0) tmsAutoPopulate();
+  }
+  buildAll(false);   // fetch + render Master Set (runs even in TMS mode, as the old tool did)
+  saveSession();                                                   // persist the initial/derived view
+  document.addEventListener('tcg:settings-changed', saveSession);  // auto-save the session hash on any settings change
+  console.info('[boot] Phase 5 — sessions + import/export live | mode:', state.appMode,
+    '| pokémon:', state.pokemonList.join(', '));
 }
-buildAll(false);   // fetch + render Master Set (runs even in TMS mode, as the old tool did)
-saveSession();                                                   // persist the initial/derived view
-document.addEventListener('tcg:settings-changed', saveSession);  // auto-save the session hash on any settings change
-console.info('[boot] Phase 5 — sessions + import/export live | mode:', state.appMode,
-  '| pokémon:', state.pokemonList.join(', '));
+
+if (storage.get(POKESTORE) === null) showFirstRunModal(finishBoot);
+else finishBoot();
 
 // ── GLOBAL HANDLERS (wiring manifest for inline onclick= in index.html) ───────
 // Add to this list as each module lands. Anything the markup calls inline MUST

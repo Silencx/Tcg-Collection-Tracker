@@ -120,7 +120,7 @@ function selectAll(){
 // ── POKÉMON SELECTOR UI ───────────────────────────────────────────────────────
 function renderPokeChips(){
   const t=document.getElementById('page-title');
-  if(appMode==='tms'){
+  if(state.appMode==='tms'){
     if(t) t.textContent=`⭐ True Master Set Checklist`;
     return;
   }

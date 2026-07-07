@@ -1,0 +1,40 @@
+name: Refresh card data
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # Builds the DEFAULT_POKEMON demo snapshot. tools/build-data.mjs also accepts
+      # an optional comma-separated Pokémon list argument for building a different
+      # snapshot locally (e.g. `node tools/build-data.mjs "Pikachu,Eevee"`); this
+      # scheduled workflow always runs the no-arg (default) form.
+      - name: Build data
+        run: node tools/build-data.mjs
+
+      - name: Commit and push if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/cards.json data/sets.json data/jp.json
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "chore: refresh card data"
+            git push
+          fi

@@ -407,4 +407,26 @@ body{padding-top:8px;}main{max-width:1100px;margin:0 auto;padding:12px;}
 .tms-act-btn:hover{background:#f5f5f5;}
 .tms-act-btn.success{color:#2e7d32;border-color:#a5d6a7;}
 .tms-act-btn.danger{color:#c62828;border-color:#ef9a9a;}
+.tms-act-btn:disabled{opacity:.4;cursor:not-allowed;}
+
+/* ── FIRST-RUN MODAL ── */
+.first-run-overlay{display:none;position:fixed;inset:0;z-index:400;background:rgba(0,0,0,.72);backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:16px;}
+.first-run-overlay.open{display:flex;}
+.first-run-modal{background:white;border-radius:12px;width:min(94vw,560px);max-height:88vh;box-shadow:0 12px 60px rgba(0,0,0,.45);display:flex;flex-direction:column;overflow:hidden;}
+.first-run-head{background:linear-gradient(135deg,var(--c-accent1,#1b5e20),var(--c-accent2,#2e7d32));color:white;padding:16px 18px;flex-shrink:0;}
+.first-run-title{font-size:16px;font-weight:bold;}
+.first-run-sub{font-size:11px;opacity:.85;margin-top:4px;}
+.first-run-body{padding:12px 18px;overflow-y:auto;flex:1;}
+.first-run-search{width:100%;padding:6px 12px;border-radius:20px;border:1.5px solid #ccc;font-size:11px;outline:none;box-sizing:border-box;margin-bottom:10px;}
+.first-run-search:focus{border-color:var(--c-accent2,#2e7d32);}
+.first-run-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(95px,1fr));gap:7px;}
+.first-run-tile{background:#fafafa;border:2px solid #e0e0e0;border-radius:8px;padding:7px 5px;cursor:pointer;text-align:center;transition:border-color .12s,background .12s,transform .08s;user-select:none;}
+.first-run-tile:hover{border-color:var(--c-card-hover-border,#81c784);background:var(--c-card-hover,#f0f8f0);transform:translateY(-1px);}
+.first-run-tile.selected{border-color:var(--c-card-done-border,#43a047);background:var(--c-card-done-bg,#e8f5e9);}
+.first-run-tile-name{font-size:10px;font-weight:bold;color:#1a1a1a;line-height:1.3;word-break:break-word;}
+.first-run-tile-dex{font-size:8px;color:#aaa;}
+.first-run-empty{grid-column:1/-1;padding:24px;text-align:center;color:#999;font-size:11px;}
+.first-run-foot{padding:10px 18px 16px;border-top:1px solid #eee;flex-shrink:0;}
+.first-run-hint{font-size:9.5px;color:#888;line-height:1.5;margin:0 0 10px;}
+.first-run-actions{display:flex;justify-content:flex-end;gap:8px;}
 .tms-toolbar-sep{width:1px;background:#ddd;height:18px;margin:0 2px;flex-shrink:0;}

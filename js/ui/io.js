@@ -17,7 +17,8 @@ import {
 } from '../state.js';
 import * as storage from '../storage.js';
 import { SCHEMA_VERSION, CHKSTORE, CACHESTORE, TMSSTORE, TMSCACHESTORE, PALETTE_KEY, SESSIONSTORE } from '../config.js';
-import { ptcgioToTcgdexSetId, ptcgioToTcgdexLocalId } from '../api/images.js';
+import { looksPtcgio, migrateCardId, migrateIdToken } from '../api/id-migration.js';
+import { encodeSessionPayload, decodeSession } from './session-codec.js';
 
 const EXPORT_TOOL = 'pokemon-master-set-tool';
 
@@ -41,16 +42,8 @@ export function exportData() {
 }
 
 // ──────────────────── ID MIGRATION (MS checklist) ────────────────────
-// "sv5-163" → "sv05-163": split at the last '-', remap set id + local id.
-function migrateCardId(cardId) {
-  const i = cardId.lastIndexOf('-');
-  if (i < 0) return cardId;
-  const setId = cardId.slice(0, i), num = cardId.slice(i + 1);
-  const series = setId.replace(/\d.*$/, '');
-  return `${ptcgioToTcgdexSetId(setId)}-${ptcgioToTcgdexLocalId(num, series)}`;
-}
-// A pokemontcg.io card id has a set id containing a digit, then "-localId".
-function looksPtcgio(cardId) { return /^[a-z]+\d[\w]*-[A-Za-z0-9]+$/.test(cardId); }
+// looksPtcgio / migrateCardId / migrateIdToken now live in ../api/id-migration.js
+// (pure logic — importable without pulling in state.js/localStorage).
 
 // Returns { migrated:[unique ids], unmatched:[original ids that don't resolve] }.
 // `validIds` = ids present in the live MS index (state._meta keys).
@@ -78,14 +71,6 @@ function migrateChecklist(oldIds, validIds) {
 // any old ids deterministically BEFORE the first render. Runs once, guarded by a flag
 // (bump the flag if the id scheme ever changes again).
 const MIGRATED_FLAG = 'tcgMigrated_v1';
-
-/** Transform one "{BADGE}_{cardId}" id → TCGdex format; JP/placeholder/unknown unchanged. */
-function migrateIdToken(id) {
-  const u = id.indexOf('_');
-  if (u < 0) return id;
-  const badge = id.slice(0, u), cardId = id.slice(u + 1);
-  return looksPtcgio(cardId) ? `${badge}_${migrateCardId(cardId)}` : id;
-}
 
 export function migrateCheckedOnBoot() {
   if (storage.get(MIGRATED_FLAG)) return;
@@ -183,21 +168,15 @@ export function importData(input) {
 }
 
 // ──────────────────── SESSIONS (settings-only hash) ────────────────────
-function b64urlEncode(s) {
-  return btoa(unescape(encodeURIComponent(s))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
-function b64urlDecode(b) {
-  b = b.replace(/-/g, '+').replace(/_/g, '/');
-  while (b.length % 4) b += '=';
-  return decodeURIComponent(escape(atob(b)));
-}
+// b64urlEncode/b64urlDecode/encodeSessionPayload/decodeSession now live in
+// ./session-codec.js (pure logic — importable without pulling in state.js/DOM).
 function currentPalette() {
   const m = document.body.className.match(/palette-[\w-]+/);
   return m ? m[0] : '';
 }
 
 export function encodeSession() {
-  return b64urlEncode(JSON.stringify({
+  return encodeSessionPayload({
     v: SCHEMA_VERSION,
     mode: state.appMode,
     msf: [...state.activeLangs],
@@ -205,12 +184,10 @@ export function encodeSession() {
     pokes: state.pokemonList,
     sort: state.sortDesc ? 'd' : 'a',
     pal: currentPalette(),
-  }));
+  });
 }
 
-export function decodeSession(hash) {
-  try { return JSON.parse(b64urlDecode(hash)); } catch { return null; }
-}
+export { decodeSession };
 
 // Apply a decoded settings payload to state + persistence. Does NOT re-render —
 // callers either run during boot (before first render) or reload afterwards.

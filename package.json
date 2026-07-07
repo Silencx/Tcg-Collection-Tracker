@@ -7,7 +7,8 @@
   "scripts": {
     "dev": "python3 -m http.server 8000",
     "build-data": "node tools/build-data.mjs",
-    "check": "for f in js/config.js js/storage.js js/state.js js/api/images.js js/api/providers/legacy.js js/api/providers/tcgdex.js js/api/providers/snapshot.js js/api/router.js js/ui/banners.js js/ui/masterset.js js/ui/print.js js/ui/tms.js js/ui/io.js js/main.js; do node --check \"$f\" || exit 1; done && echo all-modules-ok"
+    "check": "node tools/check.mjs",
+    "test": "node --test"
   },
   "license": "MIT"
 }
