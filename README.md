@@ -9,7 +9,6 @@ The Seedot → Nuzleaf → Shiftry line is just the default demo list — type a
 Pokémon's name in and it builds your checklist for you.
 
 ![Screenshot](docs/screenshot.png)
-*(placeholder — drop a screenshot at `docs/screenshot.png`)*
 
 ---
 
