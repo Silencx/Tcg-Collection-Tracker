@@ -48,6 +48,41 @@ export function limitlessJpUrl(code, jpnum){
 // ── TCGdex asset CDN builders (fallback images + set symbols) ─────────────────
 // The Master-Set render still inlines these URLs verbatim from the old tool;
 // these helpers centralize the pattern for Phase 3's image-routing pass.
+
+/**
+ * The CDN path segment for a set's assets — its TCGdex SERIES, not a slice of its id.
+ *
+ * LOAD-BEARING, and the fix for a long-standing wrong-URL bug. The old rule was
+ * `setId.replace(/\d.*$/,'')`, which happens to work for sv05→sv and base1→base and is
+ * WRONG for a large minority of sets. Measured against the art URLs TCGdex actually
+ * serves: wrong for 48 of the 179 sets in data/sets.json that carry one, including
+ *
+ *     swshp → guessed "swshp", served under "swsh"   (SWSH Black Star Promos)
+ *     cel25 → guessed "cel",   served under "swsh"   (Celebrations)
+ *     A1    → guessed "A",     served under "tcgp"   (TCG Pocket)
+ *     dpp   → guessed "dpp",   served under "dp"
+ *     np    → guessed "np",    served under "pop"
+ *     tk-*  → guessed the whole id, served under "tk" (all 20 Trainer Kits)
+ *
+ * and yielding the EMPTY STRING for 2021swsh, which built
+ * `assets.tcgdex.net/en//2021swsh/…`. Verified live: /en/A/A1/001/low.webp is a 404,
+ * /en/tcgp/A1/001/low.webp is a 200.
+ *
+ * `setSeries` is data/sets.json's build-time map, derived from TCGdex's own /series
+ * endpoints. The guess survives only as a fallback for callers that have no map yet.
+ *
+ * @param {string} setId
+ * @param {Object<string,string>|null} [setSeries] sets.json's setSeries map
+ */
+export function tcgdexSerieSegment(setId, setSeries = null) {
+  const known = setSeries && setSeries[setId];
+  if (known) return known;
+  const guess = String(setId).replace(/\d.*$/, '');
+  // Never '' — that is what produced the double-slash URLs for the McDonald's sets and
+  // every other id that starts with a digit.
+  return guess || String(setId);
+}
+
 /** Set symbol (language-neutral). */
 export function tcgdexSymbolUrl(series, setId) {
   return `https://assets.tcgdex.net/univ/${series}/${setId}/symbol.webp`;

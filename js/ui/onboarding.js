@@ -1,26 +1,41 @@
 // =============================================================================
 // ui/onboarding.js — first-run Pokémon picker.
 //
-// Shown once, before the first render, when POKESTORE has never been saved (a
-// fresh browser — not a restored session/shared link, which already persists
-// its own Pokémon list via applySession's savePoke() call). Lets a first-time
-// visitor search POKEMON_CATALOG and pick their own tracked Pokémon instead of
-// silently loading the Seedot/Nuzleaf/Shiftry demo list. "Try the demo" keeps
-// DEFAULT_POKEMON. Either path saves via the normal savePoke() — identical
-// persistence to any other Pokémon-list edit.
+// A MASTER-SET question, so it is asked on the way INTO Master set and nowhere
+// else. It used to block boot: every first-time visitor was made to choose a
+// Pokémon line before they could see Home, a mode that does not use the list at
+// all. main.js now calls this from MODE_ENTER.master, once, when POKESTORE has
+// never been saved (a fresh browser — not a restored session/shared link, which
+// already persists its own Pokémon list via applySession's savePoke() call).
+//
+// Lets a first-time visitor search POKEMON_CATALOG and pick their own tracked
+// Pokémon instead of silently loading the Seedot/Nuzleaf/Shiftry demo list.
+// "Try the demo" keeps DEFAULT_POKEMON. Either path saves via the normal
+// savePoke() — identical persistence to any other Pokémon-list edit.
+//
+// `onCancel` is what makes asking here safe: the modal covers the page, so
+// arriving at it by clicking a mode button (rather than by loading the app) has
+// to have a way back out that does NOT commit a Pokémon list.
 // =============================================================================
 
 import { state, savePoke } from '../state.js';
 import { DEFAULT_POKEMON, POKEMON_CATALOG } from '../config.js';
 
-/** Show the modal; `onDone` runs once state.pokemonList is settled + saved. */
-export function showFirstRunModal(onDone) {
+/**
+ * Show the modal.
+ *
+ * @param {() => void} onDone    runs once state.pokemonList is settled + saved.
+ * @param {() => void} [onCancel] runs if the visitor backs out without choosing;
+ *   nothing is saved, so the next visit to Master set asks again.
+ */
+export function showFirstRunModal(onDone, onCancel) {
   const overlay = document.createElement('div');
   overlay.className = 'first-run-overlay open';
   overlay.innerHTML = `
     <div class="first-run-modal">
       <div class="first-run-head">
-        <div class="first-run-title">&#127807; Track your own master set</div>
+        <button type="button" class="first-run-close" aria-label="Close">&times;</button>
+        <div class="first-run-title">Track your own master set</div>
         <div class="first-run-sub">Pick any Pokémon to build a checklist across every set and language.</div>
       </div>
       <div class="first-run-body">
@@ -74,7 +89,25 @@ export function showFirstRunModal(onDone) {
     state.pokemonList = pokemonList;
     savePoke();
     overlay.remove();
+    document.removeEventListener('keydown', onKey);
     onDone();
+  }
+
+  function cancel() {
+    overlay.remove();
+    document.removeEventListener('keydown', onKey);
+    onCancel?.();
+  }
+  // Escape closes, matching every other overlay in the app (the preview modal, the TMS
+  // popup, the ⋯ menus). Only wired when there is somewhere to go back TO.
+  function onKey(e) { if (e.key === 'Escape' && onCancel) cancel(); }
+
+  const closeBtn = overlay.querySelector('.first-run-close');
+  if (onCancel) {
+    closeBtn.addEventListener('click', cancel);
+    document.addEventListener('keydown', onKey);
+  } else {
+    closeBtn.remove();
   }
 
   overlay.querySelector('.first-run-demo').addEventListener('click', () => finish([...DEFAULT_POKEMON]));

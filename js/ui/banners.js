@@ -18,20 +18,17 @@ export function installStorageQuotaHandler() {
     if (!el) {
       el = document.createElement('div');
       el.id = 'storage-quota-banner';
-      el.style.cssText =
-        'position:fixed;top:0;left:0;right:0;z-index:99999;background:#b71c1c;' +
-        'color:#fff;padding:8px 12px;font:13px/1.4 Arial,sans-serif;text-align:center;' +
-        'display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap;';
+      // Presentation lives in css/style.css under #storage-quota-banner \u2014 it used to
+      // be inline here AND in storage.js's fallback, two copies of one look.
       const msg = document.createElement('span');
       msg.id = 'storage-quota-msg';
       const exportBtn = document.createElement('button');
       exportBtn.textContent = 'Export data';
-      exportBtn.style.cssText = 'cursor:pointer;border:1px solid #fff;background:transparent;color:#fff;border-radius:4px;padding:2px 8px;';
       exportBtn.addEventListener('click', () => { if (typeof window.exportData === 'function') window.exportData(); });
       const close = document.createElement('button');
       close.textContent = '\u00d7';
       close.title = 'Dismiss';
-      close.style.cssText = 'cursor:pointer;border:none;background:transparent;color:#fff;font-size:16px;line-height:1;';
+      close.className = 'quota-close';
       close.addEventListener('click', () => el.remove());
       el.append(msg, exportBtn, close);
       document.body.appendChild(el);

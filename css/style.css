@@ -7,8 +7,7 @@
    ============================================================================= */
 
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:Arial,Helvetica,sans-serif;background:var(--c-body-bg,#ecf5ec);color:#1a1a1a;font-size:12px;  --c-set-head-jp:#bf360c;
-}
+body{font-family:Arial,Helvetica,sans-serif;background:var(--c-body-bg,#ecf5ec);color:var(--c-text,#1a1a1a);font-size:var(--fs-md);}
 
 /* ── COLOUR THEME — CSS custom properties ── */
 :root{
@@ -18,19 +17,74 @@ body{font-family:Arial,Helvetica,sans-serif;background:var(--c-body-bg,#ecf5ec);
   --ph-inner:rgba(200,164,0,.35);
   /* page-wide accent colours */
   --c-accent1:#1b5e20;--c-accent2:#2e7d32;--c-accent3:#388e3c;
-  --c-poke-bar:#1b5e20;--c-poke-bar-border:#145214;
+  /* ── ACCENT AS INK ──
+     --c-accent1/2/3 paint the header, poke bar and sidebar, which is why the Dark
+     palette pins all three to near-black (see the CONSTRAINT note on body.palette-dark).
+     That makes them unusable anywhere they are the FOREGROUND on a light surface: the
+     dashboard's big stat numbers came out at contrast 1.01 against their own panel —
+     literally invisible. These two are the accent's ink form; every palette but Dark
+     inherits the same colours, and Dark overrides them alone.
+     Same trick, and same reason, as body.palette-dark .chk further down.
+
+     DECLARED ON body, NOT HERE — see the rule immediately after this block. */
   --c-body-bg:#ecf5ec;
   --c-era:#2e7d32;--c-era-bg:#e8f5e9;
   --c-set-head:#2e7d32;
+  /* Forest's JP set heads are deliberately the Fire accent — the JP head colour is a
+     language marker, not a palette echo. Declared here with its siblings rather than
+     on body{} (where it used to sit alone): each body.palette-* below still overrides
+     it for its own theme, since a declaration on body beats an inherited :root one. */
+  --c-set-head-jp:#bf360c;
   --c-card-done-bg:#e8f5e9;--c-card-done-border:#43a047;
   --c-card-hover:#f0f8f0;--c-card-hover-border:#81c784;
   --c-divider:#e8f5e9;--c-divider-text:#2e7d32;--c-divider-alt:#81c784;
+
+  /* ── NEUTRALS ──────────────────────────────────────────────────────────────
+     Everything above is chromatic and per-palette. These are the greys, and they
+     exist so a dark palette is possible at all: ~25 surfaces (.set-block, .card,
+     the filter bars, every modal, the TMS chrome) used to hardcode them, which is
+     why prefers-color-scheme was absent by design rather than by oversight.
+
+     Declared here with the exact values they replace, so introducing them changes
+     nothing on screen. Only three collapses were made, all sub-perceptual and all
+     deliberate: #666 → --c-text-dim (#555), and #888/#aaa → --c-text-muted (#999).
+     A palette overrides these eleven and every neutral surface follows. */
+  --c-text:#1a1a1a;--c-text-dim:#555;--c-text-muted:#999;
+  --c-surface:#fff;--c-surface-2:#fafafa;--c-surface-3:#f5f5f5;
+  --c-border:#e0e0e0;--c-border-soft:#eee;--c-border-strong:#ccc;
+  /* Hairline under the sticky bars. Tinted toward the theme rather than neutral,
+     which is why it is its own token and not --c-border-soft. */
+  --c-border-tint:#d7e8d7;
+  --c-shadow:rgba(0,0,0,.12);
+
+  /* Banner triples. Pale pastels are unreadable on a dark surface, so each variant
+     needs a real per-theme value rather than a shared neutral. Only the dark palette
+     overrides them; the four light palettes inherit these and are unaffected. */
+  --c-bn-blue-bg:#e8f4fd;--c-bn-blue-bd:#90caf9;--c-bn-blue-fg:#0d47a1;
+  --c-bn-amber-bg:#fff8e1;--c-bn-amber-bd:#ffe082;--c-bn-amber-fg:#e65100;
+  --c-bn-load-bg:#f3e5f5;--c-bn-load-bd:#ce93d8;--c-bn-load-fg:#4a148c;
+  --c-bn-green-bg:#e8f5e9;--c-bn-green-bd:#a5d6a7;--c-bn-green-fg:#1b5e20;
+  --c-bn-error-bg:#fce4ec;--c-bn-error-bd:#f48fb1;--c-bn-error-fg:#880e4f;
+
+  color-scheme:light;
+}
+/* ── ACCENT AS INK, PART 2: WHY THIS IS ON body ──
+   A custom property whose value is `var(--other)` resolves --other IN THE CONTEXT OF THE
+   ELEMENT IT IS DECLARED ON. Declared on :root, --c-accent-ink would resolve --c-accent1
+   against :root — where it is always Forest green — and then INHERIT that green
+   everywhere, because the palette classes live on body, one level down. Ocean, Dusk,
+   Fire and Mono all silently rendered Forest-green stat numbers; measured, all four
+   reported the identical contrast ratio, which is what gave it away.
+   Declared here, the substitution happens on body, after body.palette-* has had its say.
+   body.palette-dark's own override still wins on specificity. */
+body{
+  --c-accent-ink:var(--c-accent1);
+  --c-accent-ink-2:var(--c-accent3);
 }
 /* Ocean */
 body.palette-ocean{
   --ph-bg1:#0d2137;--ph-bg2:#1a3d5c;--ph-border:#29b6f6;--ph-name:#81d4fa;--ph-native:#b3e5fc;--ph-set:#4fc3f7;--ph-num:#29b6f6;--ph-inner:rgba(41,182,246,.3);
   --c-accent1:#01579b;--c-accent2:#0277bd;--c-accent3:#0288d1;
-  --c-poke-bar:#01579b;--c-poke-bar-border:#013a6b;
   --c-body-bg:#e1f0fa;
   --c-era:#0277bd;--c-era-bg:#e1f5fe;
   --c-set-head:#0277bd;
@@ -43,7 +97,6 @@ body.palette-ocean{
 body.palette-dusk{
   --ph-bg1:#2a1a3a;--ph-bg2:#3d2d5a;--ph-border:#ce93d8;--ph-name:#e1bee7;--ph-native:#f3e5f5;--ph-set:#ce93d8;--ph-num:#ba68c8;--ph-inner:rgba(206,147,216,.3);
   --c-accent1:#4a148c;--c-accent2:#6a1b9a;--c-accent3:#7b1fa2;
-  --c-poke-bar:#4a148c;--c-poke-bar-border:#2d0059;
   --c-body-bg:#f3e5f5;
   --c-era:#6a1b9a;--c-era-bg:#f3e5f5;
   --c-set-head:#6a1b9a;
@@ -56,7 +109,6 @@ body.palette-dusk{
 body.palette-fire{
   --ph-bg1:#3a1a0d;--ph-bg2:#5a2d1a;--ph-border:#ff8f00;--ph-name:#ffcc80;--ph-native:#ffe0b2;--ph-set:#ffb74d;--ph-num:#ffa726;--ph-inner:rgba(255,143,0,.3);
   --c-accent1:#bf360c;--c-accent2:#d84315;--c-accent3:#e64a19;
-  --c-poke-bar:#bf360c;--c-poke-bar-border:#870000;
   --c-body-bg:#fbe9e7;
   --c-era:#d84315;--c-era-bg:#fbe9e7;
   --c-set-head:#d84315;
@@ -69,7 +121,6 @@ body.palette-fire{
 body.palette-mono{
   --ph-bg1:#1c1c1c;--ph-bg2:#2e2e2e;--ph-border:#9e9e9e;--ph-name:#f5f5f5;--ph-native:#e0e0e0;--ph-set:#bdbdbd;--ph-num:#9e9e9e;--ph-inner:rgba(158,158,158,.3);
   --c-accent1:#424242;--c-accent2:#616161;--c-accent3:#757575;
-  --c-poke-bar:#424242;--c-poke-bar-border:#212121;
   --c-body-bg:#f5f5f5;
   --c-era:#616161;--c-era-bg:#eeeeee;
   --c-set-head:#616161;
@@ -78,17 +129,60 @@ body.palette-mono{
   --c-divider:#eeeeee;--c-divider-text:#616161;--c-divider-alt:#9e9e9e;
   --c-set-head-jp:#424242;
 }
+/* Dark
+   The one palette that inverts the neutrals rather than just re-tinting them, which
+   is why the eleven neutral tokens in :root had to exist first.
+
+   CONSTRAINT: --c-accent1/2/3 must stay DARK. The header, sidebar, both
+   modal heads and the ⋯ More panel all paint white or white-alpha text straight onto
+   them, so a "dark theme" that lightened the accents would break every one of those
+   at once. Dark here means the neutrals invert and the accents stay near-black. */
+body.palette-dark{
+  color-scheme:dark;
+  --ph-bg1:#141922;--ph-bg2:#232c38;--ph-border:#c8a400;--ph-name:#ffd54f;--ph-native:#ffe082;--ph-set:#9fb4c9;--ph-num:#7e94aa;--ph-inner:rgba(200,164,0,.3);
+  --c-accent1:#161a20;--c-accent2:#1f262f;--c-accent3:#2b3542;
+  /* The ONE palette that has to break the accent ↔ ink link, because the constraint
+     above forces its accents to near-black. Green + gold rather than a lightened
+     near-black: this is ink on a dark surface, so it wants to read like the done-state
+     colour the checkboxes already borrow. */
+  --c-accent-ink:#5fb37d;--c-accent-ink-2:#c8a400;
+  --c-body-bg:#0f1216;
+  --c-era:#9aa4b0;--c-era-bg:#1d232b;
+  --c-set-head:#37506b;
+  --c-set-head-jp:#7a3520;
+  --c-card-done-bg:#14301f;--c-card-done-border:#3f8b57;
+  --c-card-hover:#222a33;--c-card-hover-border:#3b4756;
+  --c-divider:#2c343e;--c-divider-text:#c3cad2;--c-divider-alt:#7f8b98;
+  --c-text:#e6e8eb;--c-text-dim:#9aa4b0;--c-text-muted:#7a8592;
+  --c-surface:#171b21;--c-surface-2:#1d232b;--c-surface-3:#252d37;
+  --c-border:#2c343e;--c-border-soft:#232a33;--c-border-strong:#3a4552;
+  --c-border-tint:#2c343e;
+  --c-shadow:rgba(0,0,0,.55);
+  --c-bn-blue-bg:#12242f;--c-bn-blue-bd:#1d4a63;--c-bn-blue-fg:#9ed3f0;
+  --c-bn-amber-bg:#2b2312;--c-bn-amber-bd:#5c4a1d;--c-bn-amber-fg:#f0cf8a;
+  --c-bn-load-bg:#241a2e;--c-bn-load-bd:#4a3560;--c-bn-load-fg:#d7b3ea;
+  --c-bn-green-bg:#13291b;--c-bn-green-bd:#2c5c3a;--c-bn-green-fg:#a3dbb2;
+  --c-bn-error-bg:#2e1620;--c-bn-error-bd:#632a3d;--c-bn-error-fg:#f2a5bd;
+  /* The neutral surfaces are dark here, so the default dark-on-light thumb would be
+     invisible on them. The sidebar keeps its own lighter pair regardless. */
+  --scroll-thumb:rgba(255,255,255,.22);--scroll-thumb-hover:rgba(255,255,255,.36);
+}
+/* color-scheme has to reach the ROOT element to flip the page canvas and the native
+   scrollbar; the palette class only ever lands on <body>. */
+:root:has(body.palette-dark){color-scheme:dark;}
+/* (The .chk accent-color override that lived here went with the per-card checkbox. Its
+   reasoning survives in --c-accent-ink above, which exists for the same reason: Dark's
+   accents are near-black by the constraint above and unusable as foreground.) */
+
 /* Apply page-wide variables */
 body{background:var(--c-body-bg);}
 .header{background:linear-gradient(135deg,var(--c-accent1) 0%,var(--c-accent2) 60%,var(--c-accent3) 100%);}
-.poke-bar{background:var(--c-poke-bar);border-bottom-color:var(--c-poke-bar-border);}
 .era-label{color:var(--c-era);}
 .set-head.c-green{background:var(--c-set-head);}
 .card:hover{background:var(--c-card-hover);border-color:var(--c-card-hover-border);}
 .card.done{background:var(--c-card-done-bg);border-color:var(--c-card-done-border);}
 .poke-divider{color:var(--c-divider-text);border-top-color:var(--c-divider);}
 .poke-divider-names-alt{color:var(--c-divider-alt);}
-.poke-sug-item:hover{background:var(--c-era-bg);}
 /* placeholder card colours */
 .custom-placeholder{background:linear-gradient(160deg,var(--ph-bg1) 0%,var(--ph-bg2) 50%,var(--ph-bg1) 100%)!important;border-color:var(--ph-border)!important;}
 .custom-placeholder::before{border-color:var(--ph-inner)!important;}
@@ -96,126 +190,986 @@ body{background:var(--c-body-bg);}
 .cp-native{color:var(--ph-native)!important;}
 .cp-set{color:var(--ph-set)!important;}
 .cp-num{color:var(--ph-num)!important;}
-/* Palette toolbar in header */
-.palette-bar{display:flex;align-items:center;gap:4px;}
-.palette-label{font-size:9px;color:rgba(255,255,255,.7);white-space:nowrap;}
-.palette-btn{width:16px;height:16px;border-radius:50%;border:2px solid rgba(255,255,255,.3);cursor:pointer;flex-shrink:0;transition:transform .1s,border-color .1s;}
-.palette-btn:hover{transform:scale(1.25);}
-.palette-btn.active{border-color:white;box-shadow:0 0 0 1px rgba(255,255,255,.5);}
-@media print{.palette-bar{display:none!important;}}
-
 /* ── HEADER ── */
-.header{background:linear-gradient(135deg,var(--c-accent1) 0%,var(--c-accent2) 60%,var(--c-accent3) 100%);color:white;padding:8px 14px;display:flex;align-items:center;gap:7px;flex-wrap:wrap;box-shadow:0 4px 16px rgba(0,0,0,.35);border-radius:12px 12px 0 0;}
-.header h1{font-size:12px;flex:1;min-width:120px;}
-.stats{font-size:11px;background:rgba(0,0,0,.25);padding:3px 9px;border-radius:20px;white-space:nowrap;}
-.btn{padding:4px 10px;border:1.5px solid rgba(255,255,255,.7);border-radius:5px;background:transparent;color:white;cursor:pointer;font-size:10px;font-weight:bold;white-space:nowrap;}
+/* min-height reserves the control row in EVERY mode. Home and the set picker have no
+   control row (or hide it), and without this the header collapsed to one row there —
+   a 32px jump every time you switched into or out of them. See .mode-bar below for the
+   other half of keeping .sticky-top a constant height. */
+/* align-content:FLEX-START, not center. min-height reserves 73px for two rows, but on
+   Home and the single-set picker there IS no control row — .header-row2 collapses to 0 —
+   and `center` then centred the one remaining line inside the reserved box. So the mode
+   tabs sat 13px lower on those two modes than on Master set and True master set, and the
+   whole identity row visibly dropped every time you switched into them. Pinning the
+   first line to the top means the reserved space is always BELOW the tabs, where it
+   belongs, and the tabs never move. */
+.header{background:linear-gradient(135deg,var(--c-accent1) 0%,var(--c-accent2) 60%,var(--c-accent3) 100%);color:white;padding:8px 14px;display:flex;align-items:center;gap:7px;flex-wrap:wrap;box-shadow:0 4px 16px rgba(0,0,0,.35);border-radius:12px 12px 0 0;min-height:73px;align-content:flex-start;}
+.header h1{font-size:var(--fs-md);flex:1;min-width:120px;}
+.stats{font-size:var(--fs-md);background:rgba(0,0,0,.25);padding:3px 9px;border-radius:20px;white-space:nowrap;}
+.btn{padding:4px 10px;border:1.5px solid rgba(255,255,255,.7);border-radius:5px;background:transparent;color:white;cursor:pointer;font-size:var(--fs-base);font-weight:bold;white-space:nowrap;}
 .btn:hover{background:rgba(255,255,255,.18);}
 .btn:disabled{opacity:.4;cursor:not-allowed;}
 .btn-secondary{border-color:rgba(255,255,255,.4);color:rgba(255,255,255,.85);font-weight:normal;}
 .btn-print-sel{background:rgba(255,255,255,.15);}
+/* ── "⋯ More" MENU — <details>, so it needs no JS at all and every button keeps
+   its original inline onclick attribute. ── */
+.more-menu{position:relative;display:inline-block;}
+.more-menu>summary{list-style:none;display:inline-block;}
+.more-menu>summary::-webkit-details-marker{display:none;}
+.more-menu>summary::marker{content:'';}
+.more-panel{
+  position:absolute;top:calc(100% + 4px);right:0;z-index:100;
+  display:flex;flex-direction:column;align-items:stretch;gap:4px;
+  min-width:150px;padding:7px;border-radius:6px;
+  background:var(--c-accent1,#1a3a2a);border:1px solid rgba(255,255,255,.25);
+  box-shadow:0 6px 18px rgba(0,0,0,.35);
+}
+.more-panel .btn{text-align:left;}
+
+/* ── SETTINGS PANEL ──
+   One panel at header level replaces the two ⋯ More menus. The theme picker used to be
+   duplicated once per mode row (because applyModeUI hides the inactive row) and its six
+   swatches wrapped inside a 150px panel; a named grid in a wider panel fixes both. */
+.settings-panel{min-width:min(290px,86vw);gap:10px;}
+.settings-section{display:flex;flex-direction:column;gap:5px;}
+.settings-section + .settings-section{padding-top:9px;border-top:1px solid rgba(255,255,255,.18);}
+.settings-label{font-size:var(--fs-sm);font-weight:bold;text-transform:uppercase;letter-spacing:.6px;color:rgba(255,255,255,.6);}
+.theme-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;}
+/* Named, not just coloured: "Dusk" and "Mono" were indistinguishable as bare swatches. */
+.theme-opt{
+  display:flex;align-items:center;gap:5px;padding:5px 6px;border-radius:6px;
+  border:1px solid rgba(255,255,255,.28);background:rgba(255,255,255,.08);color:#fff;
+  font-size:var(--fs-sm);cursor:pointer;text-align:left;white-space:nowrap;
+}
+.theme-opt:hover{background:rgba(255,255,255,.2);}
+.theme-opt.active{border-color:#fff;background:rgba(255,255,255,.26);font-weight:bold;}
+.theme-dot{width:13px;height:13px;border-radius:3px;flex-shrink:0;}
+.settings-actions{display:flex;flex-wrap:wrap;gap:5px;}
+.settings-actions .btn{text-align:left;}
+.btn-danger{border-color:rgba(255,150,150,.65);color:#ffcdd2;}
+.btn-danger:hover{background:rgba(255,80,80,.25);}
+
 @media print{.header{display:none!important;}}
 
-/* ── POKÉMON SELECTOR BAR ── */
-.poke-bar{background:var(--c-poke-bar,#1b5e20);border-top:1px solid rgba(255,255,255,.1);padding:6px 14px;display:flex;align-items:center;gap:7px;flex-wrap:wrap;}
-.filter-bar{background:#fff;border-top:1px solid #d7e8d7;padding:6px 14px;display:flex;align-items:center;gap:7px;flex-wrap:wrap;border-radius:0 0 12px 12px;box-shadow:0 4px 16px rgba(0,0,0,.18);}.sticky-top{position:sticky;top:8px;z-index:20;max-width:1100px;margin:0 auto;padding:0 12px;}
-.poke-bar-label{font-size:10px;font-weight:bold;color:rgba(255,255,255,.8);white-space:nowrap;}
-.poke-chips{display:flex;flex-wrap:wrap;gap:4px;flex:1;}
-.poke-chip{display:inline-flex;align-items:center;gap:4px;background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.4);color:white;border-radius:20px;padding:2px 8px;font-size:10px;font-weight:bold;}
-.poke-chip-remove{background:none;border:none;color:rgba(255,255,255,.7);cursor:pointer;font-size:13px;line-height:1;padding:0 0 0 2px;}
-.poke-chip-remove:hover{color:white;}
-.poke-input-wrap{display:flex;gap:5px;}
-.poke-input{padding:3px 8px;border-radius:4px;border:1px solid rgba(255,255,255,.4);background:rgba(255,255,255,.12);color:white;font-size:10px;width:130px;outline:none;}
-.poke-input::placeholder{color:rgba(255,255,255,.5);}
-.poke-input:focus{border-color:rgba(255,255,255,.8);background:rgba(255,255,255,.18);}
-.poke-add-btn{padding:3px 9px;border-radius:4px;border:1px solid rgba(255,255,255,.5);background:rgba(255,255,255,.15);color:white;font-size:10px;cursor:pointer;white-space:nowrap;}
-.poke-add-btn:hover{background:rgba(255,255,255,.25);}
-.poke-suggestions{position:absolute;top:100%;left:0;background:white;border:1px solid #ccc;border-radius:4px;max-height:160px;overflow-y:auto;z-index:100;min-width:180px;box-shadow:0 4px 12px rgba(0,0,0,.15);display:none;}
-.poke-suggestions.open{display:block;}
-.poke-sug-item{padding:5px 10px;font-size:10px;cursor:pointer;color:#1a1a1a;}
-.poke-sug-item:hover{background:#e8f5e9;}
-.poke-input-container{position:relative;}
-@media print{.poke-bar{display:none!important;}}
+/* ── NON-WRAPPING CHROME ──
+   The sticky header used to wrap into SEVEN rows on a 390px phone and the language
+   pills into two more: 257px, 30% of the screen, permanently occupied before a single
+   card was visible. And .sticky-top's height feeds --sticky-h, which drives
+   scroll-margin-top, so the waste compounded into jumps that landed short.
+
+   Every horizontal run of chips, pills and buttons now scrolls sideways instead of
+   wrapping. overflow-x:auto means the scrollbar only appears when it is actually
+   needed, so nothing changes on a desktop where the row already fits. */
+.hscroll{
+  display:flex;flex-wrap:nowrap;align-items:center;
+  overflow-x:auto;overscroll-behavior-x:contain;
+  min-width:0;flex:1;
+  scrollbar-width:thin;scrollbar-color:var(--scroll-thumb) transparent;
+}
+.hscroll::-webkit-scrollbar{height:6px;}
+.hscroll::-webkit-scrollbar-track{background:transparent;}
+.hscroll::-webkit-scrollbar-thumb{background:var(--scroll-thumb);border-radius:3px;}
+.hscroll>*{flex-shrink:0;}
+
+/* ── "THERE IS MORE THIS WAY" ──
+   overflow-x:auto reserves NO gutter under the overlay scrollbars Windows 11 and macOS
+   both default to, so the rows above scrolled but never looked like it: at a 500px
+   viewport the toolbar swallowed "Print checklist" and the language row five of its
+   twelve pills, and the only cue was that things stopped. js/ui/hscroll.js measures each
+   row and adds these classes for whichever edge still has content.
+
+   mask-image, not a gradient overlay: these three rows sit on three different
+   backgrounds (the header's 135deg gradient, the poke bar's flat green, the filter bar's
+   white surface) across six palettes, so a colour-matched overlay would be six times the
+   work and wrong the moment a palette changes. A mask is background-agnostic.
+
+   Both the standard property and -webkit- are declared, as elsewhere in this file. */
+:root{--hs-fade:26px;}
+.hs-fade-end{
+  -webkit-mask-image:linear-gradient(to right,#000 calc(100% - var(--hs-fade)),transparent);
+          mask-image:linear-gradient(to right,#000 calc(100% - var(--hs-fade)),transparent);
+}
+.hs-fade-start{
+  -webkit-mask-image:linear-gradient(to left,#000 calc(100% - var(--hs-fade)),transparent);
+          mask-image:linear-gradient(to left,#000 calc(100% - var(--hs-fade)),transparent);
+}
+/* Scrolled to neither end — must come last to outrank the two single-edge rules. */
+.hs-fade-start.hs-fade-end{
+  -webkit-mask-image:linear-gradient(to right,transparent,#000 var(--hs-fade),#000 calc(100% - var(--hs-fade)),transparent);
+          mask-image:linear-gradient(to right,transparent,#000 var(--hs-fade),#000 calc(100% - var(--hs-fade)),transparent);
+}
+/* Printing lays everything out at full width, and a mask left over from the last
+   on-screen measurement would fade content that is no longer clipped. */
+@media print{
+  .hs-fade-start,.hs-fade-end{-webkit-mask-image:none!important;mask-image:none!important;}
+}
+/* Action buttons take a row of their own so the identity row above them stays intact.
+   flex:0 0 100% (not just flex-basis) — applyModeUI sets display:flex inline on these,
+   and without a 0 flex-grow/shrink the row expanded to its content width and pushed the
+   whole page sideways. */
+.header-row2{flex:0 0 100%;display:flex;align-items:center;gap:5px;min-width:0;}
+/* flex:1 1 auto, not flex:0 0 100%: the control rows share row 2 with the ☰ Sets toggle
+   now, so a row that claimed the full width pushed Sets onto a line of its own. */
+.control-row{flex:1 1 auto;min-width:0;gap:5px;}
+@media print{.control-row{display:none!important;}}
+
+/* ── CONTEXT BARS ── */
+.filter-bar{background:var(--c-surface,#fff);border-top:1px solid var(--c-border-tint,#d7e8d7);padding:6px 14px;display:flex;align-items:center;gap:7px;flex-wrap:wrap;border-radius:0 0 12px 12px;box-shadow:0 4px 16px rgba(0,0,0,.18);}
+/* ── ONE HEIGHT PER BAR ──
+   A fixed height, not min-height: the point is that a bar cannot grow or shrink with its
+   own contents, so nothing under it can move while you are in a mode. Everything inside
+   scrolls sideways rather than wrapping.
+
+   overflow-x:clip, NOT overflow:hidden — the Pokémon suggestions dropdown is
+   absolutely positioned inside this bar and hangs ~60px below it. `hidden` clipped it
+   to the bar's 34px, so typing a Pokémon showed a sliver of the first suggestion.
+   `clip` on one axis leaves the other genuinely visible, which `hidden` does not
+   (hidden on one axis coerces the other to auto). */
+.mode-bar{height:34px;flex-wrap:nowrap;overflow-x:clip;overflow-y:visible;border-radius:0 0 12px 12px;box-shadow:0 4px 16px rgba(0,0,0,.18);}
+/* STACKED BARS: only the LAST VISIBLE bar closes the sticky card, so #poke-bar drops the
+   rounded bottom and the drop shadow — #ms-filter-bar is always shown directly under it.
+   Keyed to the id rather than to a `+ .mode-bar` sibling selector because all five bars
+   are siblings in .sticky-top and only applyModeUI knows which are on screen; CSS would
+   see #ms-filter-bar followed by #tms-filter-bar and square off the wrong one. */
+#poke-bar{border-radius:0;box-shadow:none;}
+/* Home's bar is a summary line, not controls. */
+.dash-bar-text{font-size:var(--fs-base);color:var(--c-text-dim,#555);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.dash-bar-text strong{color:var(--c-accent-ink);font-variant-numeric:tabular-nums;}.sticky-top{position:sticky;top:8px;z-index:20;width:min(100%,var(--page-w));margin:0 auto;padding:0 12px;
+  /* ── CHROME TYPE RAMP ──
+     The top bar is chrome, not content, and chrome that keeps pace with a 4K monitor
+     crowds out what it frames — at 1920px the header had reached 15.2px body / 16.8px
+     title. These ramps top out around a 1000px viewport instead, so a laptop and a 4K
+     display get the same bar while phones keep their slightly larger touch sizes.
+
+     Redefining the TOKENS here rather than editing rules is the whole trick: every
+     descendant — header, mode toggle, poke bar, both filter bars, the ⋯ More panel —
+     inherits the tighter scale without a single selector changing. The card grid and
+     the modals live outside .sticky-top and keep the full scale. */
+  --fs-3xs :clamp(.344rem, .325rem + .09vw, .40rem);   /*  5.5 → 6.4px */
+  --fs-2xs :clamp(.438rem, .415rem + .11vw, .50rem);   /*  7   → 8px   */
+  --fs-xs  :clamp(.500rem, .470rem + .14vw, .5625rem); /*  8   → 9px   */
+  --fs-sm  :clamp(.563rem, .515rem + .22vw, .66rem);   /*  9   → 10.5px */
+  --fs-base:clamp(.625rem, .590rem + .16vw, .6875rem); /* 10   → 11px  */
+  --fs-md  :clamp(.750rem, .705rem + .21vw, .8125rem); /* 12   → 13px  */
+  --fs-lg  :clamp(.813rem, .765rem + .22vw, .875rem);  /* 13   → 14px  */
+  --fs-xl  :clamp(1.00rem, .940rem + .28vw, 1.0625rem);/* 16   → 17px  */
+}
+/* Scrolls sideways rather than wrapping — see .hscroll. A long Pokémon list used to
+   push the poke bar to three or four rows. */
+.poke-chips{display:flex;flex-wrap:nowrap;gap:4px;flex:1;min-width:0;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:thin;scrollbar-color:var(--scroll-thumb) transparent;}
+.poke-chips::-webkit-scrollbar{height:6px;}
+.poke-chips::-webkit-scrollbar-track{background:transparent;}
+.poke-chips::-webkit-scrollbar-thumb{background:var(--scroll-thumb);border-radius:3px;}
+.poke-chips>*{flex-shrink:0;}
+/* These four used to be white-on-translucent-white, because this bar was the app's one
+   dark strip. It is a .filter-bar like every other bar now, so they take the same
+   surface treatment as .filter-pill / .filter-clear beside them. */
+.poke-chip{display:inline-flex;align-items:center;gap:4px;background:var(--c-era-bg,#f0f8f0);border:1px solid var(--c-border-strong,#ccc);color:var(--c-text,#1a1a1a);border-radius:20px;padding:2px 4px 2px 9px;font-size:var(--fs-base);font-weight:bold;}
+.poke-chip-remove{background:none;border:none;color:var(--c-text-muted,#999);cursor:pointer;font-size:var(--fs-lg);line-height:1;padding:0 3px;}
+.poke-chip-remove:hover{color:#e53935;}
+.poke-add-btn{padding:0 10px;height:22px;border-radius:20px;border:1px solid var(--c-border-strong,#ccc);background:var(--c-surface,#fff);color:var(--c-text-dim,#555);font-size:var(--fs-base);cursor:pointer;white-space:nowrap;}
+.poke-add-btn:hover{background:var(--c-surface-3,#f5f5f5);border-color:var(--c-accent-ink);}
+/* .poke-input / .poke-suggestions are GONE — adding a Pokémon is a modal now
+   (js/ui/pickers.js). Their scrollbar rules went with them. */
+@media print{#poke-bar{display:none!important;}}
 
 /* ── FILTER BAR ── */
 
-.filter-label{font-size:10px;font-weight:bold;color:#555;white-space:nowrap;}
-.filter-pills{display:flex;flex-wrap:wrap;gap:4px;flex:1;}
-.filter-pill{font-size:10px;font-weight:bold;padding:2px 8px;border-radius:20px;border:1.5px solid transparent;cursor:pointer;color:white;opacity:.38;transition:opacity .12s,transform .08s;user-select:none;}
+.filter-label{font-size:var(--fs-base);font-weight:bold;color:var(--c-text-dim,#555);white-space:nowrap;}
+/* Still a scroller: the TMS card popup's pill row lives in here too, and .filter-pills is
+   the shared style class. Master Set's and TMS's sticky copies now hold ONE summary
+   button — see .lang-summary. */
+.filter-pills{display:flex;flex-wrap:nowrap;gap:4px;flex:1;min-width:0;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:thin;scrollbar-color:var(--scroll-thumb) transparent;}
+.filter-pills::-webkit-scrollbar{height:6px;}
+.filter-pills::-webkit-scrollbar-track{background:transparent;}
+.filter-pills::-webkit-scrollbar-thumb{background:var(--scroll-thumb);border-radius:3px;}
+.filter-pills>*{flex-shrink:0;}
+.filter-pill{font-size:var(--fs-base);font-weight:bold;padding:2px 8px;border-radius:20px;border:1.5px solid transparent;cursor:pointer;color:white;opacity:.38;transition:opacity .12s,transform .08s;user-select:none;}
 .filter-pill:hover{opacity:.7;transform:scale(1.05);}
 .filter-pill.active{opacity:1;border-color:rgba(0,0,0,.2);transform:scale(1.05);}
-.filter-clear{font-size:10px;padding:2px 9px;border:1px solid #ccc;border-radius:20px;background:white;color:#555;cursor:pointer;white-space:nowrap;}
-.filter-clear:hover{background:#f5f5f5;}
+.filter-clear{font-size:var(--fs-base);padding:2px 9px;border:1px solid var(--c-border-strong,#ccc);border-radius:20px;background:var(--c-surface,#fff);color:var(--c-text-dim,#555);cursor:pointer;white-space:nowrap;}
+.filter-clear:hover{background:var(--c-surface-3,#f5f5f5);}
+
+/* ── LANGUAGE SUMMARY (the sticky bar's stand-in for the pill row) ── */
+.lang-summary{
+  display:inline-flex;align-items:center;gap:5px;height:22px;padding:0 8px;
+  border:1px solid var(--c-border-strong,#ccc);border-radius:20px;
+  background:var(--c-surface,#fff);color:var(--c-text,#1a1a1a);
+  font:inherit;font-size:var(--fs-base);cursor:pointer;white-space:nowrap;max-width:100%;
+}
+.lang-summary:hover{background:var(--c-surface-3,#f5f5f5);border-color:var(--c-accent-ink);}
+.lang-summary:focus-visible{outline:2px solid var(--c-accent-ink);outline-offset:1px;}
+.lang-summary-text{overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums;}
+.lang-summary-caret{color:var(--c-text-muted,#999);font-size:var(--fs-sm);}
+/* The flag itself. A 1px hairline stops white-field flags (JP, KR, ID) dissolving into a
+   white bar; the radius keeps it from reading as a broken image. */
+.lang-flag-wrap{display:inline-flex;flex-shrink:0;}
+.lang-flag{
+  display:block;width:1.35em;height:.9em;border-radius:2px;
+  box-shadow:0 0 0 1px rgba(0,0,0,.22);
+}
+
 .card.lang-hidden{display:none!important;}
 .set-block.all-hidden{display:none!important;}
 .era-label.era-hidden{display:none!important;}
 @media print{.filter-bar{display:none!important;}}
 
+/* ── SET NAVIGATION SIDEBAR ── */
+/* The panel OVERLAYS; it never displaces the page.
+   It used to reserve its width as padding on BODY, which shrank the centring box so
+   .sticky-top, main and #tms-app all re-centred in what was left — opening the panel
+   moved the whole content column sideways by half the panel width. Instead the content
+   stays centred in the full viewport at all times and the panel floats above it, parked
+   in the empty gutter beside the column wherever there is room for it. */
+:root{
+  /* ── LAYOUT KNOBS ──
+     One place to tune page density. Everything that used to hardcode 1100px or a tile
+     size now reads these, INCLUDING .set-nav's parked position below, which needs half
+     the column width to park the sidebar beside it.
+
+     These reproduce dex.tcg's card ladder, measured off their pages:
+       502px → 3 columns   788px → 4   1928px → 6   2560px → 6 (their column caps too)
+     --tile-min is the readability knob; it scales on vw rather than stepping at
+     breakpoints, which is what let the old 380px and 600px grid overrides be deleted.
+     The 140px floor is what gives a phone 2 large columns rather than 3 small ones.
+
+     --page-w is load-bearing beyond the three centring rules: .set-nav derives its parked
+     position from it, so widening the column eats the gutter the panel sits in. At 1500px
+     the panel had nowhere to park and overlapped the cards at 1920px; 1220px restores it.
+     Changing it no longer needs a matching breakpoint recomputed by hand — see the min()
+     on .set-nav's `right`. */
+  --page-w:1220px;
+  /* Solved against the REAL gap and padding at each width, not their maxima: --grid-gap
+     and --grid-pad are clamps too, so a narrow viewport gets a 4px gap rather than 10px
+     and fits an extra column. A flat 14vw ramp gave 5 columns at 788px where the
+     reference has 4. This ramp holds 2/3/4/6/6 at 390/502/788/1220/1928+. */
+  --tile-min:clamp(132px, 126px + 4vw, 180px);
+  --grid-gap:clamp(4px, .55vw, 10px);
+  --grid-pad:clamp(5px, .5vw, 8px);
+
+  /* ── TYPE SCALE ──
+     Nine steps replacing 79 hardcoded font sizes across 18 distinct values. Each is a
+     clamp so text grows with the viewport instead of being tuned for one width.
+
+     rem, NOT px, on purpose: a px clamp silently overrides the reader's browser
+     font-size setting, a rem one scales with it. Note body is 12px while the root stays
+     at the browser default (usually 16px) — so 1rem is 16px here and every value below
+     is derived from the ORIGINAL px at that ratio, not from body's 12px. Getting that
+     backwards would rescale the whole app by 0.75.
+
+     Card internals are deliberately absent: they use container units (cqw) so they track
+     the tile rather than the viewport — see .card. */
+  --fs-3xs:clamp(.344rem, .30rem + .18vw, .44rem);   /*  5.5-7px   */
+  --fs-2xs:clamp(.438rem, .39rem + .20vw, .55rem);   /*  7-8.8px   */
+  --fs-xs :clamp(.500rem, .45rem + .22vw, .63rem);   /*  8-10px    */
+  --fs-sm :clamp(.563rem, .50rem + .26vw, .72rem);   /*  9-11.5px  */
+  --fs-base:clamp(.625rem, .56rem + .28vw, .80rem);  /* 10-12.8px  */
+  --fs-md :clamp(.750rem, .67rem + .34vw, .95rem);   /* 12-15.2px  */
+  --fs-lg :clamp(.813rem, .72rem + .38vw, 1.05rem);  /* 13-16.8px  */
+  --fs-xl :clamp(1.00rem, .89rem + .46vw, 1.28rem);  /* 16-20.5px  */
+  --fs-2xl:clamp(1.375rem, 1.22rem + .64vw, 1.75rem);/* 22-28px    */
+
+  --sb-panel-w:236px;
+  /* Matches body{padding-top:8px} and .sticky-top{top:8px}, so the docked panel lines
+     up with the gutter the rest of the page already uses. */
+  --sb-inset:8px;
+  /* Matches .header / .filter-bar, so the panel reads as the same family of surface. */
+  --sb-radius:12px;
+  /* Clearance between the parked panel and the content column. Deliberately wider than
+     --sb-inset: 50vw below counts the classic scrollbar, so the parked position runs a
+     few px optimistic on Windows and this absorbs it. */
+  --sb-gap:20px;
+  /* One knob for the whole slide, so the reduced-motion override below collapses the
+     panel and the scrim to instant together. */
+  --sb-anim:.22s;
+  --sb-ease:cubic-bezier(.2,.7,.3,1);
+}
+@media (prefers-reduced-motion:reduce){ :root{--sb-anim:0s;} }
+/* The panel UNROLLS: its width animates 0 ↔ --sb-panel-w, so it reads as coming out of
+   the main block rather than flying in from off-screen.
+   `display` is not animatable, so the original display:none ↔ flex could never
+   transition at all. visibility is what preserves the semantics display:none gave us —
+   hidden from the a11y tree, not focusable, not hit-testable — since a zero-width
+   element with overflow:hidden is invisible but would otherwise still be "there".
+   The `visibility 0s linear var(--sb-anim)` DELAY is the trick: opening flips it
+   instantly, closing waits until the animation has finished.
+
+   COST, accepted deliberately: width is a layout property, so the rows inside reflow on
+   every frame and the text compresses as it opens. clip-path:inset() would give the same
+   unroll as a compositor-only wipe — swap it in if the squash ever grates. */
+.set-nav{
+  position:fixed;left:0;right:auto;top:0;bottom:0;width:0;z-index:150;
+  display:flex;flex-direction:column;
+  visibility:hidden;
+  transition:width var(--sb-anim) var(--sb-ease),
+             visibility 0s linear var(--sb-anim);
+  /* The header is linear-gradient(135deg, accent1, accent2, accent3) and its LEFT edge
+     — exactly where this panel sits — is accent1. Starting here and easing to accent2
+     reads as a continuation of the same light instead of a flat slab pasted on top.
+     accent2 is lighter than accent1 in every palette, so this needs no per-theme work. */
+  background:linear-gradient(180deg,var(--c-accent1,#1a3a2a) 0%,var(--c-accent2,#2d5a3d) 100%);
+  color:#fff;
+  /* Drawer mode only the exposed edge is visible, so only it gets rounded. */
+  border-radius:0 var(--sb-radius) var(--sb-radius) 0;
+  box-shadow:2px 0 18px var(--c-shadow,rgba(0,0,0,.3));
+  /* Clips the full-bleed .sb-row hover fills to the radius — one line instead of a
+     per-row change. Safe because .sb-list owns its own scroll container. */
+  overflow:hidden;
+}
+/* Docked: a floating card in the left gutter rather than a full-height slab.
+   GATED ON THE MEDIA QUERY, NOT body.sb-docked, deliberately. applyOpenState drops
+   .sb-docked at the START of a close, so geometry keyed to that class would snap from
+   inset to flush before the panel had finished sliding out. body.sb-docked no longer
+   drives any CSS at all — it survives purely as a JS-side state marker.
+   Keep 1000px in step with DOCK_MIN_PX in js/ui/setnav.js.
+
+   ── WHICH EDGE IS PINNED, AND WHY IT IS THE RIGHT ONE ──
+   The width animates 0 ↔ --sb-panel-w, so whichever edge is pinned is the one the panel
+   grows AWAY from. Pinning `left` (as the drawer below 1000px does) makes it unroll
+   left → right, INTO the content. Pinning `right` against the content column makes it
+   unroll out of the main block, which is the reading we want at every docked width.
+
+   This used to be a `left:` park plus a second @media (min-width:1748px) that flipped to
+   `right:` — a literal hand-derived from four custom properties, with a comment warning
+   to recompute it by hand. It was also wrong in its own terms: 1748px is the width at
+   which the panel fits with the FULL --sb-gap to spare, but it already fits without
+   overlapping anything from ~1708px, so between those two the gutter was visibly wider
+   than the panel and the thing still unrolled into the content.
+
+   min() of the two candidate positions replaces both the literal and the media query:
+     • parked  — right edge one --sb-gap clear of the content column;
+     • floor   — right edge at --sb-inset + --sb-panel-w from the left, i.e. flush left,
+                 which is what keeps the panel on screen once the gutter runs out.
+   A larger `right` puts the panel further left, so min() picks whichever candidate sits
+   further RIGHT, and that is always the correct one. No threshold to keep in step.
+
+   % NOT vw in the floor, and this is load-bearing: for a position:fixed box a percentage
+   resolves against the initial containing block, which EXCLUDES the classic Windows
+   scrollbar, whereas 100vw includes it. calc(100vw - …) parks the panel a scrollbar-width
+   too far left and pushes its left edge off-screen. (The parked candidate keeps 50vw for
+   continuity — it runs a few px optimistic for the same reason, which is exactly the
+   slack --sb-gap exists to absorb.) */
+@media (min-width:1000px){
+  .set-nav{
+    top:var(--sb-inset);bottom:var(--sb-inset);
+    border-radius:var(--sb-radius);
+    box-shadow:0 8px 28px var(--c-shadow,rgba(0,0,0,.28));
+    left:auto;
+    right:min(calc(50vw + var(--page-w) / 2 + var(--sb-gap)),
+              calc(100% - var(--sb-inset) - var(--sb-panel-w)));
+  }
+}
+.set-nav.open{
+  visibility:visible;width:var(--sb-panel-w);
+  transition:width var(--sb-anim) var(--sb-ease), visibility 0s;
+}
+@media (max-width:600px){ .set-nav.open{width:min(82vw,300px);} }
+
+/* Two rows: [title, ×] over [search, collapse]. One row could not hold a third control
+   in 236px without squeezing the search box to nothing. */
+.sb-head{display:flex;flex-direction:column;gap:6px;padding:8px;border-bottom:1px solid rgba(255,255,255,.15);flex-shrink:0;background:rgba(0,0,0,.14);}
+.sb-head-top{display:flex;align-items:center;justify-content:space-between;gap:5px;}
+.sb-head-row{display:flex;gap:5px;}
+.sb-title{font-size:var(--fs-sm);font-weight:bold;text-transform:uppercase;letter-spacing:.8px;color:rgba(255,255,255,.75);}
+.sb-close{
+  border:1px solid rgba(255,255,255,.35);background:rgba(255,255,255,.12);color:#fff;
+  border-radius:6px;cursor:pointer;line-height:1;font-size:var(--fs-md);
+  /* A real tap target — this is the primary way out of the drawer on a phone. */
+  min-width:28px;min-height:24px;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;
+}
+.sb-close:hover{background:rgba(255,255,255,.28);}
+.sb-close:focus-visible{outline:2px solid #fff;outline-offset:1px;}
+.sb-search{flex:1;min-width:0;padding:4px 7px;border-radius:6px;border:1px solid rgba(255,255,255,.35);background:rgba(255,255,255,.12);color:#fff;font-size:var(--fs-base);outline:none;}
+.sb-search::placeholder{color:rgba(255,255,255,.5);}
+.sb-search:focus{border-color:rgba(255,255,255,.8);background:rgba(255,255,255,.2);}
+.sb-collapse{padding:4px 6px;border-radius:6px;border:1px solid rgba(255,255,255,.35);background:rgba(255,255,255,.12);color:#fff;font-size:var(--fs-sm);cursor:pointer;white-space:nowrap;}
+.sb-collapse:hover{background:rgba(255,255,255,.25);}
+.sb-list{flex:1;overflow-y:auto;overscroll-behavior:contain;padding:6px 0 12px;}
+.sb-empty{padding:10px;font-size:var(--fs-base);color:rgba(255,255,255,.55);}
+.sb-era{font-size:var(--fs-sm);font-weight:bold;text-transform:uppercase;letter-spacing:.8px;color:rgba(255,255,255,.5);padding:9px 10px 3px;}
+.sb-row{
+  /* Progress fills the row from the left via --p, set per row by setNavSync. No set
+     symbols here on purpose: several hundred extra <img> nodes in the panel whose
+     job is cutting render cost would defeat it. The era-coloured left border and
+     the bar carry the same information for free. */
+  position:relative;display:flex;align-items:center;gap:6px;width:100%;
+  padding:4px 9px 5px;border:none;border-left:3px solid var(--c-set-head,#2e7d32);
+  background:transparent;color:rgba(255,255,255,.85);
+  font-size:var(--fs-base);text-align:left;cursor:pointer;
+  /* Rounded on the right only, with a gutter to round into: the era-coloured left
+     border stays flush at x=0 because that stripe is what carries the era grouping. */
+  border-radius:0 8px 8px 0;margin-right:6px;width:calc(100% - 6px);
+}
+.sb-row.jp{border-left-color:var(--c-set-head-jp,#bf360c);}
+.sb-row::after{
+  content:'';position:absolute;left:3px;right:0;bottom:0;height:2px;
+  background:var(--c-card-done-border,#43a047);
+  transform:scaleX(var(--p,0));transform-origin:left;
+}
+.sb-row:hover{background:rgba(255,255,255,.12);color:#fff;}
+.sb-row.current{background:rgba(255,255,255,.18);color:#fff;font-weight:bold;}
+.sb-row.complete .sb-row-count{color:var(--c-card-done-border,#43a047);font-weight:bold;}
+.sb-row-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.sb-row-count{font-size:var(--fs-sm);color:rgba(255,255,255,.6);flex-shrink:0;font-variant-numeric:tabular-nums;}
+/* Fades with the panel. Same visibility-delay pattern, and pointer-events:none so a
+   scrim that is merely transparent can never swallow a click. */
+.set-nav-scrim{
+  display:block;position:fixed;inset:0;z-index:149;background:rgba(0,0,0,.45);
+  opacity:0;visibility:hidden;pointer-events:none;
+  transition:opacity var(--sb-anim) linear, visibility 0s linear var(--sb-anim);
+}
+/* Drawer below the dock breakpoint: it must cover .sticky-top (z 20) and the
+   Pokémon suggestion dropdown (z 100), while staying under preview (200),
+   TMS (300), first-run (400) and the quota banner (99999). */
+@media (max-width:999px){
+  body.sb-open{overflow:hidden;}
+  body.sb-open .set-nav-scrim{
+    opacity:1;visibility:visible;pointer-events:auto;
+    transition:opacity var(--sb-anim) linear, visibility 0s;
+  }
+}
+/* (Removed: a duplicate of the .set-nav.open phone-width rule above that was missing its
+   `.open`. Targeting .set-nav outright overrode the closed state's width:0, so below
+   600px the panel sat at full width whether open or not — never unrolling, with
+   visibility alone hiding it. The correct rule is beside .set-nav.open.) */
+
+/* ── THEMED SCROLLBARS ──
+   The panel is dark chrome, so a default light OS scrollbar sat on it like a sticker.
+   --scroll-thumb INHERITS, which is the whole trick: declaring it once on the dark
+   surfaces covers everything inside them, and the light surfaces take the :root value.
+   That is also why the thumb is an ALPHA rather than a solid colour — one pair of
+   values then works on all six palettes with no per-theme overrides, except in Dark
+   where the "light" surfaces are themselves dark and flip to a light thumb.
+   Both the standard properties and the -webkit- pseudo-elements are declared: Firefox
+   only implements the former, Safari only the latter. */
+:root{--scroll-thumb:rgba(0,0,0,.22);--scroll-thumb-hover:rgba(0,0,0,.34);}
+.set-nav,.more-panel{--scroll-thumb:rgba(255,255,255,.26);--scroll-thumb-hover:rgba(255,255,255,.44);}
+.sb-list,.tms-popup-body,.first-run-body,.picker-body,.more-panel{
+  scrollbar-width:thin;scrollbar-color:var(--scroll-thumb) transparent;
+}
+.sb-list::-webkit-scrollbar,.tms-popup-body::-webkit-scrollbar,.first-run-body::-webkit-scrollbar,
+.picker-body::-webkit-scrollbar,.more-panel::-webkit-scrollbar{width:9px;height:9px;}
+.sb-list::-webkit-scrollbar-track,.tms-popup-body::-webkit-scrollbar-track,.first-run-body::-webkit-scrollbar-track,
+.picker-body::-webkit-scrollbar-track,.more-panel::-webkit-scrollbar-track{background:transparent;}
+/* The transparent border + background-clip is what insets the thumb from the track
+   edge, so it reads as a floating pill rather than a full-width bar. */
+.sb-list::-webkit-scrollbar-thumb,.tms-popup-body::-webkit-scrollbar-thumb,.first-run-body::-webkit-scrollbar-thumb,
+.picker-body::-webkit-scrollbar-thumb,.more-panel::-webkit-scrollbar-thumb{
+  background:var(--scroll-thumb);border-radius:6px;
+  border:2px solid transparent;background-clip:padding-box;
+}
+.sb-list::-webkit-scrollbar-thumb:hover,.tms-popup-body::-webkit-scrollbar-thumb:hover,
+.first-run-body::-webkit-scrollbar-thumb:hover,.picker-body::-webkit-scrollbar-thumb:hover,
+.more-panel::-webkit-scrollbar-thumb:hover{background:var(--scroll-thumb-hover);background-clip:padding-box;}
+/* The PAGE scrollbar is deliberately left to color-scheme (set per palette above)
+   rather than scrolled-colour here: scrollbar-color on the root element resolves its
+   var()s against :root, where the palette classes — which live on <body> — are not
+   visible, so it would silently pin every theme to Forest. */
+/* Jump target offset. The sticky header wraps, so its height is measured by
+   setnav.js's ResizeObserver and published as --sticky-h rather than guessed. */
+.set-block,.era-label{scroll-margin-top:calc(var(--sticky-h,140px) + 16px);}
+/* Confirms where a sidebar jump landed, which absorbs the few px of residual
+   drift from content-visibility's estimated heights. */
+@keyframes sb-flash{from{box-shadow:inset 0 0 0 2px var(--c-accent3,#c8a400);}to{box-shadow:inset 0 0 0 2px transparent;}}
+.set-head.sb-flash{animation:sb-flash 1.1s ease-out;}
+@media (prefers-reduced-motion:reduce){ .set-head.sb-flash{animation:none;} }
+/* Explicit "Collapse all" only — never a default. The card DOM stays in place so
+   applyFilter, the language pills, the stats totals and print all keep working. */
+.set-block.sb-collapsed .cards-grid{display:none;}
+@media print{
+  .set-nav,.set-nav-scrim,.sb-toggle{display:none!important;}
+  /* No body padding to undo here any more — the panel overlays rather than reserving
+     space, so a printed page has never any left gutter to begin with. */
+  /* Someone who collapsed everything and then hits Ctrl+P still wants a full sheet. */
+  .set-block.sb-collapsed .cards-grid{display:grid!important;}
+}
+
 /* ── MAIN ── */
-body{padding-top:8px;}main{max-width:1100px;margin:0 auto;padding:12px;}
-.era-label{font-size:10px;font-weight:bold;text-transform:uppercase;letter-spacing:1px;color:var(--c-era,#555);margin:14px 0 4px 2px;}
+/* No padding-left, and no transition on it. Reserving the panel's width here shifted
+   the centred column sideways whenever the sidebar opened, and animating that shift
+   relayed out the whole ~24000px page every frame. The panel overlays instead, so this
+   is a plain static rule and .sticky-top / main / #tms-app stay centred in the full
+   viewport in every state. */
+body{padding-top:8px;}
+main{width:min(100%,var(--page-w));margin:0 auto;padding:12px;}
+.era-label{font-size:var(--fs-base);font-weight:bold;text-transform:uppercase;letter-spacing:1px;color:var(--c-era,#555);margin:14px 0 4px 2px;}
+
+/* ── DASHBOARD (start page) ──
+   #dash is a sibling of #dyn and #tms-app; applyModeUI shows exactly one.
+
+   Everything here sizes off auto-fit/minmax rather than breakpoints, matching how the
+   card grid does it — so the metric tiles go 4 → 2 → 1 across and the three mode cards
+   become full-width rows on a phone without a single media query. */
+#dash{display:none;}
+
+/* Top row: the summary panel beside the distribution chart. The chart gets the larger
+   share because up to twelve columns need the width; below ~640px they stack, and
+   auto-fit does that without a breakpoint. */
+.dash-top{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(min(280px,100%),1fr));
+  gap:10px;margin-bottom:18px;align-items:start;
+}
+.dash-top > .dash-panel:last-child{grid-column:span 1;}
+@media (min-width:760px){ .dash-top{grid-template-columns:minmax(230px,1fr) 2fr;} }
+.dash-panel{
+  background:var(--c-surface,#fff);border:1px solid var(--c-border-tint,#d7e8d7);
+  border-radius:10px;padding:14px 16px;
+}
+.dash-panel-title{
+  font-size:var(--fs-sm);font-weight:bold;font-style:italic;
+  color:var(--c-text-dim,#555);margin-bottom:10px;
+}
+/* Label over value, stacked — reads as a spec sheet rather than a row of tiles. */
+.dash-stat + .dash-stat{margin-top:11px;}
+.dash-stat-label{font-size:var(--fs-base);font-weight:bold;color:var(--c-text-dim,#555);}
+.dash-stat-value{
+  font-size:var(--fs-xl);font-weight:bold;color:var(--c-accent-ink);
+  line-height:1.15;font-variant-numeric:tabular-nums;
+}
+.dash-stat-hint{font-size:var(--fs-sm);color:var(--c-text-muted,#999);}
+
+/* Distribution: a column per language, on a shared baseline. flex-end so the columns
+   grow upward from the axis; the badge and the value sit outside the track so a short
+   bar never swallows its own label. */
+.dash-chart{
+  display:flex;align-items:flex-end;gap:6px;
+  padding-top:4px;border-bottom:1px solid var(--c-border-tint,#d7e8d7);
+}
+.dash-col{display:flex;flex-direction:column;align-items:center;gap:3px;flex:1;min-width:0;}
+.dash-col-value{
+  font-size:var(--fs-sm);color:var(--c-text-dim,#555);
+  font-variant-numeric:tabular-nums;line-height:1;
+}
+/* Fixed height: the fill's percentage resolves against this, so it must not be `auto`. */
+.dash-col-track{display:flex;align-items:flex-end;width:100%;height:96px;}
+.dash-col-fill{display:block;width:100%;border-radius:4px 4px 0 0;min-height:2px;}
+.dash-col-badge{
+  font-size:var(--fs-2xs);font-weight:bold;color:#fff;border-radius:20px;
+  padding:1px 4px;margin-bottom:-8px;position:relative;white-space:nowrap;
+}
+
+/* Expansions. Same auto-fit as the mode cards: three across on a desktop, one per row
+   on a phone, no breakpoint. */
+.dash-section-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:8px;}
+.dash-section-count{font-size:var(--fs-base);color:var(--c-text-muted,#999);flex-shrink:0;}
+.dash-exp-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;}
+/* A <button>, not a div: the whole card opens the set. text-align/font/color are reset
+   because a button inherits none of them. */
+.dash-exp{
+  display:flex;gap:11px;align-items:stretch;width:100%;text-align:left;
+  font:inherit;color:inherit;cursor:pointer;
+  background:var(--c-surface,#fff);border:1px solid var(--c-border-tint,#d7e8d7);
+  border-radius:10px;padding:10px 12px;
+  transition:border-color .12s,box-shadow .12s;
+}
+.dash-exp:hover{border-color:var(--c-accent-ink);box-shadow:0 4px 14px rgba(0,0,0,.10);}
+.dash-exp:focus-visible{outline:2px solid var(--c-accent-ink);outline-offset:2px;}
+/* Sets TCGdex lists but has no card data for — clickable would be a dead end. */
+.dash-exp.inert{opacity:.5;cursor:default;box-shadow:none;}
+.dash-exp.inert:hover{border-color:var(--c-border-tint,#d7e8d7);}
+@media (prefers-reduced-motion:reduce){ .dash-exp{transition:none;} }
+/* The symbol sits on a tinted square so a transparent PNG has something to read against
+   — several TCGdex symbols are near-white line art. */
+.dash-exp-art{
+  flex-shrink:0;width:76px;height:60px;border-radius:8px;padding:5px;
+  background:var(--c-era-bg,#eef5ee);
+  display:flex;align-items:center;justify-content:center;overflow:hidden;
+}
+/* Logos are wide wordmarks, symbols are square glyphs — same box, different fit. */
+.dash-exp-logo{max-width:100%;max-height:100%;object-fit:contain;}
+.dash-exp-sym{max-width:36px;max-height:36px;object-fit:contain;}
+.dash-exp-foot-sym{width:15px;height:15px;object-fit:contain;flex-shrink:0;opacity:.75;}
+/* 61 sets have no art of either kind. The id beats an empty rectangle, which reads as a
+   broken image rather than as a deliberately plain set. */
+.dash-exp-artid{
+  font-size:var(--fs-sm);font-weight:bold;letter-spacing:.5px;text-transform:uppercase;
+  color:var(--c-text-muted,#999);
+}
+.dash-exp-body{display:flex;flex-direction:column;justify-content:center;gap:2px;flex:1;min-width:0;}
+.dash-exp-name{font-size:var(--fs-md);font-weight:bold;color:var(--c-text,#1a1a1a);overflow-wrap:anywhere;}
+.dash-exp-date{font-size:var(--fs-sm);color:var(--c-text-muted,#999);}
+.dash-exp-track{height:4px;border-radius:20px;background:var(--c-surface-3,#f5f5f5);overflow:hidden;margin-top:6px;}
+/* No count in sets.json ⇒ no bar at all. An empty track reads as 0% collected, which is
+   a different claim from "this set's size is unknown". */
+.dash-exp-track.unknown{visibility:hidden;}
+.dash-exp-fill{
+  height:100%;border-radius:20px;
+  background:linear-gradient(90deg,var(--c-accent-ink),var(--c-accent-ink-2));
+}
+.dash-exp-foot{display:flex;justify-content:space-between;gap:8px;margin-top:4px;}
+.dash-exp-count,.dash-exp-pct{font-size:var(--fs-sm);color:var(--c-text-muted,#999);font-variant-numeric:tabular-nums;}
+
+.dash-section{margin-bottom:18px;}
+.dash-section-title{font-size:var(--fs-md);font-weight:bold;color:var(--c-text,#1a1a1a);}
+.dash-note{font-size:var(--fs-base);color:var(--c-text-muted,#999);margin-top:6px;}
+
+/* The three ways in. Same auto-fit trick: three across on a desktop, one full-width
+   row per card on a phone, which is why the chevron is pinned right — it reads as a
+   list row at that size and as a card above it. */
+.dash-modes{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;}
+.dash-card{
+  position:relative;display:flex;flex-direction:column;gap:4px;
+  text-align:left;padding:14px 34px 14px 16px;
+  background:var(--c-surface,#fff);border:1px solid var(--c-border-tint,#d7e8d7);
+  border-radius:10px;cursor:pointer;font:inherit;color:inherit;
+  transition:border-color .12s,box-shadow .12s,transform .08s;
+}
+.dash-card:hover{border-color:var(--c-accent-ink);box-shadow:0 4px 14px rgba(0,0,0,.10);transform:translateY(-1px);}
+.dash-card:focus-visible{outline:2px solid var(--c-accent-ink);outline-offset:2px;}
+.dash-card.accent{border-color:var(--c-accent-ink);box-shadow:0 2px 10px rgba(0,0,0,.08);}
+/* Single-set mode does not exist yet. Shown rather than hidden so the row does not
+   reflow when it lands — and inert, so it cannot be clicked or tabbed to. */
+.dash-card.disabled{opacity:.55;cursor:default;pointer-events:none;}
+.dash-card-head{display:flex;align-items:center;gap:7px;}
+.dash-card-icon{font-size:var(--fs-lg);}
+.dash-card-title{font-size:var(--fs-md);font-weight:bold;}
+.dash-card-count{font-size:var(--fs-xl);font-weight:bold;color:var(--c-accent-ink);font-variant-numeric:tabular-nums;}
+.dash-card-blurb{font-size:var(--fs-base);color:var(--c-text-dim,#555);line-height:1.45;}
+.dash-card-chevron{position:absolute;top:50%;right:12px;transform:translateY(-50%);font-size:var(--fs-xl);color:var(--c-text-muted,#999);}
+.dash-card.disabled .dash-card-chevron{display:none;}
+
+.dash-empty{
+  background:var(--c-surface,#fff);border:1px solid var(--c-border-tint,#d7e8d7);
+  border-radius:10px;padding:20px;margin-bottom:18px;
+}
+.dash-empty-title{font-size:var(--fs-lg);font-weight:bold;margin-bottom:6px;}
+.dash-empty-body{font-size:var(--fs-base);color:var(--c-text-dim,#555);line-height:1.55;}
+
+@media (prefers-reduced-motion:reduce){
+  .dash-card{transition:none;}
+  .dash-card:hover{transform:none;}
+}
+@media print{#dash{display:none!important;}}
+
+/* ── SINGLE-SET MODE ──
+   #set-app is the fourth render container. The card grid reuses .cards-grid/.card
+   wholesale, so only the picker and the set header need rules of their own. */
+#set-app{display:none;}
+.set-loading{padding:24px;text-align:center;color:var(--c-text-muted,#999);font-size:var(--fs-md);}
+
+/* Picker. auto-fit again rather than breakpoints — 218 sets need to stay scannable
+   from a phone to a 4K monitor. */
+.set-picker-head{margin-bottom:12px;}
+.set-picker-title{font-size:var(--fs-lg);font-weight:bold;margin-bottom:8px;}
+.set-picker-search{
+  width:100%;padding:7px 10px;border-radius:8px;font-size:var(--fs-md);outline:none;
+  border:1px solid var(--c-border-strong,#ccc);background:var(--c-surface,#fff);color:var(--c-text,#1a1a1a);
+}
+.set-picker-search:focus{border-color:var(--c-accent-ink);}
+/* Search / language / sort. This row is NOT page content — it is injected into #set-bar,
+   a .mode-bar, which is 34px tall with overflow-x:clip and overflow-y:VISIBLE (the
+   Pokémon suggestions dropdown in Master Set's copy has to hang below it).
+
+   So the old `flex-wrap:wrap` here overrode .mode-bar's nowrap and broke out of the bar
+   in both directions: on a phone the sort button wrapped onto a second row that the bar
+   could not clip and landed on top of "Pick a set to complete", and at every width the
+   34px-tall bar held a 31px input plus 6px of its own padding, so all three controls
+   poked out through the rounded bottom edge. Both are the same bug — content taller or
+   wider than a bar with a FIXED height and one clipped axis.
+
+   Fixed by making the controls fit: nowrap, and heights that live inside 34px − 12px of
+   padding. box-sizing is global in this file, so height on the input includes its border
+   and padding. */
+.set-picker-bar{display:flex;flex-wrap:nowrap;gap:7px;align-items:center;min-width:0;}
+.set-picker-search{flex:1 1 220px;min-width:60px;height:22px;padding:2px 9px;border-radius:6px;font-size:var(--fs-base);}
+.set-picker-lang,.set-picker-sort{
+  flex-shrink:0;height:22px;padding:0 8px;border-radius:6px;cursor:pointer;font:inherit;
+  font-size:var(--fs-base);white-space:nowrap;line-height:1;
+  border:1px solid var(--c-border-strong,#ccc);
+  background:var(--c-surface,#fff);color:var(--c-text,#1a1a1a);
+}
+/* The language <select> carries a set COUNT per option ("EN · English (203)"), which is
+   what makes it 230px wide. On a phone that is over half the bar; clamp it and let the
+   text ellipsis rather than push the sort button off the end. */
+.set-picker-lang{max-width:min(230px,38%);text-overflow:ellipsis;}
+.set-picker-lang:focus-visible,.set-picker-sort:focus-visible{outline:2px solid var(--c-accent-ink);outline-offset:1px;}
+.set-picker-sort:hover{background:var(--c-surface-3,#f5f5f5);border-color:var(--c-accent-ink);}
+
+.set-picker-list{display:flex;flex-direction:column;}
+/* Series heading — the same visual weight as the era labels on the Master Set page,
+   because it is the same idea. */
+.set-picker-series{
+  display:flex;align-items:baseline;justify-content:space-between;gap:10px;
+  font-size:var(--fs-base);font-weight:bold;text-transform:uppercase;letter-spacing:1px;
+  color:var(--c-era,#555);margin:16px 0 6px 2px;
+}
+.set-picker-series-count{font-weight:normal;text-transform:none;letter-spacing:0;color:var(--c-text-muted,#999);}
+.set-picker-empty{padding:20px;text-align:center;color:var(--c-text-muted,#999);font-size:var(--fs-base);}
+/* 200+ cards, each with a logo <img>. lazy loading alone does not help when the grid is
+   auto-fit and most cards sit just below the fold; this keeps them out of layout and
+   paint until they are near it. The intrinsic size stops the scrollbar jumping. */
+.set-picker-list .dash-exp{content-visibility:auto;contain-intrinsic-size:0 84px;}
+
+/* ── OPEN SET: the sticky bar's second personality ──
+   #set-bar holds the picker's controls while you are choosing and the set's identity once
+   you have. Same element, same 34px, so nothing under it moves when you switch between
+   the two — which is the entire reason it is not simply hidden for the open set. */
+.set-open-bar{gap:8px;}
+.set-bar-sym{height:22px;width:22px;object-fit:contain;flex-shrink:0;}
+/* flex:1 + min-width:0 is what makes the ellipsis reachable: without it a long set name
+   takes its full intrinsic width and pushes the date and count off the end instead of
+   truncating itself. Shared with #set-status-name in the bottom bar. */
+.set-bar-name{flex:1;min-width:0;font-size:var(--fs-md);font-weight:bold;color:var(--c-text,#1a1a1a);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.set-bar-date{font-size:var(--fs-base);color:var(--c-text-muted,#999);white-space:nowrap;flex-shrink:0;}
+/* Progress text in the bottom bar. */
+.set-bar-sub{font-size:var(--fs-base);color:var(--c-text-dim,#555);white-space:nowrap;flex-shrink:0;font-variant-numeric:tabular-nums;}
+.set-back{
+  flex-shrink:0;padding:4px 10px;border-radius:8px;cursor:pointer;white-space:nowrap;
+  border:1px solid var(--c-border-strong,#ccc);background:var(--c-surface,#fff);
+  color:var(--c-text-dim,#555);font:inherit;font-size:var(--fs-base);
+}
+.set-back:hover{background:var(--c-surface-3,#f5f5f5);border-color:var(--c-accent-ink);color:var(--c-accent-ink);}
+.set-back:focus-visible{outline:2px solid var(--c-accent-ink);outline-offset:1px;}
+
+/* ── SINGLE-SET STATUS BAR ──
+   The open set's back button, name and progress, docked to the bottom of the viewport.
+   index.html explains why it is not a third sticky strip under the header.
+
+   position:fixed and width-matched to --page-w so it lines up with .sticky-top and main
+   rather than spanning a 4K monitor edge to edge. z-index sits below .set-nav's drawer
+   (which must cover everything) and above the card grid.
+
+   display is driven by applyModeUI / renderSetMode — see MODE_PANELS in main.js — so
+   there is no `display:none` default here to fight with. */
+.set-status-bar{
+  position:fixed;left:0;right:0;bottom:0;z-index:19;
+  width:min(100%,var(--page-w));margin:0 auto;
+  background:var(--c-surface,#fff);
+  border-top:1px solid var(--c-border-tint,#d7e8d7);
+  border-radius:12px 12px 0 0;
+  box-shadow:0 -4px 16px rgba(0,0,0,.18);
+  /* Below the notch/home-indicator on iOS, flush to the edge everywhere else. */
+  padding:0 14px env(safe-area-inset-bottom,0) 14px;
+}
+/* Full-bleed across the top edge of the bar: the track IS the bar's top border, which is
+   why it is a sibling of the row rather than a member of it. */
+.set-status-track{
+  height:4px;margin:0 -14px;border-radius:12px 12px 0 0;overflow:hidden;
+  background:var(--c-surface-3,#f5f5f5);
+}
+.set-status-fill{
+  height:100%;width:0;
+  background:linear-gradient(90deg,var(--c-accent-ink),var(--c-accent-ink-2));
+  transition:width .25s ease;
+}
+.set-status-row{display:flex;align-items:center;gap:10px;min-height:36px;padding:5px 0;}
+@media (prefers-reduced-motion:reduce){ .set-status-fill{transition:none;} }
+/* The bar floats over the grid, so the last row of cards needs somewhere to end.
+   Applied to #set-app only — the other three modes have no bottom bar. */
+#set-app{padding-bottom:52px;}
+@media print{.set-status-bar{display:none!important;}}
+@media print{#set-app,#set-controls,#set-filter-bar{display:none!important;}}
 
 /* ── BANNERS ── */
-.banner{border-radius:6px;padding:7px 12px;margin-bottom:8px;font-size:10px;line-height:1.5;display:flex;align-items:flex-start;gap:8px;}
+.banner{border-radius:6px;padding:7px 12px;margin-bottom:8px;font-size:var(--fs-base);line-height:1.5;display:flex;align-items:flex-start;gap:8px;}
 .banner-body{flex:1;}
-.banner-close{background:none;border:none;cursor:pointer;font-size:14px;line-height:1;opacity:.6;flex-shrink:0;padding:0;}
+.banner-close{background:none;border:none;cursor:pointer;font-size:var(--fs-lg);line-height:1;opacity:.6;flex-shrink:0;padding:0;}
 .banner-close:hover{opacity:1;}
-.banner-blue{background:#e8f4fd;border:1px solid #90caf9;color:#0d47a1;}
-.banner-amber{background:#fff8e1;border:1px solid #ffe082;color:#e65100;}
-.banner-load{background:#f3e5f5;border:1px solid #ce93d8;color:#4a148c;animation:pulse 1.5s infinite;}
-.banner-green{background:#e8f5e9;border:1px solid #a5d6a7;color:#1b5e20;}
-.banner-error{background:#fce4ec;border:1px solid #f48fb1;color:#880e4f;}
+.banner-blue{background:var(--c-bn-blue-bg);border:1px solid var(--c-bn-blue-bd);color:var(--c-bn-blue-fg);}
+.banner-amber{background:var(--c-bn-amber-bg);border:1px solid var(--c-bn-amber-bd);color:var(--c-bn-amber-fg);}
+.banner-load{background:var(--c-bn-load-bg);border:1px solid var(--c-bn-load-bd);color:var(--c-bn-load-fg);animation:pulse 1.5s infinite;}
+.banner-green{background:var(--c-bn-green-bg);border:1px solid var(--c-bn-green-bd);color:var(--c-bn-green-fg);}
+.banner-error{background:var(--c-bn-error-bg);border:1px solid var(--c-bn-error-bd);color:var(--c-bn-error-fg);}
+/* Same palette as banner-load, WITHOUT the infinite pulse. "N new cards found" reused
+   banner-load purely for its purple and inherited the animation with it, so a notice
+   that was not in progress pulsed until the next full re-render. */
+.banner-new{background:var(--c-bn-load-bg);border:1px solid var(--c-bn-load-bd);color:var(--c-bn-load-fg);}
+/* Transient banners fade rather than vanish. The bell keeps a copy either way. */
+.banner{transition:opacity .3s linear;}
+.banner-leaving{opacity:0;}
+.banner-retry-btn{
+  margin-left:8px;padding:2px 8px;cursor:pointer;border-radius:3px;font-size:var(--fs-base);
+  border:1px solid currentColor;background:transparent;color:inherit;
+}
+.banner-retry-btn:hover{background:rgba(0,0,0,.08);}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.6}}
+/* The other two animations (sb-flash, ph-spin) already opt out; this one never did. */
+@media (prefers-reduced-motion:reduce){
+  .banner-load{animation:none;}
+  .banner{transition:none;}
+}
 @media print{.banner{display:none!important;}}
 
+/* ── NOTIFICATION BELL ── */
+.sr-only{
+  position:absolute;width:1px;height:1px;padding:0;margin:-1px;
+  overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0;
+}
+.notif-menu>summary{position:relative;}
+.notif-count{
+  position:absolute;top:-5px;right:-6px;min-width:14px;height:14px;padding:0 3px;
+  border-radius:7px;background:#c62828;color:#fff;
+  font-size:var(--fs-xs);font-weight:bold;line-height:14px;text-align:center;
+}
+.notif-panel{min-width:250px;max-width:320px;gap:0;}
+/* The ROWS scroll, not the panel — a "Clear all" header inside a scrolling panel
+   scrolls out of reach the moment the log fills up. */
+.notif-rows{max-height:260px;overflow-y:auto;}
+.notif-head{
+  display:flex;align-items:center;justify-content:space-between;gap:8px;
+  padding:0 4px 5px;margin-bottom:3px;border-bottom:1px solid rgba(255,255,255,.18);
+}
+/* .notif-head sets display:flex, which outranks the UA sheet's [hidden]{display:none}. */
+.notif-head[hidden]{display:none;}
+.notif-head-title{
+  font-size:var(--fs-sm);font-weight:bold;text-transform:uppercase;
+  letter-spacing:.6px;color:rgba(255,255,255,.6);
+}
+.notif-clear{
+  flex-shrink:0;padding:2px 6px;border:1px solid rgba(255,255,255,.35);border-radius:4px;
+  background:transparent;color:rgba(255,255,255,.85);font-size:var(--fs-sm);cursor:pointer;
+}
+.notif-clear:hover{background:rgba(255,255,255,.18);}
+.notif-close{
+  flex-shrink:0;padding:0 2px;border:none;background:transparent;
+  color:rgba(255,255,255,.45);font-size:var(--fs-md);line-height:1;cursor:pointer;
+}
+.notif-close:hover{color:#fff;}
+.notif-item{
+  display:flex;gap:8px;align-items:baseline;justify-content:space-between;
+  padding:5px 4px;border-bottom:1px solid rgba(255,255,255,.12);
+  font-size:var(--fs-base);line-height:1.45;color:rgba(255,255,255,.9);
+}
+.notif-item:last-child{border-bottom:none;}
+.notif-text{flex:1;min-width:0;overflow-wrap:anywhere;}
+.notif-when{flex-shrink:0;font-size:var(--fs-sm);color:rgba(255,255,255,.5);font-variant-numeric:tabular-nums;}
+.notif-warn .notif-text{color:#ffcc80;}
+.notif-error .notif-text{color:#ef9a9a;}
+.notif-empty{padding:8px 4px;font-size:var(--fs-base);color:rgba(255,255,255,.55);}
+@media print{.notif-menu{display:none!important;}}
+
+/* Storage-quota bar. Fixed and above everything (z 99999) because a failed write is
+   the one message that must survive whatever else is open. Styled here rather than
+   inline: js/storage.js and js/ui/banners.js each carried their own copy of the same
+   cssText, so they could drift. The stylesheet is a blocking <link> in <head>, so it
+   is present before either module runs — the fallback in storage.js still works even
+   if banners.js never loads. #b71c1c stays a literal on purpose: an emergency colour
+   must not follow the palette or fade into a dark theme. */
+#storage-quota-banner{
+  position:fixed;top:0;left:0;right:0;z-index:99999;background:#b71c1c;
+  color:#fff;padding:8px 12px;font-family:Arial,Helvetica,sans-serif;font-size:var(--fs-lg);line-height:1.4;text-align:center;
+  display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap;
+}
+#storage-quota-banner button{
+  cursor:pointer;border:1px solid #fff;background:transparent;color:#fff;
+  border-radius:4px;padding:2px 8px;font:inherit;
+}
+#storage-quota-banner .quota-close{border:none;font-size:var(--fs-xl);line-height:1;padding:0 4px;}
+@media print{#storage-quota-banner{display:none!important;}}
+
 /* ── SET BLOCK ── */
-.set-block{background:white;border-radius:8px;margin-bottom:10px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.12);}
-.set-head{color:white;padding:5px 12px;display:flex;justify-content:space-between;align-items:center;gap:6px;}
+.set-block{background:var(--c-surface,#fff);border-radius:8px;margin-bottom:10px;overflow:hidden;box-shadow:0 1px 4px var(--c-shadow,rgba(0,0,0,.12));}
+/* The whole head is the collapse target, not just the chevron: on a phone a 20px
+   glyph is a miss-tap, and the head is already a distinct band. user-select stops a
+   double-click on the set name selecting text instead of toggling. */
+.set-head{color:white;padding:5px 12px;display:flex;justify-content:space-between;align-items:center;gap:6px;cursor:pointer;user-select:none;}
+.set-chevron{
+  background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.35);color:white;
+  border-radius:4px;font-size:var(--fs-base);line-height:1;cursor:pointer;flex-shrink:0;
+  /* A real hit target: the glyph is tiny but the button is not. */
+  min-width:22px;min-height:20px;display:inline-flex;align-items:center;justify-content:center;
+}
+.set-chevron:hover{background:rgba(255,255,255,.28);}
+.set-chevron:focus-visible{outline:2px solid #fff;outline-offset:1px;}
+@media print{.set-chevron{display:none!important;}}
 .set-head.c-green{background:var(--c-set-head,#2e7d32);}.set-head.c-blue{background:#1565c0;}.set-head.c-brown{background:#4e342e;}.set-head.c-orange{background:var(--c-set-head-jp,#bf360c);}
 .set-head-left{display:flex;align-items:center;gap:8px;min-width:0;}
 .set-symbol{width:24px;height:24px;object-fit:contain;flex-shrink:0;filter:brightness(0) invert(1);opacity:.9;}
 .set-name-block{display:flex;flex-direction:column;min-width:0;}
-.set-name-en{font-size:11px;font-weight:bold;white-space:normal;overflow:hidden;word-break:break-word;}
+.set-name-en{font-size:var(--fs-md);font-weight:bold;white-space:normal;overflow:hidden;word-break:break-word;}
 .set-head-right{display:flex;align-items:center;gap:6px;flex-shrink:0;}
-.set-count{font-size:10px;opacity:.75;}
-.set-select-btn{font-size:9px;font-weight:bold;padding:2px 7px;border-radius:3px;border:1px solid rgba(255,255,255,.55);background:rgba(255,255,255,.12);color:white;cursor:pointer;white-space:nowrap;}
+.set-count{font-size:var(--fs-base);opacity:.75;}
+.set-select-btn{font-size:var(--fs-sm);font-weight:bold;padding:2px 7px;border-radius:3px;border:1px solid rgba(255,255,255,.55);background:rgba(255,255,255,.12);color:white;cursor:pointer;white-space:nowrap;}
 .set-select-btn:hover{background:rgba(255,255,255,.25);}
 @media print{.set-select-btn{display:none!important;}}
 
 /* ── CARD GRID — 3 to 9 cards per row depending on viewport ── */
 .cards-grid{
   display:grid;
-  /* Cards are min 90px, grow to fill. auto-fill means as many columns as fit.
-     At 1100px wide (~main max-width): ~10-11 cards. At 400px: ~4 cards. */
-  grid-template-columns:repeat(auto-fill,minmax(min(90px,100%),1fr));
-  gap:6px;padding:6px 8px;
+  /* Tiles are at least --tile-min and grow to fill; auto-fill takes as many columns as
+     fit. Because --tile-min is itself a clamp on vw, density scales continuously rather
+     than stepping — ~3 columns of ~108px at 375px, ~7 of ~200px at 1920px. The old
+     380px/600px grid overrides existed only to step this by hand and are gone.
+     min(…,100%) stops a single tile overflowing a viewport narrower than the floor. */
+  grid-template-columns:repeat(auto-fill,minmax(min(var(--tile-min),100%),1fr));
+  gap:var(--grid-gap);padding:var(--grid-pad) var(--grid-pad);
+
+  /* Off-screen grids skip style, layout and paint entirely. The default list is
+     776 tiles / 12k nodes over a 24000px page (65 EN cards × 11 languages —
+     see LANGUAGES + PLACEHOLDER_LANGS); a popular Pokémon is ten times that, and
+     every full relayout used to walk all of it (~31ms on the demo). Images inside
+     a skipped subtree are also not considered near-viewport, so their lazy loads
+     never enter the network queue until the grid is actually approached.
+     ON THE GRID, NOT ON .set-block, deliberately: set heads must stay rendered
+     and measurable, because setnav.js observes them with an IntersectionObserver
+     for its scroll-spy — inside a skipped subtree they never report intersecting.
+     `auto` (not `hidden`) keeps content findable: the browser un-skips a subtree
+     on a find-in-page hit, so Ctrl+F still reaches the last set. */
+  content-visibility:auto;
+  /* First-paint height guess only; `auto` remembers the real size once rendered.
+     renderBySet sets --cv-h per grid from the card count (estimateGridHeight) so
+     the scrollbar and sidebar jumps land close on the first pass. */
+  contain-intrinsic-block-size:auto var(--cv-h,600px);
 }
 
 /* Pokémon name divider inside a set block */
 .poke-divider{
   grid-column: 1 / -1;
   padding: 5px 2px 2px;
-  font-size: 10px; font-weight: bold; color: var(--c-divider-text,#2e7d32);
+  font-size:var(--fs-base); font-weight: bold; color: var(--c-divider-text,#2e7d32);
   border-top: 1px solid var(--c-divider,#e8f5e9);
 }
 .poke-divider:first-child { border-top: none; padding-top: 2px; }
 .poke-divider-names-alt { font-weight: normal; color: var(--c-divider-alt,#81c784); }
 
 /* ── CARD — consistent size, no overflow ── */
+/* The card is a CONTAINER, so everything inside it is sized in cqw (percent of the
+   tile's own width) rather than px or vw. A tile now ranges from ~108px on a phone to
+   ~200px on a desktop, and fixed 7-9px labels looked lost at the top of that range and
+   cramped at the bottom. Sizing against the tile keeps the card's internal proportions
+   identical at every viewport — which is also what removed the need for the old
+   two-row footer split at 600px.
+   Every cqw value is clamp()ed so a very narrow or very wide tile still yields legible,
+   sane text. */
 .card{
-  border:2px solid #e0e0e0;border-radius:7px;padding:4px;
-  display:flex;flex-direction:column;align-items:center;gap:3px;
-  cursor:pointer;background:#fafafa;
-  transition:background .1s,border-color .1s,transform .08s;
+  container-type:inline-size;
+  border:2px solid var(--c-border,#e0e0e0);border-radius:clamp(5px,4cqw,9px);padding:clamp(3px,2.5cqw,6px);
+  display:flex;flex-direction:column;align-items:center;gap:clamp(2px,2cqw,5px);
+  cursor:pointer;background:var(--c-surface-2,#fafafa);
+  /* No `transform` in the transition list: it is only ever set by :hover below,
+     which is now pointer-only, and transitioning it on hundreds of tiles promotes
+     a layer per tile. Colour transitions are compositor-cheap and stay. */
+  transition:background .1s,border-color .1s;
   user-select:none;overflow:hidden;
   /* consistent width — let grid control it */
   min-width:0;
 }
-.card:hover{background:var(--c-card-hover,#f0f8f0);border-color:var(--c-card-hover-border,#81c784);transform:translateY(-1px);}
+/* Pointer devices only. On touch, a tap left the hover state painted with no way
+   to clear it, so the last-tapped card stayed highlighted. */
+@media (hover:hover){
+  .card:hover{background:var(--c-card-hover,#f0f8f0);border-color:var(--c-card-hover-border,#81c784);transform:translateY(-1px);}
+}
 .card.done{background:var(--c-card-done-bg,#e8f5e9);border-color:var(--c-card-done-border,#43a047);}
 .card.cameo{border:2px solid #c8a400;}
-.card.cameo.done{background:#e8f5e9;border-color:#43a047;}
+.card.cameo.done{background:var(--c-card-done-bg,#e8f5e9);border-color:var(--c-card-done-border,#43a047);}
+/* ── OWNED IS COLOUR ──
+   The per-card checkbox is gone. What you own reads off the ARTWORK: unowned cards are
+   desaturated and slightly dimmed, owned ones are full colour. Across a 776-tile grid
+   that is legible at a glance in a way a 14px tick never was.
 
-.img-wrap{width:100%;display:flex;justify-content:center;overflow:hidden;}
+   The filter is on .img-wrap, not .card-img, so the placeholder cards (missing artwork —
+   a coloured div, not an image) desaturate with everything else. Partial, not full: a
+   completely grey grid is depressing to look at and loses the set symbols' colour cues.
+
+   The tile carries role="checkbox" + aria-checked, so this is a visual layer over a real
+   control rather than the only signal — see markCardToggle in js/ui/masterset.js. */
+.card .img-wrap{filter:grayscale(.82) opacity(.72);transition:filter .18s ease;}
+.card.done .img-wrap{filter:none;}
+@media (hover:hover){ .card:hover .img-wrap{filter:grayscale(.4) opacity(.9);} .card.done:hover .img-wrap{filter:none;} }
+@media (prefers-reduced-motion:reduce){ .card .img-wrap{transition:none;} }
+/* Focusable now that the tile is the control. */
+.card:focus-visible{outline:2px solid var(--c-accent-ink);outline-offset:2px;}
+
+.img-wrap{width:100%;display:flex;justify-content:center;overflow:hidden;position:relative;}
 /* Card image fills the cell width, maintains card aspect ratio */
 .card-img{
   width:100%;height:auto;
@@ -223,6 +1177,12 @@ body{padding-top:8px;}main{max-width:1100px;margin:0 auto;padding:12px;}
   border-radius:5px;display:block;
   object-fit:cover;
 }
+/* Placeholder shown over the image's reserved box while that image loads, so a tile is
+   never blank. The IMAGE keeps normal flow (its width+aspect-ratio reserve the box even
+   undecoded, and leaving it unpositioned keeps loading="lazy" behaving as before); the
+   PLACEHOLDER is what floats. JS removes it on decode, or drops .ph-over back into flow
+   when every source has failed. */
+.img-wrap .custom-placeholder.ph-over{position:absolute;inset:0;z-index:1;}
 
 /* ── CUSTOM PLACEHOLDER (missing image) — fills grid cell like a real card ── */
 .custom-placeholder{
@@ -235,28 +1195,54 @@ body{padding-top:8px;}main{max-width:1100px;margin:0 auto;padding:12px;}
   gap:2px;padding:5px 3px;text-align:center;position:relative;overflow:hidden;
 }
 .custom-placeholder::before{content:'';position:absolute;inset:2px;border-radius:4px;border:1px solid rgba(200,164,0,.35);pointer-events:none;}
-.cp-symbol{width:20px;height:20px;object-fit:contain;opacity:.5;filter:brightness(0) invert(1);margin-bottom:1px;}
-.cp-lang{font-size:7px;font-weight:bold;color:white;padding:1px 4px;border-radius:2px;}
-.cp-name{font-size:8px;font-weight:bold;color:#ffd54f;line-height:1.2;word-break:break-word;text-shadow:0 1px 2px rgba(0,0,0,.5);}
-.cp-native{font-size:8px;font-weight:bold;color:#ffe082;line-height:1.2;word-break:break-word;}
-.cp-set{font-size:7px;color:#a5d6a7;line-height:1.2;word-break:break-word;}
-.cp-num{font-size:6.5px;color:#81c784;font-style:italic;}
-.cp-note{font-size:6px;color:rgba(255,255,255,.4);margin-top:1px;line-height:1.2;}
-.img-retry-btn{margin-top:3px;padding:2px 5px;font-size:6.5px;border:1px solid rgba(200,164,0,.5);border-radius:3px;background:rgba(0,0,0,.2);color:#a5d6a7;cursor:pointer;}
+/* Placeholder text also scales with the tile — it stands in for card artwork, so it has
+   to stay readable at both ends of the tile range. The preview modal overrides these
+   with its own clamp()s further down. */
+.cp-symbol{width:clamp(16px,13cqw,30px);height:clamp(16px,13cqw,30px);object-fit:contain;opacity:.5;filter:brightness(0) invert(1);margin-bottom:1px;}
+.cp-lang{font-size:clamp(6.5px,4.4cqw,11px);font-weight:bold;color:white;padding:1px clamp(3px,2.4cqw,6px);border-radius:2px;}
+.cp-name{font-size:clamp(7.5px,5.2cqw,13px);font-weight:bold;color:#ffd54f;line-height:1.2;word-break:break-word;text-shadow:0 1px 2px rgba(0,0,0,.5);}
+.cp-native{font-size:clamp(7.5px,5.2cqw,13px);font-weight:bold;color:#ffe082;line-height:1.2;word-break:break-word;}
+.cp-set{font-size:clamp(6.5px,4.4cqw,11px);color:#a5d6a7;line-height:1.2;word-break:break-word;}
+.cp-num{font-size:clamp(6px,4cqw,10px);color:#81c784;font-style:italic;}
+.cp-note{font-size:clamp(5.5px,3.8cqw,9px);color:rgba(255,255,255,.4);margin-top:1px;line-height:1.2;}
+.img-retry-btn{margin-top:3px;padding:2px clamp(4px,3cqw,8px);font-size:clamp(6px,4cqw,10px);border:1px solid var(--ph-inner,rgba(200,164,0,.35));border-radius:3px;background:rgba(0,0,0,.2);color:var(--ph-set,#a5d6a7);cursor:pointer;}
 .img-retry-btn:hover{background:rgba(0,0,0,.35);}
 @media print{.img-retry-btn{display:none!important;}}
 
-/* ── CARD FOOTER ── */
-.card-footer{width:100%;display:flex;align-items:center;gap:3px;}
-.card-num{font-size:9px;color:#666;margin-right:auto;}
-.lang{font-size:7.5px;font-weight:bold;padding:1px 4px;border-radius:3px;color:white;}
+/* Spinner corner-marking a placeholder whose image is still in flight — the preview
+   adds .ph-loading on open and drops it once every candidate has settled. Only shown
+   when a request is genuinely pending: a card with no artwork gets no spinner, because
+   its placeholder is already the final answer. */
+.custom-placeholder.ph-loading::after{
+  content:'';position:absolute;top:6px;right:6px;width:12px;height:12px;
+  border:2px solid rgba(200,164,0,.25);border-top-color:#c8a400;border-radius:50%;
+  animation:ph-spin .7s linear infinite;
+}
+.preview-placeholder .custom-placeholder.ph-loading::after{
+  top:14px;right:14px;width:26px;height:26px;border-width:3px;
+}
+@keyframes ph-spin{to{transform:rotate(360deg);}}
+/* Honour reduced-motion: keep the indicator, drop the spin. */
+@media (prefers-reduced-motion:reduce){
+  .custom-placeholder.ph-loading::after{animation:none;opacity:.6;}
+}
+@media print{.custom-placeholder.ph-loading::after{display:none!important;}}
+
+/* ── CARD FOOTER ──
+   Sized in cqw against the card, so the footer keeps the same proportion of the tile at
+   every viewport instead of being tuned for one width. */
+.card-footer{width:100%;display:flex;align-items:center;gap:clamp(2px,2cqw,5px);}
+.card-num{font-size:clamp(8px,5.5cqw,13px);color:var(--c-text-dim,#555);margin-right:auto;}
+.lang{font-size:clamp(7px,4.6cqw,11px);font-weight:bold;padding:1px clamp(3px,2.4cqw,6px);border-radius:3px;color:white;}
 .lang-EN{background:#1565c0;}.lang-DE{background:#5b4000;}.lang-FR{background:#1a237e;}
 .lang-ES{background:#b71c1c;}.lang-IT{background:#1b5e20;}.lang-PT{background:#880e4f;}
 .lang-JP{background:#4527a0;}.lang-TW{background:#c62828;}.lang-TH{background:#283593;}
 .lang-ID{background:#e65100;}.lang-KR{background:#00695c;}.lang-SC{background:#4a148c;}
 .vbadges{display:inline-flex;gap:2px;align-items:center;}
-.vbadge{font-size:6.5px;font-weight:bold;line-height:1.4;padding:1px 3px;border-radius:3px;background:#3a2f00;color:#ffd54f;border:1px solid rgba(255,213,79,.45);letter-spacing:.3px;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
-.chk{width:14px;height:14px;cursor:pointer;accent-color:#2e7d32;flex-shrink:0;}
+.vbadge{font-size:clamp(6px,4cqw,10px);font-weight:bold;line-height:1.4;padding:1px clamp(2px,1.8cqw,5px);border-radius:3px;background:#3a2f00;color:#ffd54f;border:1px solid rgba(255,213,79,.45);letter-spacing:.3px;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+/* (.chk / .chk-hit removed with the per-card checkbox — the whole tile is the toggle
+   now and colour is the state. The print sheet keeps its own .chk-col checkbox, which
+   is a different thing: a box to tick with a pen.) */
 
 /* ── PREVIEW MODAL ── */
 .preview-overlay{
@@ -265,8 +1251,12 @@ body{padding-top:8px;}main{max-width:1100px;margin:0 auto;padding:12px;}
   align-items:center;justify-content:center;padding:16px;
 }
 .preview-overlay.open{display:flex;}
+/* The preview chrome is drawn from the PLACEHOLDER palette (--ph-*), not the neutral
+   surface tokens: it frames a card, so it should read like the placeholder card art it
+   sits next to. Those tokens are already per-palette, so this is pure reuse — and it
+   incidentally stops the overlay being Forest-green while the rest of the page is Ocean. */
 .preview-box{
-  background:#1a2a1a;border-radius:12px;
+  background:var(--ph-bg1,#1a2a1a);border-radius:12px;
   width:min(88vw,calc(80vh * 63.5 / 88.9));
   max-width:500px;
   position:relative;box-shadow:0 12px 60px rgba(0,0,0,.7);
@@ -294,33 +1284,50 @@ body{padding-top:8px;}main{max-width:1100px;margin:0 auto;padding:12px;}
 @media(max-width:500px){
   .preview-box{width:min(94vw,calc(75vh * 63.5 / 88.9));}
 }
-.preview-meta{color:#a5d6a7;font-size:11px;text-align:center;line-height:1.6;}
+.preview-meta{color:var(--ph-set,#a5d6a7);font-size:var(--fs-md);text-align:center;line-height:1.6;}
 .preview-close{
   position:absolute;top:8px;right:10px;background:none;border:none;
-  color:rgba(255,255,255,.6);font-size:22px;cursor:pointer;line-height:1;
+  color:rgba(255,255,255,.6);font-size:var(--fs-2xl);cursor:pointer;line-height:1;
 }
 .preview-close:hover{color:white;}
+/* Was font-size:var(--fs-2xs) with 1px padding — a ~12px target, unusable with a finger and
+   fiddly with a mouse. Sized against the tile now, so it is a comfortable target on a
+   large card and still fits beside the checkbox on a narrow one. That is what let the
+   old two-row footer split at 600px go. */
 .preview-btn{
-  font-size:7px;padding:1px 4px;border:1px solid rgba(200,164,0,.5);
-  border-radius:3px;background:rgba(0,0,0,.2);color:#a5d6a7;
-  cursor:pointer;margin-top:2px;
+  font-size:clamp(9px,6cqw,14px);padding:clamp(2px,1.8cqw,5px) clamp(5px,4cqw,10px);
+  border:1px solid var(--ph-inner,rgba(200,164,0,.35));
+  border-radius:3px;background:rgba(0,0,0,.2);color:var(--ph-set,#a5d6a7);
+  cursor:pointer;margin-top:0;line-height:1;
+  min-width:clamp(26px,17cqw,44px);min-height:clamp(22px,13cqw,32px);
+  display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;
 }
 .preview-btn:hover{background:rgba(0,0,0,.35);}
 
 /* ── MOBILE ── */
 @media(max-width:600px){
-  .header h1{font-size:11px;}
-  .btn{padding:3px 7px;font-size:9px;}
-  .stats{font-size:10px;}
-  .poke-bar{top:36px;}
-  .filter-bar{top:76px;}
-  .cards-grid{grid-template-columns:repeat(auto-fill,minmax(min(80px,100%),1fr));gap:4px;padding:5px;}
-  .card{padding:3px;gap:2px;}
-  .set-name-en{font-size:10px;}
+  .header h1{font-size:var(--fs-md);}
+  .btn{padding:3px 7px;font-size:var(--fs-sm);}
+  .stats{font-size:var(--fs-base);}
+  /* No per-bar `top:` here: the .filter-bars are position:static and sit inside
+     .sticky-top, which is the single sticky element. Offsets on a static element do
+     nothing — the old values were leftovers from when each bar stuck individually. */
+  /* The grid, the card padding and the two-row footer split used to be stepped here by
+     hand. --tile-min/--grid-gap/--grid-pad are clamps on vw now, and the card's own
+     contents are sized in container units, so all of that scales continuously instead —
+     including the tap targets the footer split existed to rescue. */
+  .set-name-en{font-size:var(--fs-base);}
   main{padding:6px;}
-}
-@media(max-width:380px){
-  .cards-grid{grid-template-columns:repeat(auto-fill,minmax(min(70px,100%),1fr));gap:3px;}
+  /* The h1 is static now, and the mode toggle beside it already says which mode you are
+     in — so on a phone it is pure duplication, and dropping it buys the identity row the
+     space the mode toggle and the stats need to stay on one line. */
+  #page-title{display:none;}
+  .mode-long{display:none;}
+  .stats-word{display:none;}
+  /* Reclaims 12px of horizontal padding and 4px of gaps — the identity row needed 349px
+     in a 338px box, so these are what let it stay a single line. */
+  .header{padding:8px;gap:6px;}
+  .filter-bar,#tms-filter-bar{padding-left:8px;padding-right:8px;}
 }
 
 /* ── PRINT CHECKLIST ── */
@@ -330,7 +1337,10 @@ body{padding-top:8px;}main{max-width:1100px;margin:0 auto;padding:12px;}
   .era-label{margin:6px 0 2px 1px;font-size:8px;}
   .set-block{box-shadow:none!important;margin-bottom:5px!important;border:1px solid #ccc!important;break-inside:avoid;}
   .set-head{padding:3px 8px!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
-  .cards-grid{grid-template-columns:repeat(6,1fr)!important;gap:3px!important;padding:5px!important;}
+  /* MANDATORY alongside the content-visibility:auto above. Without it, a manual
+     Ctrl+P of the page silently drops every set that was off-screen at the time. */
+  .cards-grid{grid-template-columns:repeat(6,1fr)!important;gap:3px!important;padding:5px!important;
+              content-visibility:visible!important;contain-intrinsic-block-size:auto none!important;}
   .card{border:1px solid #bbb!important;padding:3px!important;gap:2px!important;transform:none!important;}
   .card.done{background:#e8f5e9!important;border-color:#43a047!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
   .card-img{max-width:70px!important;}
@@ -347,7 +1357,7 @@ body{padding-top:8px;}main{max-width:1100px;margin:0 auto;padding:12px;}
 
 /* ── MODE TOGGLE ── */
 .mode-toggle{display:flex;gap:0;border-radius:6px;overflow:hidden;border:1.5px solid rgba(255,255,255,.45);flex-shrink:0;}
-.mode-btn{padding:4px 11px;font-size:10px;font-weight:bold;background:transparent;color:rgba(255,255,255,.65);border:none;cursor:pointer;transition:background .12s,color .12s;white-space:nowrap;}
+.mode-btn{padding:4px 11px;font-size:var(--fs-base);font-weight:bold;background:transparent;color:rgba(255,255,255,.65);border:none;cursor:pointer;transition:background .12s,color .12s;white-space:nowrap;}
 .mode-btn.active{background:rgba(255,255,255,.22);color:white;}
 .mode-btn:hover:not(.active){background:rgba(255,255,255,.1);color:rgba(255,255,255,.9);}
 @media print{.mode-toggle{display:none!important;}}
@@ -356,55 +1366,61 @@ body{padding-top:8px;}main{max-width:1100px;margin:0 auto;padding:12px;}
 #tms-header-controls{display:none;flex-wrap:wrap;gap:5px;}
 
 /* ── TMS FILTER BAR (sticky, same style as MS filter-bar) ── */
-#tms-filter-bar{background:#fff;border-top:1px solid #d7e8d7;padding:6px 14px;display:none;align-items:center;gap:7px;flex-wrap:wrap;}
+/* No flex-wrap:wrap here. It is a .mode-bar — 34px tall with overflow-y:visible — so a
+   wrapped second row does not get clipped, it lands on top of the page content. That is
+   exactly what .set-picker-bar used to do on a phone. */
+#tms-filter-bar{background:var(--c-surface,#fff);border-top:1px solid var(--c-border-tint,#d7e8d7);padding:6px 14px;display:none;align-items:center;gap:7px;}
 @media print{#tms-filter-bar{display:none!important;}}
 
 /* ── TMS APP ── */
-#tms-app{display:none;max-width:1100px;margin:0 auto;padding:12px;}
+#tms-app{display:none;width:min(100%,var(--page-w));margin:0 auto;padding:12px;}
 .tms-toolbar{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;align-items:center;}
 .tms-gen-filter{display:flex;flex-wrap:wrap;gap:4px;}
-.tms-gen-btn{padding:3px 9px;border-radius:20px;border:1.5px solid #ccc;background:white;color:#555;font-size:10px;cursor:pointer;transition:background .12s,color .12s;}
+.tms-gen-btn{padding:3px 9px;border-radius:20px;border:1.5px solid var(--c-border-strong,#ccc);background:var(--c-surface,#fff);color:var(--c-text-dim,#555);font-size:var(--fs-base);cursor:pointer;transition:background .12s,color .12s;}
 .tms-gen-btn.active{background:var(--c-accent2,#2e7d32);color:white;border-color:var(--c-accent2,#2e7d32);}
-.tms-gen-btn:hover:not(.active){background:#f0f0f0;}
-.tms-search{padding:4px 10px;border-radius:20px;border:1.5px solid #ccc;font-size:10px;outline:none;width:150px;}
+.tms-gen-btn:hover:not(.active){background:var(--c-surface-3,#f5f5f5);}
+/* background/color are explicit, not inherited: an <input> with no declared background
+   takes the UA's `Field` colour, which stays white-on-white in a dark palette. */
+.tms-search{padding:4px 10px;border-radius:20px;border:1.5px solid var(--c-border-strong,#ccc);background:var(--c-surface,#fff);color:var(--c-text,#1a1a1a);font-size:var(--fs-base);outline:none;width:150px;}
 .tms-search:focus{border-color:var(--c-accent2,#2e7d32);}
-.tms-lang-actions{background:#fff;border-top:1px solid #d7e8d7;padding:6px 14px;display:flex;flex-wrap:wrap;gap:5px;align-items:center;margin-bottom:10px;}
-.tms-lang-lbl{font-size:10px;font-weight:bold;color:#555;white-space:nowrap;margin-right:2px;}
-.tms-lang-btn{padding:2px 6px;border-radius:3px;border:1px solid transparent;font-size:8.5px;font-weight:bold;cursor:pointer;color:white;transition:opacity .1s;opacity:.85;}
-.tms-lang-btn:hover{opacity:1;}
-.tms-lang-btn.rem{background:#9e9e9e!important;border-color:#9e9e9e!important;}
+/* .tms-lang-actions / .tms-lang-lbl / .tms-lang-btn are GONE with the "Global language"
+   row they styled — see the comment in js/ui/tms.js's renderTMS. */
 
 /* TMS Pokémon grid */
-.tms-poke-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(95px,1fr));gap:7px;}
-.tms-poke-tile{background:white;border:2px solid #e0e0e0;border-radius:8px;padding:7px 5px;cursor:pointer;text-align:center;transition:border-color .12s,background .12s,transform .08s;position:relative;display:flex;flex-direction:column;align-items:center;gap:2px;}
+/* min(…,100%) matches .cards-grid: without it a single tile wider than the viewport
+   forces the page to scroll sideways. */
+.tms-poke-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(95px,100%),1fr));gap:7px;}
+.tms-poke-tile{background:var(--c-surface,#fff);border:2px solid var(--c-border,#e0e0e0);border-radius:8px;padding:7px 5px;cursor:pointer;text-align:center;transition:border-color .12s,background .12s,transform .08s;position:relative;display:flex;flex-direction:column;align-items:center;gap:2px;}
 .tms-poke-tile:hover{border-color:var(--c-card-hover-border,#81c784);background:var(--c-card-hover,#f0f8f0);transform:translateY(-1px);}
 .tms-poke-tile.has-cards{border-color:var(--c-card-done-border,#43a047);background:var(--c-card-done-bg,#e8f5e9);}
-.tms-poke-name{font-size:10px;font-weight:bold;color:#1a1a1a;line-height:1.3;word-break:break-word;}
-.tms-poke-dex{font-size:8px;color:#aaa;}
-.tms-poke-count{font-size:9px;font-weight:bold;color:var(--c-accent2,#2e7d32);}
-.tms-no-results{grid-column:1/-1;padding:24px;text-align:center;color:#999;font-size:11px;}
+.tms-poke-name{font-size:var(--fs-base);font-weight:bold;color:var(--c-text,#1a1a1a);line-height:1.3;word-break:break-word;}
+.tms-poke-dex{font-size:var(--fs-xs);color:var(--c-text-muted,#999);}
+.tms-poke-count{font-size:var(--fs-sm);font-weight:bold;color:var(--c-accent-ink);}
+.tms-no-results{grid-column:1/-1;padding:24px;text-align:center;color:var(--c-text-muted,#999);font-size:var(--fs-md);}
 
 /* TMS Popup Overlay */
 .tms-overlay{display:none;position:fixed;inset:0;z-index:300;background:rgba(0,0,0,.72);backdrop-filter:blur(4px);align-items:flex-start;justify-content:center;padding:16px;overflow-y:auto;}
 .tms-overlay.open{display:flex;}
-.tms-popup{background:white;border-radius:12px;width:min(96vw,880px);margin:auto;box-shadow:0 12px 60px rgba(0,0,0,.45);display:flex;flex-direction:column;max-height:88vh;position:relative;}
+.tms-popup{background:var(--c-surface,#fff);border-radius:12px;width:min(96vw,880px);margin:auto;box-shadow:0 12px 60px rgba(0,0,0,.45);display:flex;flex-direction:column;max-height:88vh;position:relative;}
 .tms-popup-head{background:linear-gradient(135deg,var(--c-accent1,#1b5e20),var(--c-accent2,#2e7d32));color:white;padding:11px 44px 11px 16px;border-radius:12px 12px 0 0;flex-shrink:0;}
-.tms-popup-title{font-size:15px;font-weight:bold;}
-.tms-popup-sub{font-size:10px;opacity:.8;margin-top:2px;}
-.tms-popup-close{position:absolute;top:9px;right:13px;background:none;border:none;color:rgba(255,255,255,.65);font-size:24px;cursor:pointer;line-height:1;z-index:1;}
+.tms-popup-title{font-size:var(--fs-xl);font-weight:bold;}
+.tms-popup-sub{font-size:var(--fs-base);opacity:.8;margin-top:2px;}
+.tms-popup-close{position:absolute;top:9px;right:13px;background:none;border:none;color:rgba(255,255,255,.65);font-size:var(--fs-2xl);cursor:pointer;line-height:1;z-index:1;}
 .tms-popup-close:hover{color:white;}
-.tms-popup-toolbar{padding:7px 10px;border-bottom:1px solid #eee;display:flex;flex-wrap:wrap;gap:5px;align-items:center;flex-shrink:0;background:#fafafa;border-radius:0;}
+.tms-popup-toolbar{padding:7px 10px;border-bottom:1px solid var(--c-border-soft,#eee);display:flex;flex-wrap:wrap;gap:5px;align-items:center;flex-shrink:0;background:var(--c-surface-2,#fafafa);border-radius:0;}
 .tms-popup-body{overflow-y:auto;padding:8px 10px;flex:1;}
 .tms-popup-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(78px,100%),1fr));gap:5px;}
-.tms-popup-card{border:2px solid #e0e0e0;border-radius:7px;padding:4px;cursor:pointer;background:#fafafa;transition:border-color .1s,background .1s;display:flex;flex-direction:column;align-items:center;gap:2px;user-select:none;}
+/* Also a container: it holds the same .custom-placeholder / .cp-* markup as a grid card,
+   which is sized in cqw. Without this they would resolve against the viewport instead. */
+.tms-popup-card{container-type:inline-size;border:2px solid var(--c-border,#e0e0e0);border-radius:7px;padding:4px;cursor:pointer;background:var(--c-surface-2,#fafafa);transition:border-color .1s,background .1s;display:flex;flex-direction:column;align-items:center;gap:2px;user-select:none;}
 .tms-popup-card:hover{border-color:var(--c-card-hover-border,#81c784);background:var(--c-card-hover,#f0f8f0);}
 .tms-popup-card.tms-in{background:var(--c-card-done-bg,#e8f5e9);border-color:var(--c-card-done-border,#43a047);}
-.tms-popup-set-divider{grid-column:1/-1;padding:4px 2px 2px;font-size:9px;font-weight:bold;color:var(--c-set-head,#2e7d32);border-top:1px solid #eee;margin-top:6px;display:flex;align-items:center;gap:4px;}
+.tms-popup-set-divider{grid-column:1/-1;padding:4px 2px 2px;font-size:var(--fs-sm);font-weight:bold;color:var(--c-set-head,#2e7d32);border-top:1px solid var(--c-border-soft,#eee);margin-top:6px;display:flex;align-items:center;gap:4px;}
 .tms-popup-set-divider:first-child{border-top:none;margin-top:0;}
 
 /* Shared action buttons for TMS popup */
-.tms-act-btn{padding:3px 9px;border-radius:4px;border:1px solid #ccc;background:white;color:#333;font-size:9px;cursor:pointer;white-space:nowrap;font-weight:bold;}
-.tms-act-btn:hover{background:#f5f5f5;}
+.tms-act-btn{padding:3px 9px;border-radius:4px;border:1px solid var(--c-border-strong,#ccc);background:var(--c-surface,#fff);color:var(--c-text,#1a1a1a);font-size:var(--fs-sm);cursor:pointer;white-space:nowrap;font-weight:bold;}
+.tms-act-btn:hover{background:var(--c-surface-3,#f5f5f5);}
 .tms-act-btn.success{color:#2e7d32;border-color:#a5d6a7;}
 .tms-act-btn.danger{color:#c62828;border-color:#ef9a9a;}
 .tms-act-btn:disabled{opacity:.4;cursor:not-allowed;}
@@ -412,21 +1428,78 @@ body{padding-top:8px;}main{max-width:1100px;margin:0 auto;padding:12px;}
 /* ── FIRST-RUN MODAL ── */
 .first-run-overlay{display:none;position:fixed;inset:0;z-index:400;background:rgba(0,0,0,.72);backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:16px;}
 .first-run-overlay.open{display:flex;}
-.first-run-modal{background:white;border-radius:12px;width:min(94vw,560px);max-height:88vh;box-shadow:0 12px 60px rgba(0,0,0,.45);display:flex;flex-direction:column;overflow:hidden;}
-.first-run-head{background:linear-gradient(135deg,var(--c-accent1,#1b5e20),var(--c-accent2,#2e7d32));color:white;padding:16px 18px;flex-shrink:0;}
-.first-run-title{font-size:16px;font-weight:bold;}
-.first-run-sub{font-size:11px;opacity:.85;margin-top:4px;}
+.first-run-modal{background:var(--c-surface,#fff);border-radius:12px;width:min(94vw,560px);max-height:88vh;box-shadow:0 12px 60px rgba(0,0,0,.45);display:flex;flex-direction:column;overflow:hidden;}
+.first-run-head{position:relative;background:linear-gradient(135deg,var(--c-accent1,#1b5e20),var(--c-accent2,#2e7d32));color:white;padding:16px 18px;flex-shrink:0;}
+/* Only rendered when there is somewhere to go back to — the picker is now reached by
+   clicking into Master set, not by loading the app, so backing out has to be possible. */
+.first-run-close{
+  position:absolute;top:8px;right:10px;background:none;border:none;line-height:1;
+  color:rgba(255,255,255,.6);font-size:var(--fs-2xl);cursor:pointer;padding:0 4px;
+}
+.first-run-close:hover{color:#fff;}
+.first-run-title{font-size:var(--fs-xl);font-weight:bold;}
+.first-run-sub{font-size:var(--fs-md);opacity:.85;margin-top:4px;}
 .first-run-body{padding:12px 18px;overflow-y:auto;flex:1;}
-.first-run-search{width:100%;padding:6px 12px;border-radius:20px;border:1.5px solid #ccc;font-size:11px;outline:none;box-sizing:border-box;margin-bottom:10px;}
+.first-run-search{width:100%;padding:6px 12px;border-radius:20px;border:1.5px solid var(--c-border-strong,#ccc);background:var(--c-surface,#fff);color:var(--c-text,#1a1a1a);font-size:var(--fs-md);outline:none;box-sizing:border-box;margin-bottom:10px;}
 .first-run-search:focus{border-color:var(--c-accent2,#2e7d32);}
-.first-run-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(95px,1fr));gap:7px;}
-.first-run-tile{background:#fafafa;border:2px solid #e0e0e0;border-radius:8px;padding:7px 5px;cursor:pointer;text-align:center;transition:border-color .12s,background .12s,transform .08s;user-select:none;}
+.first-run-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(95px,100%),1fr));gap:7px;}
+.first-run-tile{background:var(--c-surface-2,#fafafa);border:2px solid var(--c-border,#e0e0e0);border-radius:8px;padding:7px 5px;cursor:pointer;text-align:center;transition:border-color .12s,background .12s,transform .08s;user-select:none;}
 .first-run-tile:hover{border-color:var(--c-card-hover-border,#81c784);background:var(--c-card-hover,#f0f8f0);transform:translateY(-1px);}
 .first-run-tile.selected{border-color:var(--c-card-done-border,#43a047);background:var(--c-card-done-bg,#e8f5e9);}
-.first-run-tile-name{font-size:10px;font-weight:bold;color:#1a1a1a;line-height:1.3;word-break:break-word;}
-.first-run-tile-dex{font-size:8px;color:#aaa;}
-.first-run-empty{grid-column:1/-1;padding:24px;text-align:center;color:#999;font-size:11px;}
-.first-run-foot{padding:10px 18px 16px;border-top:1px solid #eee;flex-shrink:0;}
-.first-run-hint{font-size:9.5px;color:#888;line-height:1.5;margin:0 0 10px;}
+.first-run-tile-name{font-size:var(--fs-base);font-weight:bold;color:var(--c-text,#1a1a1a);line-height:1.3;word-break:break-word;}
+.first-run-tile-dex{font-size:var(--fs-xs);color:var(--c-text-muted,#999);}
+.first-run-empty{grid-column:1/-1;padding:24px;text-align:center;color:var(--c-text-muted,#999);font-size:var(--fs-md);}
+/* #ms-empty — every language deselected. All the .set-blocks above it are
+   display:none (.all-hidden), so this is the only thing on the page. */
+.empty-note{padding:28px 16px;text-align:center;color:var(--c-text-muted,#999);font-size:var(--fs-md);}
+.first-run-foot{padding:10px 18px 16px;border-top:1px solid var(--c-border-soft,#eee);flex-shrink:0;}
+.first-run-hint{font-size:var(--fs-sm);color:var(--c-text-muted,#999);line-height:1.5;margin:0 0 10px;}
 .first-run-actions{display:flex;justify-content:flex-end;gap:8px;}
-.tms-toolbar-sep{width:1px;background:#ddd;height:18px;margin:0 2px;flex-shrink:0;}
+
+/* ── PICKER MODALS (js/ui/pickers.js) ──
+   The Pokémon add/remove list and the language list. Same shell as the first-run modal
+   above and deliberately NOT sharing its classes: that one is a one-shot with its own
+   footer semantics, and merging them would mean one shell with two exclusive modes.
+   z-index 400 is the modal tier, matching .first-run-overlay and above .tms-overlay. */
+.picker-overlay{display:none;position:fixed;inset:0;z-index:400;background:rgba(0,0,0,.72);backdrop-filter:blur(4px);align-items:center;justify-content:center;padding:16px;}
+.picker-overlay.open{display:flex;}
+.picker-modal{background:var(--c-surface,#fff);border-radius:12px;width:min(94vw,560px);max-height:86vh;box-shadow:0 12px 60px rgba(0,0,0,.45);display:flex;flex-direction:column;overflow:hidden;}
+.picker-head{position:relative;background:linear-gradient(135deg,var(--c-accent1,#1b5e20),var(--c-accent2,#2e7d32));color:#fff;padding:14px 18px;flex-shrink:0;}
+.picker-title{font-size:var(--fs-xl);font-weight:bold;}
+.picker-sub{font-size:var(--fs-md);opacity:.85;margin-top:3px;padding-right:22px;}
+.picker-close{position:absolute;top:8px;right:10px;background:none;border:none;line-height:1;color:rgba(255,255,255,.6);font-size:var(--fs-2xl);cursor:pointer;padding:0 4px;}
+.picker-close:hover{color:#fff;}
+.picker-body{padding:12px 18px;overflow-y:auto;flex:1;}
+.picker-search{width:100%;padding:6px 12px;border-radius:20px;border:1.5px solid var(--c-border-strong,#ccc);background:var(--c-surface,#fff);color:var(--c-text,#1a1a1a);font-size:var(--fs-md);outline:none;margin-bottom:10px;}
+.picker-search:focus{border-color:var(--c-accent-ink);}
+.picker-section{font-size:var(--fs-sm);font-weight:bold;text-transform:uppercase;letter-spacing:.6px;color:var(--c-text-muted,#999);margin:10px 0 6px;}
+.picker-section:first-child{margin-top:0;}
+.picker-hint{font-size:var(--fs-md);color:var(--c-text-muted,#999);padding:18px 4px;text-align:center;}
+.picker-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(150px,100%),1fr));gap:6px;}
+/* Language tiles carry a flag and a full name, so they need more room than a bare name. */
+.lang-grid{grid-template-columns:repeat(auto-fill,minmax(min(170px,100%),1fr));}
+.picker-tile{
+  display:flex;align-items:center;gap:7px;width:100%;padding:7px 9px;
+  border:2px solid var(--c-border,#e0e0e0);border-radius:8px;
+  background:var(--c-surface-2,#fafafa);color:var(--c-text,#1a1a1a);
+  font:inherit;text-align:left;cursor:pointer;
+  transition:border-color .12s,background .12s,transform .08s;
+}
+.picker-tile:hover:not(:disabled){border-color:var(--c-card-hover-border,#81c784);background:var(--c-card-hover,#f0f8f0);transform:translateY(-1px);}
+.picker-tile.selected{border-color:var(--c-card-done-border,#43a047);background:var(--c-card-done-bg,#e8f5e9);}
+.picker-tile:disabled{opacity:.45;cursor:not-allowed;}
+.picker-tile:focus-visible{outline:2px solid var(--c-accent-ink);outline-offset:1px;}
+.picker-tile-name{flex:1;min-width:0;font-size:var(--fs-md);font-weight:bold;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.picker-tile-meta{flex-shrink:0;font-size:var(--fs-sm);color:var(--c-text-muted,#999);font-variant-numeric:tabular-nums;}
+/* THE OFF STATE. Same grammar as the card grid, where an unowned card is greyscaled —
+   so "colour = you have it / it is on" means one thing everywhere in the app. */
+.picker-tile.off{opacity:.62;}
+.picker-tile.off .lang-flag{filter:grayscale(1);}
+.picker-tile.off:hover{opacity:1;}
+.picker-foot{display:flex;justify-content:flex-end;gap:8px;padding:10px 18px 14px;border-top:1px solid var(--c-border-soft,#eee);flex-shrink:0;}
+.picker-act{padding:4px 11px;border-radius:6px;border:1px solid var(--c-border-strong,#ccc);background:var(--c-surface,#fff);color:var(--c-text-dim,#555);font:inherit;font-size:var(--fs-md);cursor:pointer;}
+.picker-act:hover{background:var(--c-surface-3,#f5f5f5);border-color:var(--c-accent-ink);color:var(--c-accent-ink);}
+@media (prefers-reduced-motion:reduce){ .picker-tile{transition:none;} .picker-tile:hover{transform:none;} }
+@media print{.picker-overlay{display:none!important;}}
+
+.tms-toolbar-sep{width:1px;background:var(--c-border,#e0e0e0);height:18px;margin:0 2px;flex-shrink:0;}

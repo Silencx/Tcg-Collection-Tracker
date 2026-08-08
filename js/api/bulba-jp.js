@@ -67,11 +67,18 @@ async function fetchWikitext(pokeName, fetchImpl) {
  * Used live by the browser and at build time by tools/build-data.mjs.
  */
 export async function fetchJpRaw(names, fetchImpl = fetch) {
-  const out = [];
-  for (const name of names) {
+  // Parallel, matching legacy.js's fetchBulbaData, which requests the same pages
+  // the same way — this was a sequential for/await, so a five-Pokémon list paid
+  // five round-trips end to end instead of one.
+  //
+  // Promise.all rather than the tcgdex pool on purpose: this module imports
+  // nothing, which is what lets tools/build-data.mjs run it under Node. Mapping
+  // then flattening (instead of pushing as results arrive) keeps the output order
+  // tied to `names`, so the built snapshot stays byte-stable between runs.
+  const perName = await Promise.all(names.map(async name => {
     const wt = await fetchWikitext(name, fetchImpl);
-    if (!wt) continue;
-    for (const e of parseBulbaJPCards(wt)) out.push({ ...e, pokemonName: name });
-  }
-  return out;
+    if (!wt) return [];
+    return parseBulbaJPCards(wt).map(e => ({ ...e, pokemonName: name }));
+  }));
+  return perName.flat();
 }

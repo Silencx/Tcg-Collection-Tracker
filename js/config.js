@@ -12,6 +12,43 @@
 // blobs and the export envelope so the import screen can validate/migrate.
 export const SCHEMA_VERSION = 1;
 
+// ── APP MODES ─────────────────────────────────────────────────────────────────
+// The single source of truth for "how many modes are there".
+//
+// There used to be TWO independent whitelists — state.js's boot read of MODESTORE and
+// io.js's applySession — and both silently coerced anything unrecognised to 'master'.
+// A third mode therefore could not survive a reload, and was quietly dropped from every
+// shared #s= link, with no error anywhere. Adding one here is now the whole change.
+export const APP_MODES = ['dash', 'master', 'tms', 'set'];
+
+// Where boot lands, always. Deliberate: the dashboard needs no network and no card
+// render, so it is the one mode that is free to show. See the comment on state.appMode
+// for why the persisted mode is NOT a landing preference.
+export const DEFAULT_MODE = 'dash';
+
+/** @returns {boolean} whether `m` is a mode this build knows how to render. */
+export function isValidMode(m) {
+  return APP_MODES.includes(m);
+}
+
+// ── SERIES ────────────────────────────────────────────────────────────────────
+// TCGdex groups sets into series ("sv" = Scarlet & Violet, "swsh" = Sword & Shield).
+// The map from set id → series id is shipped in data/sets.json as `setSeries`, derived
+// at build time from TCGdex's own /series endpoints — NOT guessed from the id, which is
+// wrong for a large minority of sets (see tcgdexSerieSegment in js/api/images.js).
+//
+// Series that are DIGITAL-ONLY products rather than physical expansions you can own.
+// `tcgp` is Pokémon TCG Pocket, the mobile game (A1 Genetic Apex, A1a Mythical Island,
+// B1 Mega Rising, … 15 sets). They are excluded from the single-set picker, which is a
+// tool for completing a physical set. A Set so the predicate is O(1) and adding another
+// digital line later is a one-word change.
+export const DIGITAL_SERIES = new Set(['tcgp']);
+// Bucket for any set whose series cannot be resolved. Should be empty in practice —
+// coverage measured 100% in all 9 languages — but a set added to /sets between two
+// build sweeps would otherwise vanish from the picker entirely.
+export const OTHER_SERIES_ID = 'other';
+export const OTHER_SERIES_NAME = 'Other sets';
+
 // ── STORAGE KEYS ──────────────────────────────────────────────────────────────
 export const CHKSTORE   = 'tcgChk_v1';
 export const POKESTORE  = 'tcgPokemon_v1';
@@ -23,10 +60,35 @@ export const MODESTORE  = 'tcgMode_v1';
 export const TMSSTORE   = 'tcgTMS_v1';
 export const TMSFILTERSTORE = 'tcgTMSFilter_v1';
 export const TMSCACHESTORE  = 'tcgTMSPokes_v1';
+// Single-set mode. The tcg prefix is functional — storage.keys('tcg') drives
+// export/backup — so correctly named keys need no export wiring of their own.
+export const SETTARGETSTORE = 'tcgSetTarget_v1';  // the chosen set id
+export const SETCHKSTORE    = 'tcgSetChk_v1';     // its checklist, SEPARATE from CHKSTORE
+// (No SETFILTERSTORE: single-set mode has no language filter — the language is chosen in
+// the picker, before the set. tcgSetFilter_v1 may still exist in an older profile; it is
+// simply unread, and storage.keys('tcg') will carry it through an export harmlessly.)
+export const SETPICKERSTORE = 'tcgSetPicker_v1';  // picker chrome: {lang, asc}
 export const PALETTE_KEY = 'tcgPalette_v1';
 export const SESSIONSTORE = 'tcgSession_v1'; // base64url settings hash (Phase 5)
+export const IMGFAILSTORE = 'tcgImgFail_v1'; // negative cache of image URLs that 404/403
+// Set-navigation sidebar open/closed. Device-local CHROME, deliberately NOT part
+// of the shareable session hash (io.js encodeSession) — a link shared from a
+// desktop shouldn't force the panel open on the recipient's phone.
+export const SETNAVSTORE = 'tcgSetNav_v1';
 export const DEFAULT_POKEMON = ['Seedot', 'Nuzleaf', 'Shiftry']; // default list + pre-build target
 export const CACHE_TTL  = 24*60*60*1000; // 24h EN card-data cache TTL
+
+// Image-availability negative cache (js/api/img-cache.js).
+//
+// TTL is long because the thing being remembered barely moves: TCGdex has no card
+// images AT ALL for zh-Hant/th/id (verified across bw4→sv05, every era), and the
+// per-card gaps in the Latin languages are individual missing scans. A week keeps
+// the console quiet and the requests down while still letting newly-added artwork
+// appear on its own — nothing here is ever a permanent verdict.
+export const IMG_FAIL_TTL = 7*24*60*60*1000;
+// Cap so a big Pokémon list can't grow this blob without bound (65 cards × 9
+// languages is ~585 entries for the default list). Oldest entries are evicted.
+export const IMG_FAIL_MAX = 4000;
 
 // ── LANGUAGES (data languages with TCGdex coverage) ───────────────────────────
 export const LANGUAGES = [
@@ -77,9 +139,6 @@ export const ERA_MAP = {
   hgss:'HeartGold & SoulSilver Era', pl:'Platinum Era',
   dp:'Diamond & Pearl Era', ex:'EX Series Era', base:'Original Era',
 };
-
-// Release date overrides for sets where pokemontcg.io has wrong dates
-export const RELEASE_DATE_OVERRIDES = {};
 
 // pokemontcg.io series name → TCGdex era code (for ERA_MAP display names)
 export const PTCGIO_SERIES_ERA = {

@@ -4,6 +4,11 @@ on:
   schedule:
     - cron: '0 6 * * 1'
   workflow_dispatch:
+    inputs:
+      add:
+        description: 'Pokémon to ADD to data/prebuilt.json permanently, comma-separated (e.g. "Pikachu,Eevee"). Leave blank to just rebuild the existing list.'
+        required: false
+        default: ''
 
 permissions:
   contents: write
@@ -20,18 +25,44 @@ jobs:
         with:
           node-version: 20
 
-      # Builds the DEFAULT_POKEMON demo snapshot. tools/build-data.mjs also accepts
-      # an optional comma-separated Pokémon list argument for building a different
-      # snapshot locally (e.g. `node tools/build-data.mjs "Pikachu,Eevee"`); this
-      # scheduled workflow always runs the no-arg (default) form.
+      # A manual run APPENDS to data/prebuilt.json rather than building a one-off
+      # snapshot. Passing the names straight to build-data.mjs would produce a snapshot
+      # that the next scheduled run silently overwrites; widening coverage has to be
+      # durable to be worth anything.
+      - name: Extend the prebuilt list
+        if: ${{ inputs.add != '' }}
+        env:
+          ADD: ${{ inputs.add }}
+        run: |
+          node -e '
+            const fs = require("node:fs");
+            const file = "data/prebuilt.json";
+            const current = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) : [];
+            const add = process.env.ADD.split(",").map(s => s.trim()).filter(Boolean);
+            const merged = [...new Set([...current, ...add])];
+            if (merged.length > 60) throw new Error(`prebuilt list would reach ${merged.length}; cap is 60 (each entry costs a list request plus pooled detail calls every week)`);
+            fs.writeFileSync(file, JSON.stringify(merged, null, 2) + "\n");
+            console.log(`prebuilt list: ${current.length} -> ${merged.length}`);
+          '
+
+      # No argument: build-data.mjs reads data/prebuilt.json, falling back to
+      # DEFAULT_POKEMON. It writes the monolithic snapshots, the per-Pokémon shards
+      # under data/cards|jp/, and data/index.json.
+      #
+      # APITCG_KEY is optional. It is the ONLY place API TCG is ever called from — the
+      # key must not reach the browser, since this deploys as static files. When the
+      # secret is unset (a fork, or before it has been added) the build still succeeds
+      # and simply skips the API TCG gap-fill.
       - name: Build data
+        env:
+          APITCG_KEY: ${{ secrets.APITCG_KEY }}
         run: node tools/build-data.mjs
 
       - name: Commit and push if changed
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/cards.json data/sets.json data/jp.json
+          git add data/
           if git diff --staged --quiet; then
             echo "No changes to commit"
           else

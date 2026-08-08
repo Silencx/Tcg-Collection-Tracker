@@ -12,14 +12,20 @@ $RECYCLE.BIN/
 .vscode/
 .idea/
 *.swp
+reference/
 
 # Logs
 *.log
 npm-debug.log*
 
 # Env/secrets
+# .env.local is where APITCG_KEY lives for local builds — see README "Refresh the
+# card data". CI supplies it as a repo secret instead, so it is never committed
+# either way. The wildcard covers .env.production and friends too.
 .env
-.env.local
+.env.*
+*.key
+*.pem
 
 # Claude Code tooling (local-only, not shared with the team)
 .claude

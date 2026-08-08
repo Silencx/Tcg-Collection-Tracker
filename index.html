@@ -13,76 +13,206 @@
 <!-- HEADER -->
 <div class="header">
   <div class="mode-toggle">
-    <button id="btn-mode-master" class="mode-btn active" onclick="setMode('master')">&#128230; Master Set</button>
-    <button id="btn-mode-tms" class="mode-btn" onclick="setMode('tms')">&#11088; True Master Set</button>
+    <!-- .mode-long is dropped on phones: at full length the toggle is 205px, which is
+         over half a 390px row and forces the stats and the two icon buttons onto a
+         line of their own. Nothing reads this text — setMode takes an argument and
+         applyModeUI toggles a class. -->
+    <button id="btn-mode-dash" class="mode-btn active" onclick="setMode('dash')">&#127968;<span class="mode-long"> Home</span></button>
+    <button id="btn-mode-master" class="mode-btn" onclick="setMode('master')">&#128230; Master<span class="mode-long"> set</span></button>
+    <button id="btn-mode-tms" class="mode-btn" onclick="setMode('tms')">&#11088; True<span class="mode-long"> master set</span></button>
+    <button id="btn-mode-set" class="mode-btn" onclick="setMode('set')">&#128216;<span class="mode-long"> Single set</span></button>
   </div>
-  <h1 id="page-title">&#127807; Pokémon TCG Master Set Checklist</h1>
+  <h1 id="page-title">Pokémon TCG Master Set Checklist</h1>
   <span class="stats" id="stats">Loading&hellip;</span>
-  <!-- Master Set controls -->
-  <div id="master-controls" style="display:flex;flex-wrap:wrap;gap:5px;align-items:center;">
-    <button class="btn btn-print-sel" id="btn-print-sel" onclick="printSelected()">&#128424; Print Selected</button>
-    <button class="btn btn-secondary" onclick="printChecklist()">&#9776; Print Checklist</button>
-    <button class="btn btn-secondary" id="btn-select-all" onclick="selectAll()">&#9745; Select All</button>
+  <!-- Notification bell. At .header level for the same reason as the sidebar toggle:
+       applyModeUI hides #master-controls / #tms-header-controls wholesale, so anything
+       inside either would vanish in the other mode. Reusing <details class="more-menu">
+       inherits the outside-click and Escape close already wired in main.js, so nothing
+       here needs an entry in the window manifest. -->
+  <details class="more-menu notif-menu" id="notif-menu">
+    <summary class="btn btn-secondary" title="Messages" aria-label="Notifications">&#128276;<span class="notif-count" id="notif-count" hidden>0</span></summary>
+    <!-- renderList wipes its target, so the rows live in their own inner container and
+         the "Clear all" header survives a re-render. -->
+    <div class="more-panel notif-panel" id="notif-list">
+      <div class="notif-head" id="notif-head" hidden>
+        <span class="notif-head-title">Messages</span>
+        <button type="button" class="notif-clear" id="notif-clear-all">Clear all</button>
+      </div>
+      <div class="notif-rows" id="notif-rows"></div>
+    </div>
+  </details>
+  <!-- Banners are appended into #dyn, which nothing announces. This is the live region
+       instead — never #dyn itself, which would try to announce a 776-tile render. -->
+  <div id="notif-live" class="sr-only" aria-live="polite" aria-atomic="true"></div>
+  <!-- Settings. At .header level, so ONE copy serves both modes — the theme picker used
+       to be duplicated into each control row because applyModeUI hides whichever row is
+       inactive. Sections that only apply to one mode are toggled by applyModeUI instead.
+       Reuses <details class="more-menu">, which already gets outside-click and Escape
+       closing from main.js, so it needs no window-manifest entry. -->
+  <details class="more-menu settings-menu" id="settings-menu">
+    <summary class="btn btn-secondary" title="Settings" aria-label="Settings">&#9881;</summary>
+    <div class="more-panel settings-panel">
+      <div class="settings-section">
+        <span class="settings-label">Appearance</span>
+        <div class="theme-grid">
+          <button class="theme-opt active" data-palette="" onclick="setPalette(this,'')"><span class="theme-dot" style="background:linear-gradient(135deg,#1a3a2a,#c8a400)"></span>Forest</button>
+          <button class="theme-opt" data-palette="palette-ocean" onclick="setPalette(this,'palette-ocean')"><span class="theme-dot" style="background:linear-gradient(135deg,#0d2137,#29b6f6)"></span>Ocean</button>
+          <button class="theme-opt" data-palette="palette-dusk" onclick="setPalette(this,'palette-dusk')"><span class="theme-dot" style="background:linear-gradient(135deg,#2a1a3a,#ce93d8)"></span>Dusk</button>
+          <button class="theme-opt" data-palette="palette-fire" onclick="setPalette(this,'palette-fire')"><span class="theme-dot" style="background:linear-gradient(135deg,#3a1a0d,#ff8f00)"></span>Fire</button>
+          <button class="theme-opt" data-palette="palette-mono" onclick="setPalette(this,'palette-mono')"><span class="theme-dot" style="background:linear-gradient(135deg,#1c1c1c,#9e9e9e)"></span>Mono</button>
+          <button class="theme-opt" data-palette="palette-dark" onclick="setPalette(this,'palette-dark')"><span class="theme-dot" style="background:linear-gradient(135deg,#0f1216,#3a4552)"></span>Dark</button>
+        </div>
+      </div>
+      <div class="settings-section">
+        <span class="settings-label">Your data</span>
+        <div class="settings-actions">
+          <button class="btn btn-secondary" onclick="exportData()" title="Download all your data as JSON (backup / device transfer)">Export</button>
+          <label class="btn btn-secondary" title="Restore data from a JSON backup file">Import<input type="file" accept="application/json,.json" style="display:none" onchange="importData(this)"></label>
+          <button class="btn btn-secondary" onclick="shareSession()" title="Copy a shareable link to your current view (mode, filters, Pokémon, sort, theme)">Share view</button>
+          <button class="btn btn-secondary" onclick="restoreSession()" title="Apply a shared view link/code, or restore your last saved view">&#8617; Restore view</button>
+        </div>
+      </div>
+      <!-- Mode-specific: clearCache/resetAll and clearTmsCache/resetTms act on different
+           data, so they cannot be merged. applyModeUI shows exactly one. -->
+      <div class="settings-section" id="settings-master-only">
+        <span class="settings-label">Master set data</span>
+        <div class="settings-actions">
+          <button class="btn btn-secondary" onclick="clearCache()" title="Clear cached card data and reload">Clear cache</button>
+          <button class="btn btn-secondary btn-danger" onclick="resetAll()">&#8634; Reset everything</button>
+        </div>
+      </div>
+      <div class="settings-section" id="settings-tms-only">
+        <span class="settings-label">True master set data</span>
+        <div class="settings-actions">
+          <button class="btn btn-secondary" onclick="clearTmsCache()" title="Clear cached card data">Clear cache</button>
+          <button class="btn btn-secondary btn-danger" onclick="resetTms()">&#8634; Reset True Master Set</button>
+        </div>
+      </div>
+    </div>
+  </details>
+  <!-- ── ROW 2 ──
+       The ☰ Sets toggle plus whichever mode's control row is active. Sets used to sit in
+       the identity row above; it is an action, not identity, and down here it also means
+       row 2 is never completely empty — on Home and on the set picker, where no control
+       row is shown, the header used to reserve a blank 32px band under the mode tabs.
+       It stays OUTSIDE the three control rows because applyModeUI hides those wholesale,
+       and a copy in each would be three copies of one button. -->
+  <div class="header-row2">
+  <button class="btn btn-secondary sb-toggle" id="set-nav-toggle" aria-expanded="false" aria-controls="set-nav" title="Show the set list" onclick="toggleSetNav()">&#9776; Sets</button>
+  <!-- Master Set controls. Everyday actions only, in one row that scrolls sideways
+       rather than wrapping — settings and destructive actions live in the gear panel
+       above. Collapse all and Print checklist were promoted out of the old ⋯ More
+       menu; they are used often enough that hiding them behind a click was wrong. -->
+  <!-- ORDER IS AN INVARIANT: every mode's control row opens with Print selected then
+       Print checklist, so the two controls people look for are in the same place
+       whichever mode they are in. tests/palette-manifest.test.mjs enforces it. -->
+  <div id="master-controls" class="control-row hscroll">
+    <button class="btn btn-print-sel" id="btn-print-sel" onclick="printSelected()">Print selected</button>
+    <button class="btn btn-secondary" onclick="printChecklist()">&#9776; Print checklist</button>
+    <button class="btn btn-secondary" id="btn-select-all" onclick="selectAll()">&#9745; Select all</button>
     <button class="btn btn-secondary" id="btn-refresh" onclick="doRefresh()">&#8634; Refresh</button>
-    <button class="btn btn-secondary" onclick="clearCache()" title="Clear cached card data and reload">&#128465; Clear Cache</button>
-    <button class="btn btn-secondary" onclick="exportData()" title="Download all your data as JSON (backup / device transfer)">&#128190; Export data</button>
-    <label class="btn btn-secondary" title="Restore data from a JSON backup file">&#128229; Import data<input type="file" accept="application/json,.json" style="display:none" onchange="importData(this)"></label>
-    <button class="btn btn-secondary" onclick="shareSession()" title="Copy a shareable link to your current view (mode, filters, Pokémon, sort, theme)">&#128279; Share view</button>
-    <button class="btn btn-secondary" onclick="restoreSession()" title="Apply a shared view link/code, or restore your last saved view">&#8617; Restore view</button>
-    <button class="btn btn-secondary" onclick="resetAll()">&#8634; Reset</button>
     <button class="btn btn-secondary" id="btn-sort" onclick="toggleSort()" title="Toggle set sort order">&#8595; Newest first</button>
+    <!-- Twin of the sidebar's "Collapse all". It lives out here too because the sidebar
+         copy was, for a while, the ONLY control that could expand a collapsed page —
+         and closing the panel took it away with it. -->
+    <button class="btn btn-secondary" id="more-collapse-all" onclick="toggleCollapseAll()" title="Hide every set&#8217;s cards. Collapsed sets are not reachable with Ctrl+F.">&#9662; Collapse all</button>
   </div>
   <!-- True Master Set controls -->
-  <div id="tms-header-controls">
-    <button class="btn btn-print-sel" id="btn-tms-print-sel" onclick="printTmsSelected()">&#128424; Print Selected (0)</button>
-    <button class="btn btn-secondary" onclick="printTmsChecklist()">&#9776; Print Checklist</button>
-    <button class="btn btn-secondary" onclick="resetTms()">&#8634; Reset</button>
-    <button class="btn btn-secondary" onclick="clearTmsCache()" title="Clear cached card data">&#128465; Clear Cache</button>
-    <button class="btn btn-secondary" onclick="exportData()" title="Download all your data as JSON (backup / device transfer)">&#128190; Export data</button>
-    <label class="btn btn-secondary" title="Restore data from a JSON backup file">&#128229; Import data<input type="file" accept="application/json,.json" style="display:none" onchange="importData(this)"></label>
-    <button class="btn btn-secondary" onclick="shareSession()" title="Copy a shareable link to your current view (mode, filters, Pokémon, sort, theme)">&#128279; Share view</button>
-    <button class="btn btn-secondary" onclick="restoreSession()" title="Apply a shared view link/code, or restore your last saved view">&#8617; Restore view</button>
-  <div class="palette-bar">
-    <span class="palette-label">Theme:</span>
-    <button class="palette-btn active" data-palette="" title="Forest (default)" style="background:linear-gradient(135deg,#1a3a2a,#c8a400)" onclick="setPalette(this,'')"></button>
-    <button class="palette-btn" data-palette="palette-ocean" title="Ocean" style="background:linear-gradient(135deg,#0d2137,#29b6f6)" onclick="setPalette(this,'palette-ocean')"></button>
-    <button class="palette-btn" data-palette="palette-dusk" title="Dusk" style="background:linear-gradient(135deg,#2a1a3a,#ce93d8)" onclick="setPalette(this,'palette-dusk')"></button>
-    <button class="palette-btn" data-palette="palette-fire" title="Fire" style="background:linear-gradient(135deg,#3a1a0d,#ff8f00)" onclick="setPalette(this,'palette-fire')"></button>
-    <button class="palette-btn" data-palette="palette-mono" title="Mono" style="background:linear-gradient(135deg,#1c1c1c,#9e9e9e)" onclick="setPalette(this,'palette-mono')"></button>
-  </div>
-</div>
+  <div id="tms-header-controls" class="control-row hscroll">
+    <button class="btn btn-print-sel" id="btn-tms-print-sel" onclick="printTmsSelected()">Print selected (0)</button>
+    <button class="btn btn-secondary" onclick="printTmsChecklist()">&#9776; Print checklist</button>
+  </div><!-- /tms-header-controls -->
+  <!-- Single-set controls. Reset acts ONLY on this mode's checklist — the three
+       checklists are deliberately independent. -->
+  <div id="set-controls" class="control-row hscroll">
+    <button class="btn btn-print-sel" id="btn-set-print-sel" onclick="printSetSelected()">Print selected</button>
+    <button class="btn btn-secondary" onclick="printSetChecklist()">&#9776; Print checklist</button>
+    <button class="btn btn-secondary" onclick="changeSet()">Change set</button>
+    <button class="btn btn-secondary" onclick="selectAllSet()">&#9745; Select all shown</button>
+    <button class="btn btn-secondary btn-danger" onclick="resetSet()">&#8634; Clear this set</button>
+  </div><!-- /set-controls -->
+  </div><!-- /header-row2 -->
+</div><!-- /header -->
 
-<!-- POKÉMON SELECTOR -->
-<div class="poke-bar">
-  <span class="poke-bar-label">Pokémon:</span>
+<!-- ── CONTEXT BARS ──
+     Below the header (identity row + control row) each mode renders its own bars. They
+     are all .filter-bar so every mode's chrome is the same SURFACE: Master Set's Pokémon
+     row used to be the lone dark-green/dark-grey strip in an app where Home, True master
+     set and single set all had a light one, and switching into Master set looked like a
+     theme change.
+
+     Master Set is the one mode with TWO. They were merged into a single 34px row for a
+     while to keep every mode's sticky chrome exactly the same height, and it did not
+     survive contact with real content: three Pokémon chips, an add field and twelve
+     language pills in one row left the pills clipped mid-badge and nothing legible.
+     Equal heights are not worth an unusable row. -->
+<!-- Adding a Pokémon is a MODAL (js/ui/pickers.js), not a field in this row. The old
+     "Add Pokémon…" input asked you to already know the name, matched on prefix only,
+     and showed eight results in a dropdown clipped by a 34px bar. -->
+<div class="filter-bar mode-bar" id="poke-bar">
+  <span class="filter-label">Pokémon:</span>
   <div class="poke-chips" id="poke-chips"></div>
-  <div class="poke-input-wrap">
-    <div class="poke-input-container">
-      <input class="poke-input" id="poke-input" placeholder="Add Pokémon…" autocomplete="off" oninput="onPokeInput(this.value)" onkeydown="onPokeKey(event)">
-      <div class="poke-suggestions" id="poke-suggestions"></div>
-    </div>
-    <button class="poke-add-btn" onclick="addPokeFromInput()">+ Add</button>
-  </div>
+  <button class="poke-add-btn" onclick="openPokemonPicker()" title="Add or remove tracked Pokémon">+ Add Pokémon</button>
 </div><!-- /poke-bar -->
 
-<!-- LANGUAGE FILTER (Master Set) -->
-<div class="filter-bar" id="ms-filter-bar">
+<!-- LANGUAGE FILTER (Master Set) — the second of this mode's two bars. #filter-pills
+     holds a SUMMARY button now, not twelve pills; the pills became a modal with flags
+     and full language names for the same reason the Pokémon field did. The id stays so
+     the scoping rule tests/pill-scope.test.mjs enforces still has a name to point at. -->
+<div class="filter-bar mode-bar" id="ms-filter-bar">
   <span class="filter-label">Language:</span>
   <div class="filter-pills" id="filter-pills"></div>
-  <button class="filter-clear" onclick="toggleAllFilter()">Show All</button>
-</div>
-<!-- LANGUAGE FILTER (True Master Set) -->
-<div class="filter-bar" id="tms-filter-bar" style="border-radius:0 0 12px 12px;box-shadow:0 4px 16px rgba(0,0,0,.18);">
+</div><!-- /ms-filter-bar -->
+
+<!-- LANGUAGE FILTER (True Master Set) — this mode's one bar. -->
+<div class="filter-bar mode-bar" id="tms-filter-bar">
   <span class="filter-label">Language:</span>
   <div class="filter-pills" id="tms-filter-pills"></div>
-  <button class="filter-clear" onclick="toggleAllTmsFilter()">Show All</button>
 </div>
+
+<!-- Single set's one bar, and ONLY while the PICKER is showing: search, language, sort.
+     No language filter for an open set, deliberately — the language is chosen here,
+     before the set, so the open set already has exactly one. Filled by js/ui/setmode.js,
+     which hides this again once a set is open (see #set-status-bar below). -->
+<div class="filter-bar mode-bar" id="set-bar"></div>
+
+<!-- Home's one bar: a live summary line. Real content rather than reserved blank
+     space — see the ONE CONTEXT BAR note above. Filled by js/ui/dashboard.js. -->
+<div class="filter-bar mode-bar" id="dash-bar"></div>
 </div><!-- /sticky-top -->
 
+<!-- SET NAVIGATION — between the header and the content so tab order reads
+     header → set list → cards. Populated by js/ui/setnav.js. -->
+<div class="set-nav-scrim" id="set-nav-scrim"></div>
+<aside class="set-nav" id="set-nav" aria-label="Set navigation" aria-hidden="true"></aside>
+
 <main id="app">
+<!-- One render container per mode, siblings. applyModeUI toggles their `display`;
+     nothing is ever removed, so each mode's DOM survives a switch away and back. -->
+<div id="dash"></div>
 <div id="dyn"></div>
 <div id="tms-app"></div>
+<div id="set-app"></div>
 </main>
+
+<!-- SINGLE-SET STATUS BAR — docked to the BOTTOM of the viewport, not stacked under the
+     header. "← All sets · Pitch Black · 0% complete · 0 of 84 · English" as a third
+     sticky strip read as a seam: the header's gradient, then the white bar, then the
+     page — three surfaces in 110px, and in the dark palettes the bar's surface colour is
+     close enough to the header's that the join looked like a rendering fault.
+     It is also the only strip in the app that is pure STATUS: the back button repeats
+     "Change set" in the control row and the set name repeats the h1, so nothing here
+     needs to be adjacent to the controls. Down here it frames the grid instead of
+     interrupting it, and the progress track finally has somewhere full-width to live.
+     Shown by js/ui/setmode.js only while a set is open. -->
+<div class="set-status-bar" id="set-status-bar">
+  <div class="set-status-track"><div class="set-status-fill" id="set-progress-fill"></div></div>
+  <div class="set-status-row">
+    <button type="button" class="set-back" id="set-status-back" title="Back to the set list">&#8592; All sets</button>
+    <span class="set-bar-name" id="set-status-name"></span>
+    <span class="set-bar-sub" id="set-progress-label"></span>
+  </div>
+</div>
 
 <!-- PREVIEW MODAL -->
 <div class="preview-overlay" id="preview-overlay" onclick="closePreview(event)">

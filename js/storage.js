@@ -32,9 +32,8 @@ function showFallbackBanner(msg) {
   if (!el) {
     el = document.createElement('div');
     el.id = 'storage-quota-banner';
-    el.style.cssText =
-      'position:fixed;top:0;left:0;right:0;z-index:99999;background:#b71c1c;' +
-      'color:#fff;padding:8px 12px;font:13px/1.4 Arial,sans-serif;text-align:center;';
+    // Styled by css/style.css, which is a blocking <link> in <head> and so is always
+    // parsed before this module can run.
     document.body.appendChild(el);
   }
   el.textContent = msg;

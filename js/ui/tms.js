@@ -22,8 +22,11 @@ import {
 import {
   JP_BULBA_SET_MAP,
 } from '../api/providers/legacy.js';
-import * as router from '../api/router.js';
-import { langColor, buildPlaceholderHTML, variantBadgesHtml } from './masterset.js';
+import { router } from '../api/router.js';
+import { viableSources, markBad, markGood } from '../api/img-cache.js';
+import { langColor, buildPlaceholderHTML, mkPlaceholderEl, variantBadgesHtml } from './masterset.js';
+import { escapeHtml } from './html.js';
+import { openLanguagePicker, renderLangSummary } from './pickers.js';
 
 function tmsCountForPoke(pokeName){
   let n=0;
@@ -31,9 +34,30 @@ function tmsCountForPoke(pokeName){
   return n;
 }
 
+/**
+ * pokeName → number of included cards, built in ONE pass over tmsIncluded.
+ *
+ * The grid render needs a count for each of up to 357 tiles, and
+ * tmsCountForPoke walks the whole of tmsIncluded every time it is called — so
+ * the render was O(tiles × includes). One shared map makes it O(tiles + includes).
+ */
+function tmsCountsByPoke(){
+  const counts=new Map();
+  state.tmsIncluded.forEach(id=>{
+    const poke=state._tmsCardPokemon.get(id);
+    if(poke) counts.set(poke,(counts.get(poke)||0)+1);
+  });
+  return counts;
+}
+
+// Pending search debounce, at module scope so a full re-render can cancel a
+// keystroke that is still in flight against the old (now discarded) input.
+let tmsSearchTimer=null;
+
 // ── TMS: Render the Pokémon catalog browser ───────────────────────────────────
 function renderTMS(){
   const app=document.getElementById('tms-app'); if(!app) return;
+  clearTimeout(tmsSearchTimer);
   app.innerHTML='';
 
   // Update header stats badge
@@ -45,36 +69,57 @@ function renderTMS(){
   [0,1,2,3,4,5,6,7,8,9].forEach((g,i)=>{
     const lbl=['All','Gen 1','Gen 2','Gen 3','Gen 4','Gen 5','Gen 6','Gen 7','Gen 8','Gen 9'][i];
     const btn=document.createElement('button'); btn.className='tms-gen-btn'+(state.tmsGenFilter===g?' active':'');
-    btn.textContent=lbl; btn.onclick=()=>{state.tmsGenFilter=g; renderTMS();};
+    btn.textContent=lbl;
+    btn.onclick=()=>{
+      state.tmsGenFilter=g;
+      genDiv.querySelectorAll('.tms-gen-btn').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      renderTmsGrid();
+    };
     genDiv.appendChild(btn);
   });
   toolbar.appendChild(genDiv);
   const srch=document.createElement('input'); srch.type='text'; srch.className='tms-search';
   srch.placeholder='Search Pokémon…'; srch.value=state.tmsSearchQ;
-  srch.oninput=e=>{state.tmsSearchQ=e.target.value.trim().toLowerCase(); renderTMS();};
+  // Grid-only re-render, debounced. This used to call renderTMS(), which wipes
+  // #tms-app — destroying the very input being typed into, so focus and caret
+  // were lost after each character and the field could not hold a whole word.
+  // 120ms is long enough that a fast typist filters the 357-tile catalog once
+  // instead of once per keystroke, short enough to still feel immediate.
+  srch.oninput=e=>{
+    const q=e.target.value.trim().toLowerCase();
+    clearTimeout(tmsSearchTimer);
+    tmsSearchTimer=setTimeout(()=>{ state.tmsSearchQ=q; renderTmsGrid(); },120);
+  };
   toolbar.appendChild(srch);
   app.appendChild(toolbar);
 
-  // Global language add/remove — styled like filter-bar
-  const langRow=document.createElement('div'); langRow.className='tms-lang-actions';
-  const lbl=document.createElement('span'); lbl.className='tms-lang-lbl'; lbl.textContent='Global language:';
-  langRow.appendChild(lbl);
-  const allL=[...LANGUAGES,...PLACEHOLDER_LANGS,{badge:'JP',color:'#4527a0',label:'Japanese'}];
-  allL.forEach(l=>{
-    const add=document.createElement('button'); add.className='tms-lang-btn';
-    add.style.background=l.color; add.style.borderColor=l.color;
-    add.textContent=`+ ${l.badge}`; add.title=`Add all ${l.label||l.badge} cards to TMS (for Pokémon already opened)`;
-    add.onclick=()=>tmsGlobalLang(l.badge,true);
-    langRow.appendChild(add);
-    const rem=document.createElement('button'); rem.className='tms-lang-btn rem';
-    rem.textContent=`– ${l.badge}`; rem.title=`Remove all ${l.label||l.badge} cards from TMS`;
-    rem.onclick=()=>tmsGlobalLang(l.badge,false);
-    langRow.appendChild(rem);
-  });
-  app.appendChild(langRow);
+  // NO "Global language" ROW HERE, DELIBERATELY.
+  //
+  // It was 26 buttons (+EN −EN +DE −DE … for twelve languages plus JP) sitting between
+  // the toolbar and the grid, and it only ever acted on state.tmsPokeCache — the Pokémon
+  // whose popup you had ALREADY opened this session. So "+ DE" looked like a catalogue-
+  // wide switch and was in fact a bulk edit of an invisible, order-dependent subset.
+  //
+  // The same job, scoped to something the user can see, is already in the popup: its
+  // language pills plus "+ Include All Visible" / "− Exclude All Visible". That is where
+  // per-language bulk selection belongs, and the header's own #tms-filter-bar is what
+  // filters the view.
 
-  // Pokémon grid
-  const grid=document.createElement('div'); grid.className='tms-poke-grid';
+  // Pokémon grid — an empty shell here; renderTmsGrid fills it and is the only
+  // thing search and the gen filter need to re-run.
+  const grid=document.createElement('div');
+  grid.className='tms-poke-grid'; grid.id='tms-poke-grid';
+  app.appendChild(grid);
+  renderTmsGrid();
+}
+
+// Re-render ONLY the Pokémon tiles, leaving the toolbar (and therefore the
+// focused search input) untouched.
+function renderTmsGrid(){
+  const grid=document.getElementById('tms-poke-grid'); if(!grid) return;
+  grid.innerHTML='';
+
   const filtered=POKEMON_CATALOG.filter(p=>{
     if(state.tmsGenFilter!==0&&p.gen!==state.tmsGenFilter) return false;
     if(state.tmsSearchQ&&!p.name.toLowerCase().includes(state.tmsSearchQ)) return false;
@@ -84,8 +129,9 @@ function renderTMS(){
     const empty=document.createElement('div'); empty.className='tms-no-results';
     empty.textContent='No Pokémon match the current filter.'; grid.appendChild(empty);
   }
+  const counts=tmsCountsByPoke();   // one pass, shared by every tile below
   filtered.forEach(p=>{
-    const cnt=tmsCountForPoke(p.name);
+    const cnt=counts.get(p.name)||0;
     const tile=document.createElement('div');
     tile.className='tms-poke-tile'+(cnt>0?' has-cards':'');
     tile.dataset.pokeName=p.name;
@@ -101,13 +147,12 @@ function renderTMS(){
     tile.onclick=()=>openTmsPopup(p.name);
     grid.appendChild(tile);
   });
-  app.appendChild(grid);
 }
 
 // ── TMS: Open popup for a Pokémon ─────────────────────────────────────────────
 async function openTmsPopup(pokeName){
   state._tmsOpenPoke=pokeName;
-  state._tmsPopupActive=new Set([...tmsActiveLangs]); // inherit global language filter
+  state._tmsPopupActive=new Set([...state.tmsActiveLangs]); // inherit global language filter
   const overlay=document.getElementById('tms-overlay');
   const titleEl=document.getElementById('tms-popup-title');
   const subEl=document.getElementById('tms-popup-sub');
@@ -122,7 +167,7 @@ async function openTmsPopup(pokeName){
     state._tmsPopupAllCards=cards;
     renderTmsPopup(pokeName);
   }catch(e){
-    body.innerHTML=`<div style="padding:20px;color:#c62828;font-size:11px">Error: ${e.message}</div>`;
+    body.innerHTML=`<div style="padding:20px;color:#c62828;font-size:11px">Error: ${escapeHtml(e.message)}</div>`;
     subEl.textContent='Error loading cards';
   }
 }
@@ -188,7 +233,6 @@ async function fetchTmsCardsForPoke(pokeName){
 
 // ── TMS: Render the popup content ─────────────────────────────────────────────
 function renderTmsPopup(pokeName){
-  const subEl=document.getElementById('tms-popup-sub');
   const toolbar=document.getElementById('tms-popup-toolbar');
   toolbar.innerHTML='';
 
@@ -258,18 +302,28 @@ function renderTmsPopupCards(pokeName){
       const isIn=state.tmsIncluded.has(c.id);
       const el=document.createElement('div'); el.className='tms-popup-card'+(isIn?' tms-in':''); el.dataset.id=c.id;
       // Image
+      // Placeholder-first (mirrors mkImgWrap in masterset.js): paint the stand-in
+      // immediately and let the image load underneath it, so a popup full of
+      // missing-language prints never shows a grid of empty boxes while the 404s land.
       const wrap=document.createElement('div'); wrap.className='img-wrap';
-      if(c.imgSrc){
-        const img=document.createElement('img'); img.className='card-img'; img.loading='lazy'; img.src=c.imgSrc;
+      const nat=(NATIVE_NAMES[c.lang]||{})[pokeName]||null;
+      const ph=mkPlaceholderEl(c.symSrc,c.lang,c.langColor,pokeName,nat,c.setName,c.localId);
+      wrap.appendChild(ph);
+      // Known-missing artwork is skipped without a request (img-cache.js), the same as
+      // the Master-Set grid — this popup renders every language for a Pokémon, so it hit
+      // the TCGdex language gaps hardest.
+      if(c.imgSrc && viableSources([c.imgSrc]).length){
+        ph.classList.add('ph-over');
+        const img=document.createElement('img'); img.className='card-img';
+        img.loading='lazy'; img.decoding='async'; img.fetchPriority='low';
         img.alt=`${pokeName} #${c.localId} ${c.lang}`;
-        img.onerror=()=>{ const nat=(NATIVE_NAMES[c.lang]||{})[pokeName]||null; wrap.innerHTML=buildPlaceholderHTML(c.symSrc,c.lang,c.langColor,pokeName,nat,c.setName,c.localId,false); };
+        img.onload=()=>{ ph.remove(); markGood(c.imgSrc); };
+        img.onerror=()=>{ img.remove(); markBad(c.imgSrc); ph.classList.remove('ph-over'); };
+        img.src=c.imgSrc;
         wrap.appendChild(img);
-      }else{
-        const nat=(NATIVE_NAMES[c.lang]||{})[pokeName]||null;
-        wrap.innerHTML=buildPlaceholderHTML(c.symSrc,c.lang,c.langColor,pokeName,nat,c.setName,c.localId,false);
       }
       const footer=document.createElement('div'); footer.className='card-footer';
-      footer.innerHTML=`<span class="card-num">#${c.localId}</span>${variantBadgesHtml(c.variants)}<span class="lang" style="background:${c.langColor}">${c.lang}</span>`;
+      footer.innerHTML=`<span class="card-num">#${escapeHtml(c.localId)}</span>${variantBadgesHtml(c.variants)}<span class="lang" style="background:${escapeHtml(c.langColor)}">${escapeHtml(c.lang)}</span>`;
       el.appendChild(wrap); el.appendChild(footer);
       el.onclick=()=>toggleTmsCard(c.id,el,pokeName);
       grid.appendChild(el);
@@ -312,18 +366,6 @@ function tmsPopupBulk(include){
   _updateTmsStats();
 }
 
-// ── TMS: Global add/remove a language across all cached Pokémon ───────────────
-function tmsGlobalLang(badge,add){
-  state.tmsPokeCache.forEach((cards,pokeName)=>{
-    cards.filter(c=>c.lang===badge).forEach(c=>{
-      if(add){ state.tmsIncluded.add(c.id); state._tmsCardPokemon.set(c.id,pokeName); }
-      else state.tmsIncluded.delete(c.id);
-    });
-  });
-  saveTms();
-  renderTMS();
-}
-
 // ── TMS: Update a Pokémon tile count in the grid ──────────────────────────────
 function _updateTmsTile(pokeName){
   if(!pokeName) return;
@@ -342,7 +384,7 @@ function _updateTmsTile(pokeName){
 function _updateTmsStats(){
   const t=state.tmsIncluded.size;
   const el=document.getElementById('stats');
-  if(el&&state.appMode==='tms') el.textContent=`⭐ ${t} card${t===1?'':'s'} in TMS`;
+  if(el&&state.appMode==='tms') el.textContent=`${t} card${t===1?'':'s'} included`;
 }
 
 // ── TMS: Close popup ──────────────────────────────────────────────────────────
@@ -371,38 +413,28 @@ function clearTmsCache(){
 // ── TMS: Update Print Selected button count ───────────────────────────────────
 function updateTmsPrintSelBtn(){
   const btn=document.getElementById('btn-tms-print-sel'); if(!btn) return;
-  btn.textContent=`📄 Print Selected (${state.tmsIncluded.size})`;
+  btn.textContent=`Print selected (${state.tmsIncluded.size})`;
 }
 
 // ── TMS: Language filter pills (sticky bar) ───────────────────────────────────
+// Same summary-plus-modal as Master Set's language bar (js/ui/pickers.js), reading THIS
+// mode's state. Two-letter pills could not tell TW from TH from SC; the modal shows a
+// flag and the full language name for each.
+//
+// BADGE_ORDER whole, not a "present in the current render" subset: this mode's catalogue
+// is every Pokémon, so every language is reachable from here whether or not a card in it
+// happens to be included yet.
 function buildTmsPillsTms(){
   const c=document.getElementById('tms-filter-pills'); if(!c) return;
-  c.innerHTML='';
-  BADGE_ORDER.forEach(badge=>{
-    const p=document.createElement('button');
-    p.className='filter-pill'+(state.tmsActiveLangs.has(badge)?' active':'');
-    p.textContent=badge; p.style.background=langColor(badge);
-    const l=LANGUAGES.find(x=>x.badge===badge)||PLACEHOLDER_LANGS.find(x=>x.badge===badge);
-    p.title=l?l.label:badge==='JP'?'Japanese':badge;
-    p.addEventListener('click',()=>{
-      if(state.tmsActiveLangs.has(badge)){state.tmsActiveLangs.delete(badge);p.classList.remove('active');}
-      else{state.tmsActiveLangs.add(badge);p.classList.add('active');}
-      saveTmsFilter();
-    });
-    c.appendChild(p);
+  renderLangSummary(c,{
+    available:[...BADGE_ORDER],
+    active:state.tmsActiveLangs,
+    onOpen:()=>openLanguagePicker({
+      available:[...BADGE_ORDER],
+      active:state.tmsActiveLangs,
+      onChange:()=>{ saveTmsFilter(); buildTmsPillsTms(); },
+    }),
   });
-}
-
-function toggleAllTmsFilter(){
-  const allActive=BADGE_ORDER.every(b=>state.tmsActiveLangs.has(b));
-  if(allActive){
-    state.tmsActiveLangs.clear();
-    document.querySelectorAll('#tms-filter-pills .filter-pill').forEach(p=>p.classList.remove('active'));
-  }else{
-    state.tmsActiveLangs=new Set(BADGE_ORDER);
-    document.querySelectorAll('#tms-filter-pills .filter-pill').forEach(p=>p.classList.add('active'));
-  }
-  saveTmsFilter();
 }
 
 // ── TMS: Print Selected (card images, same layout as MS printSelected) ─────────
@@ -430,5 +462,5 @@ document.addEventListener('tcg:tms-changed', updateTmsPrintSelBtn);
 
 export {
   renderTMS, buildTmsPillsTms, updateTmsPrintSelBtn, tmsAutoPopulate,
-  resetTms, clearTmsCache, toggleAllTmsFilter, closeTmsPopup,
+  resetTms, clearTmsCache, closeTmsPopup,
 };
