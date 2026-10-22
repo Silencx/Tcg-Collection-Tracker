@@ -204,6 +204,9 @@ export function loadCache() {
   return (d && d.ts && d.cards) ? d : null;
 }
 export function saveCache(d) {
+  // A CACHESTORE bump orphans the previous version's blob, which is the single largest
+  // value in localStorage — drop it before writing, or the quota banner pays for it.
+  storage.keys('tcgData').filter(k => k !== CACHESTORE).forEach(storage.remove);
   storage.setJSON(CACHESTORE, { ts: Date.now(), ...d });
 }
 /** Remove all EN card-data cache entries (current + any old versions: tcgData*). */

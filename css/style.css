@@ -1240,6 +1240,9 @@ main{width:min(100%,var(--page-w));margin:0 auto;padding:12px;}
 .lang-ID{background:#e65100;}.lang-KR{background:#00695c;}.lang-SC{background:#4a148c;}
 .vbadges{display:inline-flex;gap:2px;align-items:center;}
 .vbadge{font-size:clamp(6px,4cqw,10px);font-weight:bold;line-height:1.4;padding:1px clamp(2px,1.8cqw,5px);border-radius:3px;background:#3a2f00;color:#ffd54f;border:1px solid rgba(255,213,79,.45);letter-spacing:.3px;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+/* Inferred from the era rule, not listed by TCGdex (api/variants.js REVERSE_GAP): same
+   pill, dashed outline, so "very likely" reads differently from "listed". */
+.vbadge-inferred{border-style:dashed;}
 /* (.chk / .chk-hit removed with the per-card checkbox — the whole tile is the toggle
    now and colour is the state. The print sheet keeps its own .chk-col checkbox, which
    is a different thing: a box to tick with a pen.) */

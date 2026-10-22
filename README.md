@@ -44,6 +44,15 @@ Search also catches **cameo** appearances — cards where your Pokémon shows up
 alongside another (Tag Team cards, partner promos, etc.) — since matching is
 name-based, not "must be the only Pokémon on the card."
 
+### Print variant badges
+Each card's footer shows which prints exist: **H** holo, **RH** reverse holo,
+**1ED** 1st Edition, **SL** shadowless, **P** promo, and **+N** for anything
+rarer (stamps, Poké Ball / Master Ball patterns, jumbo, error prints). Hover
+the badges for the full list of prints. All of it comes from TCGdex. One
+exception: TCGdex has no reverse-holo data for the Black & White, XY and Sun &
+Moon eras, so those RH badges are worked out from rarity and drawn with a
+dashed outline. That rule matched TCGplayer on 99.9% of the era's cards.
+
 ### Printable checklists
 Print a photo-accurate 9-up sheet of your current selection, or a compact
 2-column text checklist — handy for binders, want lists, or trades. Both
@@ -94,11 +103,12 @@ js/
   main.js               # boot + mode switching + the window handler manifest
   api/
     images.js           # pure image-URL builders (Limitless, TCGdex)
+    variants.js         # pure print-variant normalizer + badge data (incl. BW/XY/SM reverse rule)
     router.js            # provider failover: snapshot → live TCGdex → legacy
     bulba-jp.js          # pure Bulbapedia JP parser/fetcher — shared by browser + build-data
     providers/
       snapshot.js        # reads pre-built data/*.json (instant, no API)
-      tcgdex.js          # live TCGdex (primary card index + set metadata)
+      tcgdex.js          # live TCGdex (primary card index + set metadata; variants via GraphQL)
       legacy.js          # FROZEN Bulbapedia + pokemontcg.io pipeline (fallback + JA)
   ui/
     masterset.js         # Master-Set render, filters, Pokémon chips, preview

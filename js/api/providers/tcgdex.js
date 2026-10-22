@@ -7,7 +7,8 @@
 //                           LOCALIZED name; image may be absent on list items).
 //   /{lang}/sets          → [{ id, name, releaseDate, symbol, logo, cardCount }].
 //   /{lang}/cards/{id}    → full detail incl. variants {normal,reverse,holo,
-//                           firstEdition,wPromo}. Old-era variants unreliable.
+//                           firstEdition,wPromo} + variants_detailed (one entry per print).
+//   /graphql              → the same full cards in BULK; used for variants (see below).
 //   Images: {image}/low.webp or /high.png.
 //
 // This provider emits cards in the exact shape ui/masterset.buildSetsMap already
@@ -20,6 +21,7 @@
 
 import { LANGUAGES } from '../../config.js';
 import { tcgdexAssetBase, tcgdexSerieSegment } from '../images.js';
+import { normalizeVariants } from '../variants.js';
 
 const API = 'https://api.tcgdex.net/v2';
 
@@ -66,6 +68,87 @@ export async function pooledForEach(items, limit, worker) {
     }
   };
   await Promise.all(Array.from({ length: Math.min(limit, items.length) }, runner));
+}
+
+// ── PRINT VARIANTS (GraphQL) ──────────────────────────────────────────────────
+// Variants live only on the FULL card object. REST serves that one card per request;
+// GraphQL serves it in bulk: one query covers a whole Pokémon or a whole set (measured
+// 2026-10-22: Pikachu, 246 cards, 0.2 s, 36 KB — REST needed 246 detail calls).
+// Same host, keyless, CORS-open. The traps, all measured:
+//   · page size is `itemsPerPage`; `count` is silently ignored and you get 100.
+//   · `filters` match by substring ("Mew" also finds "Mewtwo", "sv05-" every sv05 card),
+//     so callers merge results by exact id and ignore the rest.
+//   · never select set{serie}: it is null on some sets, and a null in a non-null field
+//     makes GraphQL drop the WHOLE card from the answer.
+const GQL = `${API}/graphql`;
+const GQL_PAGE = 1000;
+const GQL_MAX_PAGES = 5;
+const GQL_QUERY = 'query($f:CardsFilters,$p:Int!,$k:Int){ cards(filters:$f, pagination:{page:$p,itemsPerPage:$k}){ '
+  + 'id localId name suffix rarity category trainerType set{id} '
+  + 'variants{normal reverse holo firstEdition wPromo} '
+  + 'variants_detailed{type subtype stamp size foil} } }';
+
+// Variants are a footer badge; the card list is the page. Give the variant step its own
+// budget inside the caller's, so a slow GraphQL answer costs the badges, never the cards
+// (the router aborts the WHOLE call at 8 s and falls back to legacy).
+const VARIANT_BUDGET_MS = 4000;
+function budgetSignal(signal) {
+  if (typeof AbortSignal === 'undefined' || !AbortSignal.timeout || !AbortSignal.any) return signal;
+  const t = AbortSignal.timeout(VARIANT_BUDGET_MS);
+  return signal ? AbortSignal.any([signal, t]) : t;
+}
+
+async function gqlCards(filters, signal) {
+  const out = [];
+  for (let page = 1; page <= GQL_MAX_PAGES; page++) {
+    const r = await fetch(GQL, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ query: GQL_QUERY, variables: { f: filters, p: page, k: GQL_PAGE } }),
+      signal,
+    });
+    if (!r.ok) throw new Error(`HTTP ${r.status} — ${GQL}`);
+    const j = await r.json();
+    const list = j?.data?.cards;
+    if (!Array.isArray(list)) throw new Error(`TCGdex GraphQL: ${j?.errors?.[0]?.message || 'no data'}`);
+    out.push(...list.filter(Boolean));
+    if (list.length < GQL_PAGE) break;
+  }
+  return out;
+}
+
+// A whole-GraphQL outage must not turn into the old one-request-per-card storm: that is
+// hundreds of calls for a popular Pokémon, which blows the router's 8 s budget and
+// demotes TCGdex for the session. Only a handful of stragglers go to REST.
+const REST_VARIANT_FALLBACK_MAX = 30;
+
+/**
+ * Attach `variants` (see variants.normalizeVariants) to `cards` in place. GraphQL first,
+ * one query per filter; then REST detail for the few cards it did not return. Best
+ * effort: a card with no data keeps no `variants` and is never dropped.
+ */
+async function attachVariants(cards, filters, signal, apiCode = 'en') {
+  if (!cards.length) return;
+  const sig = budgetSignal(signal);
+  const byId = new Map(cards.map(c => [c.id, c]));
+  const results = await Promise.allSettled(filters.map(f => gqlCards(f, sig)));
+  for (const r of results) {
+    if (r.status !== 'fulfilled') continue;
+    for (const d of r.value) {
+      const c = byId.get(d.id);
+      if (!c || c.variants) continue;
+      const v = normalizeVariants(d);
+      if (v) c.variants = v;
+    }
+  }
+  const rest = cards.filter(c => !c.variants);
+  if (!rest.length || rest.length > REST_VARIANT_FALLBACK_MAX) return;
+  await pooledForEach(rest, DETAIL_CONCURRENCY, async c => {
+    try {
+      const v = normalizeVariants(await getJSON(`${API}/${apiCode}/cards/${c.id}`, sig));
+      if (v) c.variants = v;
+    } catch { /* no variant data for this card — leave it absent */ }
+  });
 }
 
 const escapeRe = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -141,18 +224,9 @@ export async function getCards(names, { signal, withVariants = true } = {}) {
   }
   if (!out.length) throw new Error('TCGdex returned no cards');
 
-  // Variant flags (reverse/holo/1st-ed/…) live only on the card DETAIL endpoint and
-  // are only trustworthy on modern eras. Fetch detail for just those cards and
-  // attach `variants`; failures simply leave it absent (never drops the card).
-  if (withVariants) {
-    const modern = out.filter(c => eraSupportsVariants(serieOf(splitId(c.id).setId)));
-    await pooledForEach(modern, DETAIL_CONCURRENCY, async c => {
-      try {
-        const d = await getJSON(`${API}/en/cards/${c.id}`, signal);
-        if (d?.variants) c.variants = d.variants;
-      } catch { /* no variant data for this card — leave it absent */ }
-    });
-  }
+  // Every era now: TCGdex fixed the old-era data (ex16-97 reports holo:true today), and
+  // the one remaining hole — BW/XY/SM reverse holos — is filled in normalizeVariants.
+  if (withVariants) await attachVariants(out, names.map(name => ({ name })), signal);
   return out;
 }
 
@@ -394,13 +468,12 @@ export function readCardCount(raw) {
  *   must pass the language the set actually belongs to.
  * @returns {Promise<{cards:Array, set:{id,name,releaseDate,symbol,logo,serie,count}}>}
  */
-// withVariants defaults FALSE here, unlike getCards. Variants live only on the card
-// DETAIL endpoint, so they cost one request per card: for the master index that is a
-// handful (the cards matching your Pokémon), but for a whole set it is the whole set —
-// 162 extra requests for Temporal Forces, on every entry into the mode. The set view is
-// a completion checklist; a reverse-holo badge is not worth turning a one-request page
-// into a 163-request one. Callers that want them can still ask.
-export async function getSetCards(setId, { signal, withVariants = false, lang = 'en' } = {}) {
+// withVariants used to default FALSE here: over REST it cost one request per card, 162
+// extra for Temporal Forces on every entry into the mode. GraphQL answers the whole set
+// in ONE request, so the set view gets its badges too. The print facts come from the EN
+// namespace, which shares set ids with every Latin-script language; zh-Hant/th/id ids
+// are absent there, so those sets simply get no badges.
+export async function getSetCards(setId, { signal, withVariants = true, lang = 'en' } = {}) {
   const def = LANGUAGES.find(l => l.code === lang);
   const apiCode = def?.apiCode || 'en';
   const cdnLang = def?.code || 'en';
@@ -424,16 +497,7 @@ export async function getSetCards(setId, { signal, withVariants = false, lang = 
       localId: c.localId != null ? String(c.localId) : splitId(c.id).localId,
     }));
 
-  // Fed the REAL serie: the id-guess silently excluded swshp, sve, svp, mfb, mee, mep,
-  // cel25 and fut2020 from variant fetching even though they are modern-era sets.
-  if (withVariants && eraSupportsVariants(serie)) {
-    await pooledForEach(cards, DETAIL_CONCURRENCY, async c => {
-      try {
-        const d = await getJSON(`${API}/${apiCode}/cards/${c.id}`, signal);
-        if (d?.variants) c.variants = d.variants;
-      } catch { /* no variant data for this card — leave it absent */ }
-    });
-  }
+  if (withVariants) await attachVariants(cards, [{ id: `${setId}-` }], signal, apiCode);
 
   return {
     cards,
@@ -450,10 +514,4 @@ export async function getSetCards(setId, { signal, withVariants = false, lang = 
   };
 }
 
-// Variant data is only trustworthy on modern eras (old-era TCGdex variants are wrong
-// — e.g. ex16-97 reports holo:false), so getCards only fetches/attaches variants for
-// these series. This predicate is the gate.
-const VARIANT_ERAS = new Set(['swsh', 'sv', 'me']);
-export function eraSupportsVariants(series) { return VARIANT_ERAS.has(series); }
-
-export const tcgdex = { getCards, getSetCards, getSetMeta, eraSupportsVariants, namesSpecies, readCardCount };
+export const tcgdex = { getCards, getSetCards, getSetMeta, namesSpecies, readCardCount };

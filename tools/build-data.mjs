@@ -57,6 +57,16 @@ async function main() {
   console.log('[build-data] fetching card index from TCGdex…');
   const cards = await getCards(POKEMON);
   console.log(`[build-data]   → ${cards.length} cards`);
+  // Variants are best effort in the provider (a footer badge must never cost the card
+  // list), so a GraphQL outage would quietly bake a snapshot with no badges at all. Say so.
+  const noVariants = cards.filter(c => !c.variants);
+  const inferred = cards.filter(c => c.variants?.inferred).length;
+  console.log(`[build-data]   → variants on ${cards.length - noVariants.length}/${cards.length} ` +
+    `(${inferred} BW/XY/SM reverse holo inferred)`);
+  if (noVariants.length) {
+    console.warn(`[build-data]   ! ${noVariants.length} card(s) have no variant data: ` +
+      noVariants.slice(0, 8).map(c => c.id).join(', '));
+  }
 
   // allEnSets, NOT the set ids these cards happen to touch. snapshot.getSetMeta rejects
   // a date map with ANY gap (a missing date collapses a set to the 1999 sort fallback,

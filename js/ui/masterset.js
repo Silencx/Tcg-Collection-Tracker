@@ -29,6 +29,7 @@ import {
 } from '../api/images.js';
 import { detectNew, JP_BULBA_SET_MAP } from '../api/providers/legacy.js';
 import { router } from '../api/router.js';
+import { variantBadges, printsSummary } from '../api/variants.js';
 import {
   viableSources, markBad, markGood, loadFirstImage, clearImgFailures,
   imgMeta, metaSources,
@@ -318,17 +319,16 @@ function langColor(badge){
   return ([...LANGUAGES,...PLACEHOLDER_LANGS,JP_DEF].find(l=>l.badge===badge)||{}).color||'#555';
 }
 
-// Informational print-variant badges (modern eras only; null elsewhere). `variants`
-// is TCGdex's {normal,reverse,holo,firstEdition,wPromo}. Normal prints get no badge.
+// Informational print-variant badges. `variants` is the card's normalized TCGdex print
+// data (api/variants.js): the five flags plus, when there is more to say, `prints` and
+// `inferred`. Normal prints get no badge. The group's hover text lists every print.
 export function variantBadgesHtml(v){
-  if(!v) return '';
-  const b=[];
-  if(v.holo) b.push(['H','Holofoil']);
-  if(v.reverse) b.push(['RH','Reverse holo']);
-  if(v.firstEdition) b.push(['1ED','First edition']);
-  if(v.wPromo) b.push(['P','Promo']);
+  const b=variantBadges(v);
   if(!b.length) return '';
-  return `<span class="vbadges">`+b.map(([t,title])=>`<span class="vbadge" title="${title} variant exists">${t}</span>`).join('')+`</span>`;
+  const all=printsSummary(v);
+  return `<span class="vbadges"${all?` title="${escapeHtml(all)}"`:''}>`
+    +b.map(x=>`<span class="vbadge${x.inferred?' vbadge-inferred':''}" title="${escapeHtml(x.title)}">${escapeHtml(x.text)}</span>`).join('')
+    +`</span>`;
 }
 
 // ── GRID HEIGHT HINT (content-visibility) ─────────────────────────────────────
@@ -648,8 +648,8 @@ function footerTemplate(){
  * @param {string} langClass e.g. 'lang-EN' — the stylesheet carries the colour.
  * @param {string} color inline background, for badges with no stylesheet class
  *   (the placeholder languages, whose colours live in config.js).
- * @param {object} variants TCGdex print variants; modern eras only, so the one
- *   remaining innerHTML parse here is rare.
+ * @param {object} variants normalized print variants (api/variants.js); null on the
+ *   legacy path and for languages TCGdex has no print data for.
  */
 function mkCardFooter(localId,badge,{langClass=null,color=null,variants=null,isDone=false}={}){
   const f=footerTemplate().cloneNode(true);
@@ -753,7 +753,7 @@ function buildSetsMap(enCards, setNamesAll, setMeta = { dates: {}, symbols: {} }
       id:`${tcgdexSetId}-${tcgdexLocalId}`,
       enImgSrc, enHiImgSrc,
       ptcgoCode: card.ptcgoCode||null,
-      variants: card.variants||null,   // {normal,reverse,holo,firstEdition,wPromo} on modern eras, else null
+      variants: card.variants||null,   // api/variants.js shape: five flags (+ prints, inferred); null on the legacy path
     });
   }
   return map;
