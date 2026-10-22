@@ -44,6 +44,7 @@ import { initNotify } from './ui/notify.js';
 import { initHScroll } from './ui/hscroll.js';
 import { renderDashboard } from './ui/dashboard.js';
 import { renderSetMode, changeSet, selectAllSet, resetSet, openSetName } from './ui/setmode.js';
+import { setPrintView, swapPrintView, syncPrintViewUI } from './ui/printview.js';
 
 // LOAD-BEARING: setPalette clears the previous theme with classList.remove(...PALETTES),
 // so a palette missing from this list can be added but never removed. It must stay in
@@ -231,6 +232,7 @@ function applyModeUI(mode) {
   // on entry; Master's are built by buildPills at the end of its render.
   if (mode === 'tms') buildTmsPillsTms();
   setNavApplyMode(mode);
+  syncPrintViewUI();   // the chips/tiles switch belongs to the three checklist modes only
 }
 
 function applyModeTitle(mode) {
@@ -383,4 +385,6 @@ Object.assign(window, {
   toggleSetNav,
   // collapse (sidebar button + ⋯ More twin)
   toggleCollapseAll,
+  // per-print tracking (gear panel + the chips/tiles switch)
+  setPrintView, swapPrintView,
 });

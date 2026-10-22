@@ -16,7 +16,7 @@
 // =============================================================================
 
 import {
-  state, saveChk, savePoke, saveFilter, saveDismissed, saveSort,
+  state, saveChk, saveMsPrints, savePoke, saveFilter, saveDismissed, saveSort,
   loadCache, saveCache, clearCardCache,
 } from '../state.js';
 import {
@@ -30,6 +30,11 @@ import {
 import { detectNew, JP_BULBA_SET_MAP } from '../api/providers/legacy.js';
 import { router } from '../api/router.js';
 import { variantBadges, printsSummary } from '../api/variants.js';
+import {
+  printsOf, tracksPrints, printId, splitPrintId, applyPrint, applyCard, clearPrintsOf,
+  printTotals, printUnset, slotCount,
+} from './prints-model.js';
+import { mkPrintChips, syncChips, markUnset, mkPrintTag } from './prints-ui.js';
 import {
   viableSources, markBad, markGood, loadFirstImage, clearImgFailures,
   imgMeta, metaSources,
@@ -53,6 +58,9 @@ import {
 // (A recount ran on every single checkbox click once, over ~776 cards on the
 // default list and ten times that for a popular Pokémon.)
 let statVisible = 0, statChecked = 0;
+// The "P / Q prints" figure, kept the same way: applyFilter assigns, clicks adjust.
+// Only shown while per-print tracking is on (state.printView !== 'off').
+let statPrints = 0, statPrintsDone = 0;
 
 // Per-set tallies from the last applyFilter pass: block → {vis, done}. Populated
 // by the pass that was going to compute them anyway, so per-set progress in the
@@ -89,8 +97,16 @@ function renderStats(){
     const word=document.createElement('span');
     word.className='stats-word'; word.textContent=' collected';
     el.appendChild(word);
+    if(state.printView!=='off'){
+      // Its own element for the same reason as "collected": the phone layout drops it.
+      const pr=document.createElement('span');
+      pr.className='stats-prints'; pr.textContent=` · ${statPrintsDone} / ${statPrints} prints`;
+      el.appendChild(pr);
+    }
   }
-  const b=document.getElementById('btn-print-sel'); if(b) b.textContent=`Print selected (${state.checked.size})`;
+  // With prints on, Print selected prints one sheet cell per ticked print (print.js).
+  const n=state.printView!=='off'?slotCount(state.checked,state.msPrints):state.checked.size;
+  const b=document.getElementById('btn-print-sel'); if(b) b.textContent=`Print selected (${n})`;
 }
 
 // Repaint the badge from the running totals. #stats is shared between the two
@@ -107,10 +123,13 @@ function updateStats(){ renderStats(); }
 function resetAll(){
   if(!confirm('Mark every card as not owned?')) return;
   state.checked.clear(); saveChk();
-  document.querySelectorAll('.card.done').forEach(e=>{
+  state.msPrints.clear(); saveMsPrints();
+  document.querySelectorAll('#dyn .card.done').forEach(e=>{
     e.classList.remove('done');
     e.setAttribute('aria-checked','false');
   });
+  document.querySelectorAll('#dyn .pchip[aria-pressed="true"]').forEach(b=>b.setAttribute('aria-pressed','false'));
+  document.querySelectorAll('#dyn .prints-unset').forEach(e=>markUnset(e,false));
   applyFilter();
 }
 
@@ -124,7 +143,16 @@ function toggleSort(){
   state.sortDesc = !state.sortDesc;
   saveSort();
   updateSortBtn();
-  // Re-render from cache — no network request needed
+  rerenderMaster();
+}
+
+/**
+ * Re-render the grid from the card cache — no network request. Used by the sort toggle
+ * and by the print-view switch (js/ui/printview.js), both of which change how the same
+ * cards are laid out. A no-op before the first buildAll, which renders the new layout
+ * itself.
+ */
+function rerenderMaster(){
   const cached = loadCache();
   if(cached && cached.cards){
     const container = document.getElementById('dyn');
@@ -153,19 +181,97 @@ function toggleSort(){
 // by their data-id, which renderBySet already sets, so nothing has to be
 // re-bound when the grid re-renders.
 function setCardChecked(el,id,on){
-  el.classList.toggle('done',on);
-  el.setAttribute('aria-checked',on?'true':'false');
-  if(on) state.checked.add(id); else state.checked.delete(id);
+  const before=tilePrints(el);
+  // applyCard, not a bare add/delete: unticking a card also clears its prints, even
+  // with tracking switched off (they are hidden then, not gone).
+  applyCard(state.checked,state.msPrints,id,on);
+  syncTile(el);
   // Only count it if the card is currently visible, so the running total keeps
   // matching the "N / M" denominator, which excludes lang-hidden cards.
   if(!el.classList.contains('lang-hidden')){
     const delta=on?1:-1;
+    statPrintsDone+=tilePrints(el)[1]-before[1];
     bumpStats(delta);
     // Bounded walk (card → grid → block), not a document query, so the sidebar's
     // per-set progress stays live at the cost of three parentNode hops.
     bumpBlock(el.closest('.set-block'),delta);
   }
-  saveChk();
+  saveChk(); saveMsPrints();
+}
+
+// ── PER-PRINT TRACKING (js/ui/prints-model.js has the rules) ──────────────────
+// A tile is one of two things:
+//   · a CARD tile   data-id = card id. In the chips view it may carry a .pchips row.
+//   · a PRINT tile  data-id = `${cardId}#${key}`, data-card = card id, data-print = key.
+//                   Tiles view only; the card's first print tile also has data-pc="1",
+//                   and it is the one that counts toward the card tallies.
+// The print list rides on the card's _meta entry (printKeys / printList), so the filter
+// pass and the print sheets read exactly what the render built from.
+
+/** The card's print keys, or [] when it is not tracked per print. */
+function keysOf(cardId){ return state._meta.get(cardId)?.printKeys||[]; }
+
+/** [total, done] prints for one tile — see printTotals. */
+function tilePrints(el){
+  if(el.dataset.print) return [1,state.msPrints.has(el.dataset.id)?1:0];
+  const id=el.dataset.id;
+  return state.printView==='chips'?printTotals(state.checked,state.msPrints,id,keysOf(id)):[1,state.checked.has(id)?1:0];
+}
+
+/** Make one tile's classes match the two sets. */
+function syncTile(el){
+  if(el.dataset.print){
+    const card=el.dataset.card, on=state.msPrints.has(el.dataset.id);
+    el.classList.toggle('done',on);
+    el.setAttribute('aria-checked',on?'true':'false');
+    markUnset(el,printUnset(state.checked,state.msPrints,card,keysOf(card)));
+    return;
+  }
+  const id=el.dataset.id, on=state.checked.has(id);
+  el.classList.toggle('done',on);
+  el.setAttribute('aria-checked',on?'true':'false');
+  syncChips(el,state.msPrints,id,keysOf(id),on);
+}
+
+/** The tiles of one card in the tiles view: its print tiles are siblings in one grid. */
+function printTilesOf(el){
+  const grid=el.parentNode; if(!grid) return [el];
+  return [...grid.querySelectorAll(`.card[data-card="${CSS.escape(el.dataset.card)}"]`)];
+}
+
+/**
+ * Tick/untick one print — a chip on a card tile, or a print tile. Keeps the card stats,
+ * the set's sidebar tally and the prints figure in step by delta, like setCardChecked.
+ */
+function togglePrint(el,cardId,printKey){
+  const tiles=el.dataset.print?printTilesOf(el):[el];
+  const wasCard=state.checked.has(cardId);
+  const before=tilePrints(el);
+  applyPrint(state.checked,state.msPrints,cardId,printKey,!state.msPrints.has(printId(cardId,printKey)),keysOf(cardId));
+  tiles.forEach(syncTile);
+  if(!el.classList.contains('lang-hidden')){
+    const delta=(state.checked.has(cardId)?1:0)-(wasCard?1:0);
+    statPrintsDone+=tilePrints(el)[1]-before[1];
+    bumpStats(delta);
+    if(delta) bumpBlock(el.closest('.set-block'),delta);
+  }
+  saveChk(); saveMsPrints();
+}
+
+/**
+ * Tick or untick a batch of tiles (select set / select all). Unticked cards have their
+ * prints cleared in ONE pass at the end — per card it would be cards × prints.
+ */
+function setTilesBulk(tiles,on){
+  const dropped=new Set();
+  for(const el of tiles){
+    if(el.dataset.print){
+      const {cardId,key:printKey}=splitPrintId(el.dataset.id);
+      if(state.msPrints.has(el.dataset.id)!==on) applyPrint(state.checked,state.msPrints,cardId,printKey,on,keysOf(cardId));
+    } else if(on) state.checked.add(el.dataset.id);
+    else { state.checked.delete(el.dataset.id); dropped.add(el.dataset.id); }
+  }
+  if(dropped.size) clearPrintsOf(state.msPrints,dropped);
 }
 
 function installCardDelegation(container){
@@ -186,7 +292,11 @@ function installCardDelegation(container){
     const card=e.target.closest?.('.card[data-id]');
     if(!card||!container.contains(card)) return;
     const id=card.dataset.id;
-    if(e.target.classList.contains('preview-btn')){ e.stopPropagation(); openPreview(id); return; }
+    if(e.target.classList.contains('preview-btn')){ e.stopPropagation(); openPreview(card.dataset.card||id); return; }
+    // A print chip ticks that print, never the card under it. The second click of a
+    // double-click is dropped here too, so a double-tap on a chip is one toggle.
+    const chip=e.target.closest('.pchip');
+    if(chip&&card.contains(chip)){ if(e.detail<=1) togglePrint(card,id,chip.dataset.key); return; }
     // (The per-card checkbox is gone — the tile itself is the toggle, and owning a card
     // is shown by the artwork being in full colour. The two LOAD-BEARING notes that used
     // to live here were both about stopping the checkbox and this handler from toggling
@@ -196,7 +306,7 @@ function installCardDelegation(container){
     // The dblclick listener below undoes the FIRST click's toggle, so a double-click is
     // net-zero on the checklist and just opens the preview.
     if(e.detail>1) return;
-    setCardChecked(card,id,!card.classList.contains('done'));
+    toggleTile(card);
   });
 
   // Double-click anywhere on a card opens the big preview — the 🔍 button stays for
@@ -208,9 +318,10 @@ function installCardDelegation(container){
     const card=e.target.closest?.('.card[data-id]');
     if(!card||!container.contains(card)) return;
     if(e.target.classList.contains('preview-btn')||e.target.classList.contains('img-retry-btn')) return;
+    if(e.target.closest('.pchip')) return;
     // Revert the toggle the first click of this double already applied.
-    setCardChecked(card,card.dataset.id,!card.classList.contains('done'));
-    openPreview(card.dataset.id);
+    toggleTile(card);
+    openPreview(card.dataset.card||card.dataset.id);
   });
 
   // Keyboard. The tile is role=checkbox now that the real one is gone, so it owes the
@@ -220,9 +331,16 @@ function installCardDelegation(container){
     if(e.key!==' '&&e.key!=='Enter') return;
     const card=e.target.closest?.('.card[data-id]');
     if(!card||!container.contains(card)) return;
+    if(e.target.closest('.pchip')) return;   // a chip is a real button: its own click handles it
     e.preventDefault();
-    setCardChecked(card,card.dataset.id,!card.classList.contains('done'));
+    toggleTile(card);
   });
+}
+
+/** One click on a tile: a print tile toggles its print, a card tile its card. */
+function toggleTile(card){
+  if(card.dataset.print) togglePrint(card,card.dataset.card,card.dataset.print);
+  else setCardChecked(card,card.dataset.id,!card.classList.contains('done'));
 }
 
 // ── SELECT ALL / SET ──────────────────────────────────────────────────────────
@@ -230,27 +348,34 @@ function selectSet(block){
   // Only affect visible (not lang-hidden) cards in this block
   const cards=[...block.querySelectorAll('.card[data-id]')].filter(c=>!c.classList.contains('lang-hidden'));
   const any=cards.some(c=>!c.classList.contains('done'));
+  // With prints tracked a tile is not always a card (tiles view), and one toggle can move
+  // the card, the prints figure and the "which print?" hint of sibling tiles at once — so
+  // recount with the one pass that owns the numbers instead of patching deltas.
+  if(state.printView!=='off'){
+    setTilesBulk(cards,any);
+    block.querySelectorAll('.card[data-id]').forEach(syncTile);
+    saveChk(); saveMsPrints(); applyFilter();
+    return;
+  }
   let delta=0;
   cards.forEach(c=>{
     const id=c.dataset.id; if(!id) return;
     if(any){ if(!c.classList.contains('done')) delta++;
-             state.checked.add(id);c.classList.add('done');c.setAttribute('aria-checked','true'); }
+             c.classList.add('done');c.setAttribute('aria-checked','true'); }
     else{    if(c.classList.contains('done')) delta--;
-             state.checked.delete(id);c.classList.remove('done');c.setAttribute('aria-checked','false'); }
+             c.classList.remove('done');c.setAttribute('aria-checked','false'); }
   });
-  saveChk();
+  setTilesBulk(cards,any);   // also clears the (hidden) prints of unticked cards
+  saveChk(); saveMsPrints();
   statChecked+=delta; renderStats(); bumpBlock(block,delta);
 }
 function selectAll(){
   // Only affect visible (not lang-hidden) cards
   const all=[...document.querySelectorAll('.card[data-id]')].filter(c=>!c.classList.contains('lang-hidden'));
   const any=all.some(c=>!c.classList.contains('done'));
-  all.forEach(c=>{
-    const id=c.dataset.id;
-    if(any){state.checked.add(id);c.classList.add('done');c.setAttribute('aria-checked','true');}
-    else{state.checked.delete(id);c.classList.remove('done');c.setAttribute('aria-checked','false');}
-  });
-  saveChk(); applyFilter();
+  setTilesBulk(all,any);
+  document.querySelectorAll('#dyn .card[data-id]').forEach(syncTile);
+  saveChk(); saveMsPrints(); applyFilter();
   const btn=document.getElementById('btn-select-all'); if(btn) btn.textContent=any?'☐ Deselect all':'☑ Select all';
 }
 
@@ -681,6 +806,22 @@ function markCardToggle(el,isDone){
   el.tabIndex=0;
 }
 
+/**
+ * One tile of the tiles view: a single print of card `cardId`, ticked on its own.
+ * `first` marks the tile that stands for the card in the card tallies (data-pc).
+ */
+function mkPrintTile(cardId,pr,first,badge){
+  const pid=printId(cardId,pr.key), on=state.msPrints.has(pid);
+  const el=document.createElement('div');
+  el.className='card card-print'+(on?' done':'');
+  el.dataset.id=pid; el.dataset.card=cardId; el.dataset.print=pr.key; el.dataset.lang=badge;
+  if(first) el.dataset.pc='1';
+  markCardToggle(el,on);
+  el.setAttribute('aria-label',pr.label);
+  markUnset(el,printUnset(state.checked,state.msPrints,cardId,keysOf(cardId)));
+  return el;
+}
+
 // ── BUILD SETS MAP ────────────────────────────────────────────────────────────
 // Handles both pokemontcg.io cards (primary) and TCGdex cards (fallback).
 // pokemontcg.io card structure: { id, name, number, set:{id,name,series,releaseDate,images}, images:{small,large} }
@@ -852,6 +993,11 @@ function renderBySet(enCards, setNamesAll, container, setMeta = { dates: {}, sym
         cards.forEach(card=>{
           // NATIVE_NAMES is keyed by species, not by printed card name.
           const spec=card.species||card.name;
+          // Per-print tracking: the card's prints, once for all its language tiles (the
+          // variant data is the EN card's, exactly as the footer badges already use it).
+          const plist=printsOf(card.variants);
+          const tracked=state.printView!=='off'&&tracksPrints(plist);
+          const pmeta=tracksPrints(plist)?{printList:plist,printKeys:plist.map(x=>x.key)}:{};
           // TCGdex languages
           for(const langDef of LANGUAGES){
             const id=`${langDef.badge}_${card.id}`, isDone=state.checked.has(id);
@@ -869,18 +1015,35 @@ function renderBySet(enCards, setNamesAll, container, setMeta = { dates: {}, sym
               hiSrc = limitlessSrc || `${tcgdexBase}/high.webp`;
               fallbackSrc = limitlessSrc ? `${tcgdexBase}/low.webp` : null;
             }
-            state._meta.set(id,{name:{en:card.name,native:(NATIVE_NAMES[langDef.badge]||{})[spec]||null},setName:si.enName,num:`#${card.localId}`,lang:langDef.badge,langColor:langDef.color,...imgMeta([loSrc,fallbackSrc],[hiSrc]),symSrc:si.symSrc});
-            const el=document.createElement('div');
-            el.className='card'+(isDone?' done':''); el.dataset.id=id; el.dataset.lang=langDef.badge;
-            markCardToggle(el,isDone);
+            state._meta.set(id,{name:{en:card.name,native:(NATIVE_NAMES[langDef.badge]||{})[spec]||null},setName:si.enName,num:`#${card.localId}`,lang:langDef.badge,langColor:langDef.color,...imgMeta([loSrc,fallbackSrc],[hiSrc]),symSrc:si.symSrc,...pmeta});
             // EN: TCGdex fallback; non-EN: TCGdex fallback when Limitless fails
             // (hiSrc is not passed — mkImgWrap only renders the low-res tile; the
             // high-res candidates reach the preview/print via _meta.hiSources above.)
             const enFallback = fallbackSrc;
-            const iw=mkImgWrap(loSrc,card.name,card.localId,si.enName,si.symSrc,langDef.badge,langDef.color,id,enFallback,spec);
+            const mkWrap=()=>mkImgWrap(loSrc,card.name,card.localId,si.enName,si.symSrc,langDef.badge,langDef.color,id,enFallback,spec);
+            // Tiles view: one tile per print, in place of the card's single tile.
+            if(tracked&&state.printView==='tiles'){
+              plist.forEach((pr,pi)=>{
+                const el=mkPrintTile(id,pr,pi===0,langDef.badge);
+                const footer=mkCardFooter(card.localId,langDef.badge,{langClass:`lang-${langDef.badge}`});
+                footer.insertBefore(mkPrintTag(pr),footer.querySelector('.lang'));
+                el.appendChild(mkWrap()); el.appendChild(footer);
+                grid.appendChild(el); count++;
+              });
+              continue;
+            }
+            const el=document.createElement('div');
+            el.className='card'+(isDone?' done':''); el.dataset.id=id; el.dataset.lang=langDef.badge;
+            markCardToggle(el,isDone);
             const footer=mkCardFooter(card.localId,langDef.badge,
-              {langClass:`lang-${langDef.badge}`,variants:card.variants,isDone});
-            el.appendChild(iw); el.appendChild(footer);
+              // Chips view: the chips say everything the badges did, and are clickable.
+              {langClass:`lang-${langDef.badge}`,variants:tracked?null:card.variants,isDone});
+            el.appendChild(mkWrap());
+            if(tracked){
+              el.appendChild(mkPrintChips(plist));
+              syncChips(el,state.msPrints,id,pmeta.printKeys,isDone);
+            }
+            el.appendChild(footer);
             grid.appendChild(el); count++;
           }
           // Placeholder langs (KR, SC)
@@ -991,7 +1154,8 @@ function syncSetHeadName(block){
 function applyFilter(){
   const container=document.getElementById('dyn'); if(!container) return;
 
-  statVisible=0; statChecked=0;
+  statVisible=0; statChecked=0; statPrints=0; statPrintsDone=0;
+  const printsTracked=state.printView!=='off';
   let eraLabel=null, eraHasVisibleSet=false;
   const finishEra=()=>{ if(eraLabel) eraLabel.classList.toggle('era-hidden',!eraHasVisibleSet); };
 
@@ -1007,7 +1171,12 @@ function applyFilter(){
       i=>{ const k=kids[i].classList;
            return k.contains('card') ? KIND_CARD : k.contains('poke-divider') ? KIND_DIVIDER : KIND_OTHER; },
       i=>state.activeLangs.has(kids[i].dataset.lang),
-      i=>kids[i].classList.contains('done'));
+      // A print tile's .done is its PRINT; the card tallies want the card.
+      i=>{ const c=kids[i].dataset.card; return c?state.checked.has(c):kids[i].classList.contains('done'); },
+      printsTracked?{
+        countedAt:i=>!kids[i].dataset.print||kids[i].dataset.pc==='1',
+        printsAt:i=>tilePrints(kids[i]),
+      }:{});
 
     for(let i=0;i<n;i++){
       const on=plan.show[i]===1;
@@ -1021,6 +1190,7 @@ function applyFilter(){
     if(!allHidden) eraHasVisibleSet=true;
 
     statVisible+=plan.visible; statChecked+=plan.done;
+    statPrints+=plan.prints; statPrintsDone+=plan.printsDone;
     blockTallies.set(node,{vis:plan.visible,done:plan.done});
     setNavSync(node,plan.visible,plan.done,allHidden);
     syncSetHeadName(node);
@@ -1417,7 +1587,7 @@ document.addEventListener('keydown',e=>{ if(e.key==='Escape') document.getElemen
 // Public API. main.js calls the renders directly + publishes the inline-onclick
 // handlers on window; langColor + buildPlaceholderHTML are shared with print.js/tms.js.
 export {
-  buildAll, renderPokeChips, updateSortBtn, updateStats,
+  buildAll, renderPokeChips, updateSortBtn, updateStats, rerenderMaster,
   clearCache, closePreview, doRefresh,
   resetAll, selectAll, toggleSort,
   langColor, buildPlaceholderHTML, mkPlaceholderEl, openPreviewMeta, markCardToggle,

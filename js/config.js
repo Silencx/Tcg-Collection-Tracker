@@ -75,6 +75,23 @@ export const IMGFAILSTORE = 'tcgImgFail_v1'; // negative cache of image URLs tha
 // of the shareable session hash (io.js encodeSession) — a link shared from a
 // desktop shouldn't force the panel open on the recipient's phone.
 export const SETNAVSTORE = 'tcgSetNav_v1';
+
+// ── PER-PRINT TRACKING ────────────────────────────────────────────────────────
+// One print set per card checklist, SEPARATE from it: the card checklists keep meaning
+// "I have at least one print", so nothing that reads them had to change. Ids are
+// `${cardId}#${printKey}` — see js/ui/prints-model.js for the rules that tie the two.
+export const CHKPRINTSTORE    = 'tcgChkPrints_v1';     // Master Set
+export const SETCHKPRINTSTORE = 'tcgSetChkPrints_v1';  // Single set
+export const TMSPRINTSTORE    = 'tcgTMSPrints_v1';     // True Master Set
+// How prints are shown: not at all (the plain checklist, and the default), as toggle
+// chips on each card, or as one tile per print. A shareable SETTING — it rides #s=.
+export const PRINTVIEWSTORE   = 'tcgPrintView_v1';
+export const PRINT_VIEWS = ['off', 'chips', 'tiles'];
+export const DEFAULT_PRINT_VIEW = 'off';
+/** @returns {boolean} whether `v` is a print view this build can render. */
+export function isValidPrintView(v) {
+  return PRINT_VIEWS.includes(v);
+}
 export const DEFAULT_POKEMON = ['Seedot', 'Nuzleaf', 'Shiftry']; // default list + pre-build target
 export const CACHE_TTL  = 24*60*60*1000; // 24h EN card-data cache TTL
 

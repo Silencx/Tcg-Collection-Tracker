@@ -53,6 +53,21 @@ exception: TCGdex has no reverse-holo data for the Black & White, XY and Sun &
 Moon eras, so those RH badges are worked out from rarity and drawn with a
 dashed outline. That rule matched TCGplayer on 99.9% of the era's cards.
 
+### Tracking individual prints (optional)
+Off by default — the plain checklist only asks "do I have this card?". Turn it on
+under ⚙ → **Print variants** to tick the exact prints you own, in Master Set,
+Single set and the True Master Set popup:
+- **Chips** keeps one tile per card and adds a toggle for each print (N, RH, H,
+  1ED, SL…). Tap the art for the card, a chip for that print.
+- **Tiles** gives every print its own tile, like binder slots.
+
+The **Prints as tiles / chips** button next to **Sets** switches between the two.
+Ticking a print ticks the card; unticking its last print unticks the card. Cards you
+ticked before turning this on stay ticked, outlined in dashed gold until you pick the
+print. The header adds a "P / Q prints" count, and Print selected / Print checklist
+print one entry per ticked print. Turning it off hides the prints but keeps them, and
+they are included in Export / Import.
+
 ### Printable checklists
 Print a photo-accurate 9-up sheet of your current selection, or a compact
 2-column text checklist — handy for binders, want lists, or trades. Both
@@ -117,6 +132,9 @@ js/
     html.js               # HTML/URL escaping for the string-built markup (print, placeholders)
     banners.js            # storage-quota banner
     io.js                 # export / import (+ id migration) and shareable sessions
+    prints-model.js       # pure per-print tracking rules (print keys, card ↔ print, totals)
+    prints-ui.js          # print chips / print-tile labels shared by the three grids
+    printview.js          # the off / chips / tiles setting and its switch
 data/                    # pre-built snapshots (committed; refreshed by CI)
   cards.json, sets.json  # EN card index + set metadata (from TCGdex)
   jp.json                # Japanese card index (from Bulbapedia)

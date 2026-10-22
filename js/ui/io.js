@@ -14,11 +14,23 @@
 
 import {
   state, saveChk, flushAll, saveTms, saveTmsCache, saveMode, saveFilter, saveTmsFilter, savePoke, saveSort, clearCardCache,
-  saveSetTarget,
+  saveSetTarget, savePrintView,
 } from '../state.js';
 import * as storage from '../storage.js';
-import { SCHEMA_VERSION, CHKSTORE, CACHESTORE, TMSSTORE, TMSCACHESTORE, SETCHKSTORE, PALETTE_KEY, SESSIONSTORE, isValidMode } from '../config.js';
+import {
+  SCHEMA_VERSION, CHKSTORE, CACHESTORE, TMSSTORE, TMSCACHESTORE, SETCHKSTORE, PALETTE_KEY, SESSIONSTORE,
+  CHKPRINTSTORE, SETCHKPRINTSTORE, TMSPRINTSTORE, isValidMode, isValidPrintView,
+} from '../config.js';
 import { looksPtcgio, migrateCardId, migrateIdToken } from '../api/id-migration.js';
+import { migratePrintId, prunePrints } from './prints-model.js';
+
+// Each print store beside the card checklist it belongs to. A print only means something
+// while its card is ticked (prints-model.js), so an import checks one against the other.
+const PRINT_STORES = [
+  [CHKPRINTSTORE, CHKSTORE],
+  [SETCHKPRINTSTORE, SETCHKSTORE],
+  [TMSPRINTSTORE, TMSSTORE],
+];
 import { encodeSessionPayload, decodeSession, safeSetId } from './session-codec.js';
 
 const EXPORT_TOOL = 'pokemon-master-set-tool';
@@ -143,6 +155,17 @@ export function importData(input) {
     let report = '';
     for (const [k, v] of Object.entries(payload.keys)) {
       if (k === CACHESTORE) continue;                // skip MS cache → forces a TCGdex refetch
+      if (PRINT_STORES.some(([pk]) => pk === k)) {
+        // Print ids carry a card id, so they get the same id migration as the card
+        // checklists. Pruned against those checklists AFTER the loop below, because the
+        // payload's key order says nothing about which arrives first.
+        let ids = null;
+        try { ids = JSON.parse(v); } catch { ids = null; }
+        if (Array.isArray(ids)) {
+          storage.set(k, JSON.stringify(ids.filter(x => typeof x === 'string').map(migratePrintId)));
+          continue;
+        }
+      }
       if (k === CHKSTORE) {
         let ids = null;
         try { ids = JSON.parse(v); } catch { ids = null; }
@@ -187,6 +210,15 @@ export function importData(input) {
       }
       storage.set(k, v);   // restore verbatim
     }
+    // Every print store, imported or not: a backup from before per-print tracking leaves
+    // this device's print sets in place while REPLACING the card checklists under them,
+    // and a print whose card is no longer ticked must not survive that.
+    for (const [printKey, cardKey] of PRINT_STORES) {
+      const cardIds = storage.getJSON(cardKey, []);
+      const cards = new Set(Array.isArray(cardIds) ? cardIds : []);
+      const kept = prunePrints(storage.getJSON(printKey, []), cards);
+      if (storage.has(printKey)) storage.set(printKey, JSON.stringify(kept));
+    }
     storage.remove(CACHESTORE);
     alert('Import complete.' + (report ? `\n\n${report}` : '') + '\n\nThe page will now reload.');
     location.reload();
@@ -216,6 +248,9 @@ export function encodeSession() {
     // itself, and the picker's own language is device-local chrome (like SETNAVSTORE),
     // so neither rides the hash. The CHECKLIST is data and stays out too.
     set: state.ssTarget || '',
+    // How prints are shown ('off' | 'chips' | 'tiles'). A setting, like the filters; the
+    // print checklists themselves are data and stay out, exactly like the card ones.
+    pv: state.printView,
   });
 }
 
@@ -252,6 +287,9 @@ export function applySession(p) {
   if (typeof p.set === 'string') {
     state.ssTarget = safeSetId(p.set) ? p.set : null;
   }
+  // Whitelisted, like the mode. A link from before per-print tracking has no `pv` and
+  // leaves the recipient's own choice alone.
+  if (isValidPrintView(p.pv)) state.printView = p.pv;
   if (Array.isArray(p.pokes) && p.pokes.length) {
     const pokes = p.pokes
       .filter(n => typeof n === 'string' && POKE_NAME_RE.test(n))
@@ -277,7 +315,7 @@ export function applySession(p) {
   }
   // Persist to the individual keys so the restored view sticks across reloads.
   saveMode(); saveFilter(); saveTmsFilter(); savePoke(); saveSort();
-  saveSetTarget();
+  saveSetTarget(); savePrintView();
   return true;
 }
 

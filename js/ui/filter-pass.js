@@ -33,30 +33,45 @@ export const KIND_DIVIDER = 2;
  * @param {(i:number)=>number} kindAt KIND_CARD / KIND_DIVIDER / KIND_OTHER
  * @param {(i:number)=>boolean} visibleAt does card i pass the language filter
  * @param {(i:number)=>boolean} doneAt is card i checked
- * @returns {{show:Uint8Array, kind:Uint8Array, cards:number, visible:number, done:number}}
+ * @param {object} [opts] per-print tracking (js/ui/prints-model.js). Both optional:
+ * @param {(i:number)=>boolean} [opts.countedAt] does card i count toward the CARD
+ *   tallies. In the one-tile-per-print view a card is several tiles; only its first
+ *   counts, the rest are shown and hidden like any card but add nothing to cards /
+ *   visible / done. Default: every card counts.
+ * @param {(i:number)=>[number,number]} [opts.printsAt] [total, done] prints for card i.
+ *   When given, `prints` and `printsDone` total it over VISIBLE cards; otherwise both 0.
+ * @returns {{show:Uint8Array, kind:Uint8Array, cards:number, visible:number, done:number,
+ *            prints:number, printsDone:number}}
  *   `show[i]` is 1 when child i should be displayed. `done` counts only VISIBLE
  *   checked cards, so it matches the "N / M collected" denominator, which excludes
  *   filtered-out cards.
  */
-export function planGridVisibility(n, kindAt, visibleAt, doneAt) {
+export function planGridVisibility(n, kindAt, visibleAt, doneAt, { countedAt = null, printsAt = null } = {}) {
   const show = new Uint8Array(n);
   const kind = new Uint8Array(n);
-  let cards = 0, visible = 0, done = 0, lastDivider = -1;
+  let cards = 0, visible = 0, done = 0, prints = 0, printsDone = 0, lastDivider = -1;
 
   for (let i = 0; i < n; i++) {
     const k = kindAt(i);
     kind[i] = k;
     if (k === KIND_DIVIDER) { lastDivider = i; continue; }   // show[i] stays 0 until a visible card follows
     if (k !== KIND_CARD) { show[i] = 1; continue; }          // anything else is never filtered
-    cards++;
+    const counted = !countedAt || countedAt(i);
+    if (counted) cards++;
     if (!visibleAt(i)) continue;
     show[i] = 1;
-    visible++;
-    if (doneAt(i)) done++;
+    if (counted) {
+      visible++;
+      if (doneAt(i)) done++;
+    }
+    if (printsAt) {
+      const [t, d] = printsAt(i);
+      prints += t; printsDone += d;
+    }
     if (lastDivider >= 0) show[lastDivider] = 1;
   }
 
-  return { show, kind, cards, visible, done };
+  return { show, kind, cards, visible, done, prints, printsDone };
 }
 
 /**
