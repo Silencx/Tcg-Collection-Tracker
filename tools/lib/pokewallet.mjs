@@ -54,7 +54,7 @@ export function listOf(body) {
 
 /**
  * Pair our Japanese rows with PokéWallet cards on set + number.
- * @param {Array<{jpset,jpnum,pokemonName}>} rows  from data/jp*.json
+ * @param {Array<{jpset,jpnum,pokemonName}>} rows  Bulbapedia rows (data/jp/<slug>.json)
  * @param {Array} pwCards  PokéWallet search rows, already limited to Japanese sets
  * @returns {{matched:Array<{row,card}>, missing:Array}}
  *   A printing with its own product ("Weedle (Mirror Holofoil)") never stands in for the

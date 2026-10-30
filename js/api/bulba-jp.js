@@ -1,7 +1,7 @@
 // =============================================================================
 // bulba-jp.js — the Bulbapedia Japanese-card source, decoupled from app state so
 // it can run in BOTH the browser and Node (tools/build-data.mjs pre-builds JA into
-// data/jp.json). Pure: imports nothing, touches no localStorage/DOM. `fetch` is a
+// data/jp/<slug>.json). Pure: imports nothing, touches no localStorage/DOM. `fetch` is a
 // parameter (defaults to the global, present in browsers and Node 18+).
 //
 // Returns RAW parsed entries [{jpset, jpnum, pokemonName}] — the same shape the MS
@@ -64,7 +64,7 @@ export function parseBulbaJPCards(wikitext) {
  * JP cards". That was harmless in the browser (an empty JP list for one session) and
  * ruinous at build time: every weekly CI build from 2026-09-14 on got "no JP cards" for
  * every Pokémon (Bulbapedia answered HTTP 403 when probed on 2026-10-22), and the job
- * committed an empty data/jp.json that every visitor then trusted over a live fetch.
+ * committed empty JP snapshot data that every visitor then trusted over a live fetch.
  * Build time needs to tell the two apart, so the failure is carried out, not swallowed.
  */
 async function fetchWikitext(pokeName, fetchImpl) {

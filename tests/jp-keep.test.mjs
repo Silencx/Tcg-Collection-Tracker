@@ -47,35 +47,24 @@ test('a real "no JP cards" answer is written when nothing was committed', () => 
   assert.deepEqual(decideJpShard(ok('Seedot', []), null), { write: true, entries: [], warning: null });
 });
 
-test('an all-failed build leaves jp.json and every shard untouched', () => {
+test('an all-failed build leaves every shard untouched', () => {
   const names = ['Seedot', 'Nuzleaf'];
   const plan = planJpSnapshot(
     names,
     names.map(n => failed(n)),
     { Seedot: [e('Seedot', '001/101')], Nuzleaf: [e('Nuzleaf', '002/101')] },
-    names,
   );
-  assert.equal(plan.combined.write, false);
   assert.ok(names.every(n => plan.shards[n].write === false));
 });
 
-test('a partial failure rewrites jp.json from fresh + kept data, in build order', () => {
-  const names = ['Seedot', 'Nuzleaf', 'Shiftry'];
+test('results are matched by name, not by position', () => {
   const plan = planJpSnapshot(
-    names,
-    [ok('Seedot', [e('Seedot', '001/101')]), failed('Nuzleaf'), failed('Shiftry')],
-    { Seedot: null, Nuzleaf: [e('Nuzleaf', '002/101')], Shiftry: null },
-    ['Seedot', 'Nuzleaf', 'Shiftry'],
+    ['Seedot', 'Nuzleaf'],
+    [ok('Nuzleaf', [e('Nuzleaf', '002/101')]), failed('Seedot')],
+    { Seedot: [e('Seedot', '001/101')], Nuzleaf: null },
   );
-  assert.equal(plan.combined.write, true);
-  // Shiftry has nothing fresh or committed, so jp.json must not claim to cover it.
-  assert.deepEqual(plan.combined.pokemon, ['Seedot', 'Nuzleaf']);
-  assert.deepEqual(plan.combined.jpCardsData.map(x => x.jpnum), ['001/101', '002/101']);
-});
-
-test('jp.json is rewritten when its coverage list would change, even with nothing fresh', () => {
-  const plan = planJpSnapshot(['Seedot'], [failed('Seedot')], { Seedot: [e('Seedot', '001/101')] }, null);
-  assert.equal(plan.combined.write, true);
+  assert.equal(plan.shards.Seedot.write, false);
+  assert.deepEqual(plan.shards.Nuzleaf.entries.map(x => x.jpnum), ['002/101']);
 });
 
 // ── fetchJpRawByName: failure must be distinguishable from "no JP cards" ──

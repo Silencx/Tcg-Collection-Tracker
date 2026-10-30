@@ -101,25 +101,12 @@ export async function getSetSeries() {
 // cannot resolve collisions ("Nidoran♀" and "Nidoran♂" slugify identically).
 
 // Memoizes the ABSENCE of the index too. loadJSON deliberately does not cache
-// rejections, so without this every call would re-request a 404 on a deployment that
-// predates sharding.
+// rejections, so without this every call would re-request a 404 on a deployment
+// that ships no snapshot. No index means no snapshot: the router goes live.
 let indexProbe = null;
 function loadIndex() {
   if (!indexProbe) indexProbe = loadJSON('index.json').then(i => (i?.pokemon ? i : null), () => null);
   return indexProbe;
-}
-
-/** Back-compat path: treat the monolithic cards.json as a shard covering its own list. */
-async function monolithPartial(names) {
-  const snap = await loadJSON('cards.json');
-  if (!snap || !snap.builtAt) throw new Error('snapshot not built yet');
-  const have = new Set(snap.pokemon || []);
-  const covered = names.filter(n => have.has(n));
-  if (!covered.length) throw new Error('snapshot covers none of the requested Pokémon');
-  const wanted = new Set(covered);
-  // `species` fallback: data/cards.json built before species existed carries only name.
-  const cards = (snap.cards || []).filter(c => wanted.has(c.species || c.name));
-  return { cards, covered, missing: names.filter(n => !have.has(n)) };
 }
 
 /**
@@ -129,7 +116,7 @@ async function monolithPartial(names) {
  */
 export async function getCardsPartial(names) {
   const index = await loadIndex();
-  if (!index) return monolithPartial(names);
+  if (!index) throw new Error('no snapshot index');
 
   const known = names.filter(n => index.pokemon[n]);
   if (!known.length) throw new Error('snapshot covers none of the requested Pokémon');
@@ -153,19 +140,7 @@ export async function getCardsPartial(names) {
 /** Raw JP entries for whichever of `names` the snapshot covers. Same contract. */
 export async function getJpRawPartial(names) {
   const index = await loadIndex();
-  if (!index) {
-    const snap = await loadJSON('jp.json');
-    if (!snap || !snap.builtAt) throw new Error('JP snapshot not built yet');
-    const have = new Set(snap.pokemon || []);
-    const covered = names.filter(n => have.has(n));
-    if (!covered.length) throw new Error('JP snapshot covers none of the requested Pokémon');
-    const wanted = new Set(covered);
-    return {
-      data: (snap.jpCardsData || []).filter(e => wanted.has(e.pokemonName)),
-      covered,
-      missing: names.filter(n => !have.has(n)),
-    };
-  }
+  if (!index) throw new Error('no snapshot index');
 
   const known = names.filter(n => index.pokemon[n]);
   if (!known.length) throw new Error('JP snapshot covers none of the requested Pokémon');

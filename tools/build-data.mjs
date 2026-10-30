@@ -2,19 +2,20 @@
 // =============================================================================
 // tools/build-data.mjs — pre-build the static data snapshots the app serves.
 //
-// Pulls the EN master card index + set metadata from TCGdex for a Pokémon list
-// and writes data/cards.json + data/sets.json (+ data/jp.json from Bulbapedia).
-// The app reads these first (instant, no rate limits, any number of users) and
-// only hits the live API as a fallback or on a user-triggered refresh.
+// Reads set metadata for every set and, for each Pokémon on the list, its EN cards from
+// TCGdex and its Japanese entries from Bulbapedia. Writes:
+//   data/sets.json          set names, dates, symbols, logos, counts, series (all languages)
+//   data/cards/<slug>.json  one EN card shard per Pokémon
+//   data/jp/<slug>.json     one Bulbapedia JP shard per Pokémon
+//   data/index.json         exact Pokémon name → shard filename
+// The app reads these first (instant, no rate limits, any number of users) and only
+// hits the live API for what they lack or on a user-triggered refresh.
 //
 // It imports the SAME tcgdex provider the browser uses, so the snapshot shape can
-// never drift from the live shape. Requires Node 18+ (global fetch).
-// Run: `node tools/build-data.mjs` (or `npm run build-data`) — builds DEFAULT_POKEMON.
-// Pass a comma-separated list to build a different snapshot instead, e.g.:
-//   node tools/build-data.mjs "Pikachu,Eevee"
+// never drift from the live shape. Requires Node 18+ (global fetch) and network access.
+// Run: `node tools/build-data.mjs` (or `npm run build-data`). Pass a comma-separated
+// list to build a different snapshot instead, e.g. `node tools/build-data.mjs "Pikachu,Eevee"`.
 // CI runs the no-arg (default) form weekly.
-//
-// NOTE: cannot run in an offline sandbox — needs network access to api.tcgdex.net.
 // =============================================================================
 
 import { writeFileSync, mkdirSync, existsSync, readFileSync } from 'node:fs';
@@ -106,16 +107,45 @@ async function main() {
     console.warn(`[build-data]   ! ${nameCount - dateCount} EN set(s) have no release date; ` +
       'snapshot.getSetMeta will miss for anyone whose cards land in one of them');
   }
-
-  console.log('[build-data] fetching card index from TCGdex…');
+  // getSetMeta swallows every failed request, so a TCGdex outage comes back as empty
+  // maps, not an error. Writing those would wipe data/sets.json for every visitor.
+  if (!nameCount) throw new Error('TCGdex returned no EN set names; nothing written');
   const setSeries = meta.setSeries || {};
-  const cards = await getCards(POKEMON, { setSeries });
-  console.log(`[build-data]   → ${cards.length} cards`);
+
+  // Slugs are fixed up front: both keep-guards below have to read each Pokémon's
+  // COMMITTED shards before anything is written over them.
+  const taken = new Set();
+  const slugs = POKEMON.map(name => uniqueSlug(name, taken));
+
+  // ── EN CARD SHARDS ──
+  // Each shard is fetched INDEPENDENTLY. getCards dedups a shared cameo ("Seedot &
+  // Nuzleaf-GX") onto the first-listed Pokémon, so one combined fetch sliced per Pokémon
+  // would leave that card out of the other's shard — and a visitor who asked for only
+  // that Pokémon would get fewer cards from the snapshot than from a live fetch.
+  //
+  // A failed fetch keeps the committed shard (same identity test as the JP guard below);
+  // with none committed, no shard is written and visitors fetch that Pokémon live. If
+  // EVERY fetch fails, TCGdex is down: stop before anything is written.
+  console.log('[build-data] fetching card shards from TCGdex…');
+  const shards = [];
+  for (const [i, name] of POKEMON.entries()) {
+    try {
+      shards.push({ cards: await getCards([name], { setSeries }) });
+    } catch (e) {
+      const prev = readJSON(`cards/${slugs[i]}.json`);
+      const kept = prev?.builtAt && prev.pokemon === name && Array.isArray(prev.cards) ? prev.cards : null;
+      console.warn(`[build-data]   ! ${name}: card fetch failed (${e.message}); ` +
+        (kept ? `keeping the committed ${kept.length} cards` : 'no committed shard, so none is written'));
+      shards.push({ cards: null, kept });
+    }
+  }
+  if (!shards.some(s => s.cards)) throw new Error('every TCGdex card fetch failed; nothing written');
   // Variants are best effort in the provider (a footer badge must never cost the card
   // list), so a GraphQL outage would quietly bake a snapshot with no badges at all. Say so.
-  const noVariants = cards.filter(c => !c.variants);
-  const inferred = cards.filter(c => c.variants?.inferred).length;
-  console.log(`[build-data]   → variants on ${cards.length - noVariants.length}/${cards.length} ` +
+  const fresh = [...new Map(shards.flatMap(s => s.cards || []).map(c => [c.id, c])).values()];
+  const noVariants = fresh.filter(c => !c.variants);
+  const inferred = fresh.filter(c => c.variants?.inferred).length;
+  console.log(`[build-data]   → ${fresh.length} cards; variants on ${fresh.length - noVariants.length}/${fresh.length} ` +
     `(${inferred} BW/XY/SM reverse holo inferred)`);
   if (noVariants.length) {
     console.warn(`[build-data]   ! ${noVariants.length} card(s) have no variant data: ` +
@@ -127,11 +157,6 @@ async function main() {
   const jpFailed = jpResults.filter(r => !r.ok).length;
   console.log(`[build-data]   → ${jpResults.reduce((n, r) => n + r.entries.length, 0)} JP entries` +
     (jpFailed ? ` (${jpFailed}/${POKEMON.length} fetch(es) FAILED)` : ''));
-
-  // Slugs are fixed up front rather than in the shard loop: the JP guard below has to
-  // read each Pokémon's COMMITTED shard before anything is written over it.
-  const taken = new Set();
-  const slugs = POKEMON.map(name => uniqueSlug(name, taken));
 
   // ── JP: NEVER TRADE COMMITTED DATA FOR A BAD FETCH ──
   // A blocked Bulbapedia used to come back as "no JP cards" and get committed as such
@@ -145,9 +170,7 @@ async function main() {
     previousJp[name] = prev?.builtAt && prev.pokemon === name && Array.isArray(prev.jpCardsData)
       ? prev.jpCardsData : null;
   });
-  const prevJpCombined = readJSON('jp.json');
-  const jp = planJpSnapshot(POKEMON, jpResults, previousJp,
-    prevJpCombined?.builtAt && Array.isArray(prevJpCombined.pokemon) ? prevJpCombined.pokemon : null);
+  const jp = planJpSnapshot(POKEMON, jpResults, previousJp);
   POKEMON.forEach((name, i) => {
     const { warning } = jp.shards[name];
     if (warning) console.warn(`[build-data]   ! JP ${name}: ${warning} — data/jp/${slugs[i]}.json`);
@@ -158,49 +181,30 @@ async function main() {
   mkdirSync(resolve(DATA_DIR, 'cards'), { recursive: true });
   mkdirSync(resolve(DATA_DIR, 'jp'), { recursive: true });
 
-  // Monolithic files stay for one release cycle: a returning visitor's cached JS may
-  // predate the index, and snapshot.js falls back to these when index.json 404s.
-  writeJSON('cards.json', { schemaVersion: SCHEMA_VERSION, builtAt, pokemon: POKEMON, cards });
   // `counts` is the DENOMINATOR for single-set mode ("47 / 165 collected"), and it costs
   // nothing to ship: cardCount is already on every entry of the /sets response this
   // build reads for names and dates.
   //
   // dates/symbols/logos/counts stay FLAT `{setId: value}` maps and are the UNION across
   // languages — see the shape note on tcgdex.getSetMeta. `lang` carries only the values
-  // that differ from them, which is why this file is 88 KB and not 275 KB.
+  // that differ from them, which is why this file is ~94 KB and not ~275 KB.
   writeJSON('sets.json', {
     schemaVersion: SCHEMA_VERSION, builtAt,
     names: meta.names, dates: meta.dates, symbols: meta.symbols,
     logos: meta.logos, counts: meta.counts,
     setSeries: meta.setSeries, series: meta.series, lang: meta.lang,
   });
-  // `pokemon` is jp.json's coverage claim, so it lists only Pokémon that have JP data
-  // (fresh or kept) — see planJpSnapshot. Skipped entirely when nothing fresh came in.
-  if (jp.combined.write) {
-    writeJSON('jp.json', {
-      schemaVersion: SCHEMA_VERSION, builtAt,
-      pokemon: jp.combined.pokemon, jpCardsData: jp.combined.jpCardsData,
-    });
-  }
 
   // ── PER-POKÉMON SHARDS ──
-  // Each shard is fetched INDEPENDENTLY rather than sliced out of the combined result.
-  // getCards dedups a shared cameo ("Seedot & Nuzleaf-GX") onto the first-listed
-  // Pokémon, so slicing would leave that card out of the other's shard — and a visitor
-  // who asked for only that Pokémon would get fewer cards from the snapshot than from a
-  // live fetch. Independent shards make a partial hit identical to the live answer.
+  // index.json lists every Pokémon; a shard file that is missing is simply a miss at
+  // runtime (snapshot.getCardsPartial), and the visitor fetches that Pokémon live.
   const index = { schemaVersion: SCHEMA_VERSION, builtAt, pokemon: {} };
   for (const [i, name] of POKEMON.entries()) {
     const slug = slugs[i];
     index.pokemon[name] = slug;
-    let own = [];
-    try {
-      own = await getCards([name], { setSeries });
-    } catch (e) {
-      console.warn(`[build-data]   ! ${name}: shard fetch failed (${e.message}); falling back to a slice`);
-      own = cards.filter(c => (c.species || c.name) === name);
-    }
-    writeJSON(`cards/${slug}.json`, { schemaVersion: SCHEMA_VERSION, builtAt, pokemon: name, cards: own });
+    // A kept card shard is left byte-identical, like a kept JP shard below.
+    const { cards: own, kept } = shards[i];
+    if (own) writeJSON(`cards/${slug}.json`, { schemaVersion: SCHEMA_VERSION, builtAt, pokemon: name, cards: own });
     // A kept JP shard is left byte-identical (not rewritten with a new builtAt), so a
     // blocked run produces no data/jp* diff for the weekly job to commit.
     const jpShard = jp.shards[name];
@@ -209,15 +213,21 @@ async function main() {
         schemaVersion: SCHEMA_VERSION, builtAt, pokemon: name, jpCardsData: jpShard.entries,
       });
     }
-    console.log(`[build-data]   shard ${slug}: ${own.length} cards, ` +
+    console.log(`[build-data]   shard ${slug}: ` +
+      (own ? `${own.length} cards, ` : kept ? `${kept.length} cards (KEPT, not refreshed), ` : 'no card shard (fetch failed), ') +
       (jpShard.write ? `${jpShard.entries.length} JP`
         : jpShard.entries ? `${jpShard.entries.length} JP (KEPT, not refreshed)` : 'no JP shard (fetch failed)'));
   }
   writeJSON('index.json', index);
 
   const jpKept = POKEMON.filter(n => !jp.shards[n].write);
-  console.log(`[build-data] wrote cards.json, sets.json, ${jp.combined.write ? 'jp.json, ' : ''}` +
-    `index.json + ${POKEMON.length} card shard(s), ${POKEMON.length - jpKept.length} JP shard(s) @ ${builtAt}`);
+  const cardsWritten = shards.filter(s => s.cards).length;
+  console.log(`[build-data] wrote sets.json, index.json + ${cardsWritten} card shard(s), ` +
+    `${POKEMON.length - jpKept.length} JP shard(s) @ ${builtAt}`);
+  if (cardsWritten < POKEMON.length) {
+    console.warn(`[build-data] ! EN cards NOT refreshed for ${POKEMON.length - cardsWritten}/${POKEMON.length} ` +
+      'Pokémon; see the card warnings above');
+  }
   if (jpKept.length) {
     console.warn(`[build-data] ! JP data NOT refreshed for ${jpKept.length}/${POKEMON.length} ` +
       `Pokémon (${jpKept.join(', ')}); committed copies kept — see the JP warnings above`);

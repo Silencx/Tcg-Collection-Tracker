@@ -11,7 +11,7 @@
 //     Japanese set, and each card's PokéWallet id is already in it — so this costs image
 //     requests only, nothing to search. Keys come from jp-model.assignJpKeys over the same
 //     cleaned rows the app's files were written from, so file names match tile ids.
-//   · otherwise the committed Bulbapedia snapshot (data/jp.json) + JP_BULBA_SET_MAP's
+//   · otherwise the committed Bulbapedia shards (data/jp/) + JP_BULBA_SET_MAP's
 //     code:null sets, matched to PokéWallet with one /search per Pokémon.
 // WHICH POKÉMON: the pre-built list (data/index.json) by default; --pokemon "A,B" for
 // others; --all for every gap card in the catalogue (≈10,700 — about 21,000 requests for
@@ -106,7 +106,13 @@ function planFromCatalogue(names) {
 
 /** Gap cards from the Bulbapedia snapshot: [{key, row}] — matched to PokéWallet later. */
 function planFromSnapshot(names) {
-  const rows = (readJSON(resolve(ROOT, 'data/jp.json')).jpCardsData || []).filter(r => !names.length || names.includes(r.pokemonName));
+  const index = readJSON(resolve(ROOT, 'data/index.json'));
+  const rows = Object.entries(index.pokemon || {})
+    .filter(([n]) => !names.length || names.includes(n))
+    .flatMap(([, slug]) => {
+      const file = resolve(ROOT, `data/jp/${slug}.json`);
+      return existsSync(file) ? readJSON(file).jpCardsData || [] : [];
+    });
   const out = [], seen = new Set();
   for (const r of rows) {
     const meta = JP_BULBA_SET_MAP[r.jpset];

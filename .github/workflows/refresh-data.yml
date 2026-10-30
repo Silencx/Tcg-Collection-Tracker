@@ -46,8 +46,8 @@ jobs:
           '
 
       # No argument: build-data.mjs reads data/prebuilt.json, falling back to
-      # DEFAULT_POKEMON. It writes the monolithic snapshots, the per-Pokémon shards
-      # under data/cards|jp/, and data/index.json.
+      # DEFAULT_POKEMON. It writes data/sets.json, the per-Pokémon shards under
+      # data/cards|jp/, and data/index.json.
       - name: Build data
         run: node tools/build-data.mjs
 

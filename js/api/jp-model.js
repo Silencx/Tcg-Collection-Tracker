@@ -138,7 +138,7 @@ export function parseOldTmsId(id) {
 export const isOldJpId = id => !!(parseOldMasterId(id) || parseOldTmsId(id));
 
 /**
- * The rows the old Master Set numbered, in the order it numbered them: data/jp*.json rows
+ * The rows the old Master Set numbered, in the order it numbered them: Bulbapedia rows
  * for the Pokémon list, skipping sets JP_BULBA_SET_MAP did not know (the old code skipped
  * those without advancing the index).
  */

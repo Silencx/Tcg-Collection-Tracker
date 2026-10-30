@@ -12,7 +12,7 @@
 //   data/jp-catalog/sets.json   gitignored build side: [{ id, name, pwName, code, date, cards, limitless }]
 //   data/jp-catalog/cards.json  gitignored build side: [[setIndex, number, name, print, rarity, ref], …]
 //   tools/jp-catalog-report.md  totals + a card-by-card check against Bulbapedia for the
-//                               Pokémon in data/jp.json
+//                               Pokémon in the committed data/jp/ shards
 // `name` keeps Bulbapedia's spelling for the 21 sets it shares (so existing JP checklist
 // ids can carry over), and drops PokéWallet's code prefix elsewhere. `limitless` is the
 // CDN code when Limitless has scans: JP_BULBA_SET_MAP, then tools/jp-gap-size.json if a
@@ -198,10 +198,19 @@ function writeAppFiles(allSets, rawCards, builtAt) {
   say(`app files: ${appSets.length} sets, ${shards.size} name shards (largest ${Math.max(...[...shards.values()].map(r => r.length))} rows).`);
 }
 
-/** Totals, plus the Pokémon already in data/jp.json checked card by card. */
+/** The committed Bulbapedia rows, from every data/jp/ shard data/index.json names. */
+function committedBulbaRows() {
+  const indexFile = resolve(ROOT, 'data/index.json');
+  if (!existsSync(indexFile)) return [];
+  return Object.values(readJSON(indexFile).pokemon || {}).flatMap(slug => {
+    const file = resolve(ROOT, `data/jp/${slug}.json`);
+    return existsSync(file) ? readJSON(file).jpCardsData || [] : [];
+  });
+}
+
+/** Totals, plus the Pokémon in the committed JP shards checked card by card. */
 function writeReport({ sets, cards, client, fetchedSets, cachedSets, incomplete, stoppedWhy, unavailableSets, failed }) {
-  const jp = existsSync(resolve(ROOT, 'data/jp.json')) ? readJSON(resolve(ROOT, 'data/jp.json')) : { jpCardsData: [] };
-  const bulba = jp.jpCardsData || [];
+  const bulba = committedBulbaRows();
   const names = [...new Set(bulba.map(r => r.pokemonName))];
   // Rebuild PokéWallet-shaped rows (with PokéWallet's own set name) so the very same
   // matcher as build-images applies, aliases included.
