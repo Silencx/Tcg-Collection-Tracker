@@ -34,7 +34,7 @@
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { loadEnvKey } from './lib/apitcg-key.mjs';
+import { loadEnvKey } from './lib/env-key.mjs';
 import { createClient, listOf, matchJpRows } from './lib/pokewallet.mjs';
 import {
   canonicalSetName, parseReleaseDate, cardTuple, cleanTuple, isJapaneseSet, japaneseOnly, pagesFor, publishCheck,

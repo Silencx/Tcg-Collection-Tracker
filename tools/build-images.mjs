@@ -38,7 +38,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { loadEnvKey } from './lib/apitcg-key.mjs';
+import { loadEnvKey } from './lib/env-key.mjs';
 import { createClient, searchAll, listOf, matchJpRows, extFor } from './lib/pokewallet.mjs';
 import { cleanTuple, japaneseOnly } from './lib/jp-catalog.mjs';
 import { JP_BULBA_SET_MAP } from '../js/api/bulba-jp.js';

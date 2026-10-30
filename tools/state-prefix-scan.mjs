@@ -3,11 +3,10 @@
 //
 // state.js keeps every mutable value on one exported `state` object precisely so
 // modules can mutate it (see the design note at the top of js/state.js). The
-// failure mode that follows is silent: porting old code and forgetting the
-// prefix leaves a bare `activeLangs` / `_meta` / `sortDesc`, which is not a
-// syntax error — it throws a ReferenceError only once that branch actually runs.
-// Four of those shipped undetected. This scan flags any state property name used
-// as a bare identifier so the build fails instead.
+// failure mode that follows is silent: forgetting the prefix leaves a bare
+// `activeLangs` / `_meta` / `sortDesc`, which is not a syntax error — it throws a
+// ReferenceError only once that branch actually runs. This scan flags any state
+// property name used as a bare identifier so the build fails instead.
 //
 // The name list is derived from the keys of the `state` literal in js/state.js,
 // not hardcoded, so adding a property extends the guard automatically.

@@ -40,7 +40,7 @@
 import { writeFileSync, mkdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, resolve } from 'node:path';
-import { loadEnvKey } from './lib/apitcg-key.mjs';
+import { loadEnvKey } from './lib/env-key.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const REPORT = resolve(ROOT, 'tools/pokewallet-probe-report.md');

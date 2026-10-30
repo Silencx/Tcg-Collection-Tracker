@@ -4,7 +4,8 @@
 //
 // The published docs are a client-rendered SPA, so the response shape cannot be read
 // without calling the API. This script makes that one-off discovery run and writes a
-// REDACTED report to tools/apitcg-probe-report.md, which is safe to read and to commit.
+// REDACTED report to tools/apitcg-probe-report.md: safe to read, but kept local
+// (gitignored) like the other probe reports, since it holds API TCG's card data.
 //
 // THE ENDPOINT (docs.apitcg.com, tag: products):
 //   GET /api/products?tcg=pokemon&type=card&name=charizard&limit=50&page=2
@@ -30,7 +31,7 @@
 import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
-import { loadApiTcgKey, KEY_HELP } from './lib/apitcg-key.mjs';
+import { loadApiTcgKey, KEY_HELP } from './lib/env-key.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const REPORT = resolve(ROOT, 'tools/apitcg-probe-report.md');

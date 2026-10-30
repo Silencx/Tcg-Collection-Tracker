@@ -31,8 +31,9 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { loadEnvKey } from './lib/apitcg-key.mjs';
+import { loadEnvKey } from './lib/env-key.mjs';
 import { createClient, listOf } from './lib/pokewallet.mjs';
+import { limitlessCodeVariants } from './lib/limitless.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const REPORT = resolve(ROOT, 'tools/jp-gap-size-report.md');
@@ -77,11 +78,6 @@ async function pool(items, fn) {
   return out;
 }
 
-const codeVariants = c => {
-  const raw = String(c || '').trim();
-  return [...new Set([raw, raw.toUpperCase(), raw.replace(/[^A-Za-z0-9]/g, ''), raw.toUpperCase().replace(/[^A-Z0-9]/g, '')])]
-    .filter(v => v && /^[A-Za-z0-9+-]+$/.test(v));
-};
 const yearOf = d => { const t = Date.parse(String(d || '').replace(/(\d+)(st|nd|rd|th)/, '$1').replace(',', '')); return Number.isNaN(t) ? null : new Date(t).getUTCFullYear(); };
 const cardsOf = s => Number(s.number_count) || Number(s.card_count) || 0;
 const mb = kb => Math.round(kb / 1024);
@@ -108,7 +104,7 @@ async function main() {
   const results = await pool(jp, async s => {
     const n = cardsOf(s);
     let code = null;
-    for (const v of codeVariants(s.set_code)) {
+    for (const v of limitlessCodeVariants(s.set_code)) {
       if (await limitlessHas(v, 1) || (n > 2 && await limitlessHas(v, Math.ceil(n / 2)))) { code = v; break; }
     }
     let sampled = 0, hits = 0;

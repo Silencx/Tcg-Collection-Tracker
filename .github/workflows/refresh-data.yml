@@ -48,14 +48,7 @@ jobs:
       # No argument: build-data.mjs reads data/prebuilt.json, falling back to
       # DEFAULT_POKEMON. It writes the monolithic snapshots, the per-Pokémon shards
       # under data/cards|jp/, and data/index.json.
-      #
-      # APITCG_KEY is optional. It is the ONLY place API TCG is ever called from — the
-      # key must not reach the browser, since this deploys as static files. When the
-      # secret is unset (a fork, or before it has been added) the build still succeeds
-      # and simply skips the API TCG gap-fill.
       - name: Build data
-        env:
-          APITCG_KEY: ${{ secrets.APITCG_KEY }}
         run: node tools/build-data.mjs
 
       # The Japanese card list (data/jp-cat/: every Japanese set, any Pokémon) from
