@@ -9,7 +9,6 @@
 //   · /sets lists 853 sets; set codes are NOT unique (40 shared, e.g. BLW), so sets are
 //     addressed by `set_id`. `language` is "jap" / "eng" / "chn".
 //   · Card names are ENGLISH even on Japanese cards; card_number is "001/053".
-//   · /search?q=<name>&limit=100 is paged (pagination.total_pages).
 //   · /images/:id?size=low|high → JPEG, 200×280 (~13 KB) / 500×699 (~57 KB), immutable.
 //   · Every response carries X-RateLimit-Remaining-Hour / -Day; 4xx count against quota.
 //   · Two Bulbapedia set names differ from PokéWallet's for the same product — see
@@ -131,18 +130,6 @@ export function createClient(key, { maxRequests = 300, reserve = 10, fetchImpl =
     get quota() { return { ...quota, resets: { ...quota.resets } }; },
     stopped,
   };
-}
-
-/** Every page of a search, stopping early if the client runs out of budget. */
-export async function searchAll(client, q, { maxPages = 10 } = {}) {
-  const out = [];
-  for (let page = 1; page <= maxPages; page++) {
-    const body = await client.call(`/search?q=${encodeURIComponent(q)}&limit=100&page=${page}`);
-    out.push(...listOf(body));
-    const pages = Number(body?.pagination?.total_pages) || 1;
-    if (page >= pages) break;
-  }
-  return out;
 }
 
 /** File extension for a downloaded image. */

@@ -10,7 +10,7 @@ import {
 import { jpImageKeyFor, jpNumKey } from '../js/api/jp-model.js';
 const jpImageKey = (jpset, jpnum) => jpImageKeyFor(setSlug(jpset), jpNumKey(jpnum));
 import {
-  setMatchKey, numberMatchKey, matchJpRows, createClient, searchAll, extFor, SET_ALIASES,
+  setMatchKey, numberMatchKey, matchJpRows, createClient, extFor, SET_ALIASES,
 } from '../tools/lib/pokewallet.mjs';
 
 // ── layout ────────────────────────────────────────────────────────────────────
@@ -134,17 +134,6 @@ test('a server-sent reset time is reported instead of the 03:00 default', async 
   const impl = async () => ({ status: 429, ok: false, headers: { get: n => h.get(n) ?? null }, text: async () => '' });
   const c = createClient('k', { fetchImpl: impl });
   await assert.rejects(c.call('/sets'), e => /retry-after: 3600/.test(e.message));
-});
-
-test('search reads every page it is told about, then stops', async () => {
-  let page = 0;
-  const impl = async () => {
-    page++;
-    const body = { results: [{ id: `p${page}` }], pagination: { page, total_pages: 2 } };
-    return { status: 200, ok: true, headers: { get: () => null }, json: async () => body, text: async () => '' };
-  };
-  const rows = await searchAll(createClient('k', { fetchImpl: impl }), 'Shiftry');
-  assert.deepEqual(rows.map(r => r.id), ['p1', 'p2']);
 });
 
 test('image extensions follow the content type, then the bytes', () => {

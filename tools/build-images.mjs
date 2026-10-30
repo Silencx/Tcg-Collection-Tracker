@@ -6,13 +6,11 @@
 // Limitless has no scans for. Everything else already has art from TCGdex or Limitless
 // and is left alone.
 //
-// WHERE THE CARD LIST COMES FROM:
-//   · the catalogue (data/jp-catalog/, tools/build-jp-catalog.mjs) when it exists: every
-//     Japanese set, and each card's PokéWallet id is already in it — so this costs image
-//     requests only, nothing to search. Keys come from jp-model.assignJpKeys over the same
-//     cleaned rows the app's files were written from, so file names match tile ids.
-//   · otherwise the committed Bulbapedia shards (data/jp/) + JP_BULBA_SET_MAP's
-//     code:null sets, matched to PokéWallet with one /search per Pokémon.
+// WHERE THE CARD LIST COMES FROM: the local build-side catalogue (data/jp-catalog/,
+// written by tools/build-jp-catalog.mjs — run that first). It covers every Japanese set,
+// and each card's PokéWallet id is already in it, so this costs image requests only,
+// nothing to search. Keys come from jp-model.assignJpKeys over the same cleaned rows the
+// app's files were written from, so file names match tile ids.
 // WHICH POKÉMON: the pre-built list (data/index.json) by default; --pokemon "A,B" for
 // others; --all for every gap card in the catalogue (≈10,700 — about 21,000 requests for
 // both sizes, so pass a --max to match the day's quota).
@@ -39,11 +37,10 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadEnvKey } from './lib/env-key.mjs';
-import { createClient, searchAll, listOf, matchJpRows, extFor } from './lib/pokewallet.mjs';
+import { createClient, extFor } from './lib/pokewallet.mjs';
 import { cleanTuple, japaneseOnly } from './lib/jp-catalog.mjs';
-import { JP_BULBA_SET_MAP } from '../js/api/bulba-jp.js';
-import { imagePath, emptyIndex, setSlug, IMAGE_SIZES } from '../js/api/local-images.js';
-import { assignJpKeys, jpImageKeyFor, jpNumKey } from '../js/api/jp-model.js';
+import { imagePath, emptyIndex, IMAGE_SIZES } from '../js/api/local-images.js';
+import { assignJpKeys, jpImageKeyFor } from '../js/api/jp-model.js';
 import { namesSpecies } from '../js/api/providers/tcgdex.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -104,64 +101,28 @@ function planFromCatalogue(names) {
   return out;
 }
 
-/** Gap cards from the Bulbapedia snapshot: [{key, row}] — matched to PokéWallet later. */
-function planFromSnapshot(names) {
-  const index = readJSON(resolve(ROOT, 'data/index.json'));
-  const rows = Object.entries(index.pokemon || {})
-    .filter(([n]) => !names.length || names.includes(n))
-    .flatMap(([, slug]) => {
-      const file = resolve(ROOT, `data/jp/${slug}.json`);
-      return existsSync(file) ? readJSON(file).jpCardsData || [] : [];
-    });
-  const out = [], seen = new Set();
-  for (const r of rows) {
-    const meta = JP_BULBA_SET_MAP[r.jpset];
-    if (!meta || meta.code) continue;
-    const key = jpImageKeyFor(setSlug(r.jpset), jpNumKey(r.jpnum));
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push({ key, row: { ...r, key }, label: `${r.jpset} ${r.jpnum}` });
-  }
-  return out;
-}
-
 async function main() {
+  if (!existsSync(resolve(CAT_DIR, 'cards.json'))) {
+    say('no catalogue in data/jp-catalog/ — run node tools/build-jp-catalog.mjs first.');
+    return;
+  }
   const idx = readIndex();
   const names = pokemonList();
-  const fromCatalogue = existsSync(resolve(CAT_DIR, 'cards.json'));
-  const gap = fromCatalogue ? planFromCatalogue(names) : planFromSnapshot(names);
+  const gap = planFromCatalogue(names);
   const todo = gap.filter(g => missingSizes(idx, g.key).length);
   const scope = all ? 'every Pokémon' : names.join(', ') || '(no Pokémon)';
-  say(`source: ${fromCatalogue ? 'catalogue' : 'Bulbapedia snapshot'}; scope: ${scope}.`);
+  say(`scope: ${scope}.`);
   say(`${gap.length} gap card(s) with no other image source, ${todo.length} still need files `
     + `(≈${todo.reduce((n, g) => n + missingSizes(idx, g.key).length, 0)} image requests).`);
   if (!todo.length) { say('nothing to fetch.'); return; }
-  if (dryRun && fromCatalogue) { say('dry run: nothing downloaded.'); return; }
+  if (dryRun) { say('dry run: nothing downloaded.'); return; }
 
   const key = loadEnvKey(KEY_NAME);
   if (!key) { say(`no ${KEY_NAME} configured — skipping (set it in .env.local).`); return; }
 
   const client = createClient(key, { maxRequests, log: m => say(`  ${m}`) });
   let files = 0, bytes = 0, stoppedWhy = null, changed = false;
-  const unmatched = [];
   try {
-    // Snapshot path only: find each card's PokéWallet id by set + number.
-    if (!fromCatalogue) {
-      const sets = listOf(await client.call('/sets'));
-      const jpSetIds = new Set(sets.filter(s => s.language === 'jap').map(s => String(s.set_id)));
-      const byPokemon = new Map();
-      for (const g of todo) byPokemon.set(g.row.pokemonName, [...(byPokemon.get(g.row.pokemonName) || []), g]);
-      for (const [name, want] of byPokemon) {
-        const found = (await searchAll(client, name)).filter(c => jpSetIds.has(String(c?.card_info?.set_id)));
-        const { matched, missing } = matchJpRows(want.map(g => g.row), found);
-        unmatched.push(...missing.map(r => `${r.jpset} ${r.jpnum}`));
-        const refByKey = new Map(matched.map(m => [m.row.key, m.card.id]));
-        for (const g of want) g.ref = refByKey.get(g.key) || null;
-        say(`${name}: ${matched.length}/${want.length} gap card(s) matched on PokéWallet.`);
-      }
-      if (dryRun) return;
-    }
-
     for (const g of todo) {
       if (!g.ref) continue;
       const entry = idx.images[g.key] || { sizes: {} };
@@ -183,9 +144,8 @@ async function main() {
   } finally {
     if (!dryRun && changed) writeIndex(idx);
     const q = client.quota;
-    say(`${dryRun ? 'dry run: ' : ''}${files} file(s), ${Math.round(bytes / 1024)} KB, ${client.spent} request(s).`
+    say(`${files} file(s), ${Math.round(bytes / 1024)} KB, ${client.spent} request(s).`
       + (q.hour != null ? ` Quota left: ${q.hour}/${q.limitHour} this hour, ${q.day}/${q.limitDay} today.` : ''));
-    if (unmatched.length) say(`not on PokéWallet (${unmatched.length}): ${unmatched.join('; ')}`);
     if (stoppedWhy) say(`stopped early (${stoppedWhy}) — run again later to continue.`);
   }
 }
