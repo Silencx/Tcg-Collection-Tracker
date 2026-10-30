@@ -8,8 +8,8 @@
 // assets.tcgdex.net/en/tcgp/A1/001/low.webp is a 200.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import { resolve, dirname } from 'node:path';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { resolve, dirname, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tcgdexSerieSegment, tcgdexAssetBase } from '../js/api/images.js';
 
@@ -84,6 +84,22 @@ test('no set in the shipped map can produce a double-slash URL', () => {
 test('every shipped set resolves to a non-empty series', () => {
   const missing = Object.keys(sets.names?.en || {}).filter(id => !sets.setSeries?.[id]);
   assert.deepEqual(missing, [], 'these would fall into the "Other sets" bucket');
+});
+
+test('no module slices a CDN series off a set id by hand', () => {
+  // The TMS popup did exactly this after the rest of the app had moved to
+  // tcgdexSerieSegment, and its art 404'd to placeholders for every known-bad set.
+  // Allowed: images.js (the fallback inside tcgdexSerieSegment itself) and
+  // id-migration.js (old pokemontcg.io ids, never a CDN path).
+  const ALLOWED = new Set(['js/api/images.js', 'js/api/id-migration.js']);
+  const walk = d => readdirSync(d).flatMap(f => {
+    const p = resolve(d, f);
+    return statSync(p).isDirectory() ? walk(p) : (f.endsWith('.js') ? [p] : []);
+  });
+  const offenders = walk(resolve(ROOT, 'js'))
+    .map(f => relative(ROOT, f).split(sep).join('/'))
+    .filter(rel => !ALLOWED.has(rel) && readFileSync(resolve(ROOT, rel), 'utf8').includes(".replace(/\\d.*$/"));
+  assert.deepEqual(offenders, [], 'derive the segment with tcgdexSerieSegment(setId, setSeries)');
 });
 
 test('tcgdexSerieSegment tolerates junk rather than throwing', () => {

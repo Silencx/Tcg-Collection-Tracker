@@ -15,7 +15,7 @@ import {
   LANGUAGES, PLACEHOLDER_LANGS, NATIVE_NAMES, BADGE_ORDER, POKEMON_CATALOG,
 } from '../config.js';
 import {
-  limitlessJpUrl, tcgdexAssetBase, tcgdexSymbolUrl,
+  limitlessJpUrl, tcgdexAssetBase, tcgdexSymbolUrl, tcgdexSerieSegment,
 } from '../api/images.js';
 import { router } from '../api/router.js';
 import { viableSources, markBad, markGood } from '../api/img-cache.js';
@@ -197,11 +197,15 @@ async function openTmsPopup(pokeName){
 
 // ── TMS: Fetch card data for one Pokémon ─────────────────────────────────────
 async function fetchTmsCardsForPoke(pokeName){
-  // A cached list from before the stable JP ids (no `imgKey` on its JP cards) is stale:
-  // it predates the catalogue, so refetch rather than show the old, shorter JP list.
+  // A cached list is rebuilt, once, when it predates either of two fixes:
+  //   • the stable JP ids (no `imgKey` on its JP cards) — it predates the catalogue,
+  //     so refetch rather than show the old, shorter JP list;
+  //   • the real CDN series (no `serie` on its other cards) — its image URLs were built
+  //     from the id-slicing guess, which 404s for a large minority of sets.
   if(state.tmsPokeCache.has(pokeName)){
     const cached=state.tmsPokeCache.get(pokeName);
-    if(!cached.some(c=>c&&c.lang==='JP'&&!c.imgKey)) return cached;
+    const stale=c=>c&&(c.lang==='JP'?!c.imgKey:!c.serie);
+    if(!cached.some(stale)) return cached;
   }
 
   // Intl card index through the ROUTER (snapshot → TCGdex), so TMS ids match the
@@ -225,7 +229,8 @@ async function fetchTmsCardsForPoke(pokeName){
     seen.add(tc.id);
     const i=tc.id.lastIndexOf('-');
     const tcgdexSetId=tc.id.slice(0,i), tcgdexLocalId=tc.id.slice(i+1);
-    const series=tcgdexSetId.replace(/\d.*$/,'');
+    // The set's real CDN segment from data/sets.json's setSeries, not a slice of its id.
+    const series=tcgdexSerieSegment(tcgdexSetId, meta.setSeries);
     const setName=enNames[tcgdexSetId]||tcgdexSetId;
     const releaseDate=(meta.dates&&meta.dates[tcgdexSetId])||'1999/01/01';
     const symSrc=(meta.symbols&&meta.symbols[tcgdexSetId])||tcgdexSymbolUrl(series,tcgdexSetId);
@@ -233,12 +238,12 @@ async function fetchTmsCardsForPoke(pokeName){
       const id=`${langDef.badge}_${tc.id}`;
       const base=tcgdexAssetBase(langDef.code, series, tcgdexSetId, tcgdexLocalId);
       state._tmsCardPokemon.set(id,pokeName);
-      cards.push({id,pokeName,setId:tcgdexSetId,setName,releaseDate,localId:tcgdexLocalId,lang:langDef.badge,langColor:langDef.color,imgSrc:`${base}/low.webp`,hiSrc:`${base}/high.webp`,symSrc,variants:tc.variants||null});
+      cards.push({id,pokeName,setId:tcgdexSetId,setName,releaseDate,localId:tcgdexLocalId,lang:langDef.badge,langColor:langDef.color,imgSrc:`${base}/low.webp`,hiSrc:`${base}/high.webp`,symSrc,serie:series,variants:tc.variants||null});
     }
     for(const pl of PLACEHOLDER_LANGS){
       const id=`${pl.badge}_${tc.id}`;
       state._tmsCardPokemon.set(id,pokeName);
-      cards.push({id,pokeName,setId:tcgdexSetId,setName,releaseDate,localId:tcgdexLocalId,lang:pl.badge,langColor:pl.color,imgSrc:null,hiSrc:null,symSrc});
+      cards.push({id,pokeName,setId:tcgdexSetId,setName,releaseDate,localId:tcgdexLocalId,lang:pl.badge,langColor:pl.color,imgSrc:null,hiSrc:null,symSrc,serie:series});
     }
   }
 
