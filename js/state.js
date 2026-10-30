@@ -81,7 +81,6 @@ export const state = {
   ssPickerAsc:      !!pickerPrefs.asc,   // false = newest first, matching sortDesc
 
   // — Runtime only (never persisted) —
-  _bulbaData:       null,       // cached Bulbapedia wikitext, shared EN+JP fetch
   _meta:            new Map(),  // cardId → render metadata
   setBlockNamesMap: new Map(),
   totalCards:       0,

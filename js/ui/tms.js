@@ -183,7 +183,7 @@ async function fetchTmsCardsForPoke(pokeName){
     if(!cached.some(c=>c&&c.lang==='JP'&&!c.imgKey)) return cached;
   }
 
-  // Intl card index now comes through the ROUTER (snapshot → TCGdex → legacy), so
+  // Intl card index now comes through the ROUTER (snapshot → TCGdex), so
   // TMS ids match the Master Set (TCGdex format) and the popup gets the same
   // failover path. JP also goes through the router (snapshot data/jp.json → live
   // Bulbapedia), exactly like the Master-Set JP injection.

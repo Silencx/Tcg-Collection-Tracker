@@ -293,9 +293,8 @@ function renderPokeChips(){
  */
 export function onPokemonListChanged(){
   renderPokeChips();
-  // Pokémon list changed → drop cached cards (+ in-memory Bulbapedia) so we refetch.
+  // Pokémon list changed → drop cached cards so we refetch.
   clearCardCache();
-  state._bulbaData=null;
   buildAll(false);
 }
 
@@ -685,7 +684,9 @@ function markCardToggle(el,isDone){
 }
 
 // ── BUILD SETS MAP ────────────────────────────────────────────────────────────
-// Handles both pokemontcg.io cards (primary) and TCGdex cards (fallback).
+// Handles both pokemontcg.io cards and TCGdex cards. Nothing fetches pokemontcg.io
+// cards any more (the legacy provider's card index was removed); the branch only
+// reads a cache the old fallback wrote, until its 24h TTL runs out.
 // pokemontcg.io card structure: { id, name, number, set:{id,name,series,releaseDate,images}, images:{small,large} }
 // TCGdex card structure:        { id, name, image:"https://assets.tcgdex.net/en/..." }
 function isPtcgioCard(card){ return !!card.set?.id; }
@@ -709,8 +710,9 @@ function buildSetsMap(enCards, setNamesAll, setMeta = { dates: {}, symbols: {} }
       tcgdexLocalId= ptcgioToTcgdexLocalId(localId, series);
       enName       = card.set.name;
       releaseDate  = card.set.releaseDate || '1999/01/01';
-      symSrc       = card.set.images?.symbol ||
-                     `https://images.pokemontcg.io/${ptcgioSetId}/symbol.png`;
+      // TCGdex, not card.set.images.symbol: that is a pokemontcg.io URL, and the host
+      // is going away.
+      symSrc       = setMeta.symbols[tcgdexSetId] || tcgdexSymbolUrl(series, tcgdexSetId);
       enImgSrc     = card.images?.small  || null;
       enHiImgSrc   = card.images?.large  || null;
     } else {
@@ -1295,14 +1297,18 @@ async function buildAll(forceRefresh){
         }
       } else { loadBanner.remove(); }
 
-      saveCache({cards,setNamesAll,setMeta,source});
+      if(cardRes.missing?.length){
+        // The snapshot covered part of the list and TCGdex could not supply the rest.
+        // Not cached: a 24h cache would hide those Pokémon long after TCGdex is back.
+        // Non-blocking, so it goes to the bell.
+        recordNotice(`Couldn't load ${escapeHtml(cardRes.missing.join(', '))} (TCGdex unavailable). Click Refresh to retry.`,'banner-amber',{once:'src-partial'});
+      } else {
+        saveCache({cards,setNamesAll,setMeta,source});
+      }
     }
 
     // Clear any remaining loading banner before rendering
     loadBanner?.remove?.();
-    // Non-blocking notice when the primary (TCGdex) was unavailable and the legacy fallback
-    // was used. "Non-blocking" is the whole argument for it being in the bell.
-    if(source==='legacy') recordNotice('Showing data from the backup source (TCGdex unavailable). Click Refresh to retry.','banner-amber',{once:'src-fallback'});
     renderBySet(cards,setNamesAll,container,setMeta);
 
     // JP: fetch all JP cards, filter by name, inject as own sets with images
@@ -1341,7 +1347,6 @@ function clearCache(){
   if(!confirm('Clear all cached card data and reload?')) return;
   clearCardCache();          // removes all tcgData* keys
   clearImgFailures();        // forget which image URLs 404'd, so all are retried
-  state._bulbaData=null;
   location.reload();
 }
 

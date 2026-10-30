@@ -5,7 +5,7 @@
 // tools/build-data.mjs via GitHub Actions.
 //
 // This is a thin READ layer; the router tries it FIRST and falls back to the live
-// TCGdex provider (then legacy) on any miss — so the app works even before the
+// TCGdex provider on any miss — so the app works even before the
 // first build (the shipped placeholder files report builtAt:null → treated as a
 // miss). A user-triggered refresh bypasses the snapshot to fetch live.
 //

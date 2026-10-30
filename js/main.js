@@ -32,6 +32,7 @@ import {
   printSetSelected, printSetChecklist,
 } from './ui/print.js';
 import { installStorageQuotaHandler } from './ui/banners.js';
+import { installSymbolFallback } from './ui/symbol-fallback.js';
 import {
   exportData, importData, shareSession, restoreSession,
   sessionFromUrl, applySession, saveSession, saveSessionSoon, migrateCheckedOnBoot,
@@ -306,6 +307,7 @@ document.addEventListener('tcg:set-mode', e => setMode(e.detail?.mode));
 // `<script type="module">` is deferred, so the DOM is parsed by the time this runs.
 installStorageQuotaHandler();   // route storage-quota failures to a visible banner
 initNotify();                   // before anything can raise a banner, so none is missed
+installSymbolFallback();        // before the first render, so no set symbol fails unseen
 // Session restore: a #s= link overrides the per-key persisted settings. Must run
 // before the first render so mode/filters/pokémon/sort/palette are already set.
 const urlSession = sessionFromUrl();
