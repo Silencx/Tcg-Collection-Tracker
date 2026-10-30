@@ -83,9 +83,32 @@ export function tcgdexSerieSegment(setId, setSeries = null) {
   return guess || String(setId);
 }
 
-/** Set symbol (language-neutral). */
+/** Set symbol (language-neutral). js/ui/symbol-fallback.js retries it per language. */
 export function tcgdexSymbolUrl(series, setId) {
   return `https://assets.tcgdex.net/univ/${series}/${setId}/symbol.webp`;
+}
+
+/**
+ * Language folders that also hold set symbols, in the order they are tried once the
+ * /univ/ copy fails to load.
+ *
+ * Measured 2026-10-30, while every /univ/ URL answered HTTP 400 `InvalidBucketName`:
+ * /en/ serves 125 of the 169 symbols in data/sets.json, /fr/ then /de/ add the other 30
+ * (byte-identical files), es/it/pt/ja add none. 14 sets have no symbol in any folder.
+ */
+export const TCGDEX_SYMBOL_FALLBACK_LANGS = ['en', 'fr', 'de'];
+
+/**
+ * The URL to try after a TCGdex set symbol failed to load: /univ/ → /en/ → /fr/ → /de/.
+ * null when the chain is exhausted or `url` is not a TCGdex symbol at all.
+ */
+export function nextTcgdexSymbolUrl(url) {
+  const m = /^https:\/\/assets\.tcgdex\.net\/([^/]+)\/([^?#]+\/symbol\.webp)$/.exec(String(url));
+  if (!m) return null;
+  const chain = ['univ', ...TCGDEX_SYMBOL_FALLBACK_LANGS];
+  const i = chain.indexOf(m[1]);
+  if (i < 0 || i === chain.length - 1) return null;
+  return `https://assets.tcgdex.net/${chain[i + 1]}/${m[2]}`;
 }
 /** Asset base URL (no extension) — the renderer/provider append /low.webp etc. */
 export function tcgdexAssetBase(lang, series, setId, localId) {
