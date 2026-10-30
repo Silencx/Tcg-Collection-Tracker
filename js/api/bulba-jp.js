@@ -53,32 +53,67 @@ export function parseBulbaJPCards(wikitext) {
   return results;
 }
 
-/** Fetch one Pokémon's Bulbapedia TCG-page wikitext (empty string on any failure). */
+/**
+ * Fetch one Pokémon's Bulbapedia TCG-page wikitext.
+ *   → { ok: true,  wikitext }  Bulbapedia ANSWERED (wikitext '' when there is no such page)
+ *   → { ok: false, error }     the request itself failed
+ *
+ * This used to collapse every failure into '' — the same value as "this page lists no
+ * JP cards". That was harmless in the browser (an empty JP list for one session) and
+ * ruinous at build time: every weekly CI build from 2026-09-14 on got "no JP cards" for
+ * every Pokémon (Bulbapedia answered HTTP 403 when probed on 2026-10-22), and the job
+ * committed an empty data/jp.json that every visitor then trusted over a live fetch.
+ * Build time needs to tell the two apart, so the failure is carried out, not swallowed.
+ */
 async function fetchWikitext(pokeName, fetchImpl) {
   const url = `https://bulbapedia.bulbagarden.net/w/api.php?action=parse&page=${encodeURIComponent(pokeName + '_(TCG)')}&prop=wikitext&format=json&origin=*`;
   try {
-    const j = await fetchImpl(url).then(r => r.json());
-    return j?.parse?.wikitext?.['*'] || '';
-  } catch { return ''; }
+    const res = await fetchImpl(url);
+    // A block is an HTML challenge page, so without this check it would only surface
+    // as a JSON parse error — the status is the useful part of the log line.
+    if (!res.ok) return { ok: false, error: `HTTP ${res.status}` };
+    const j = await res.json();
+    if (j?.error) {
+      // 'missingtitle' is MediaWiki's "no such page": a real answer (no TCG page, so no
+      // JP cards), not an outage. Any other API error is a failure to get an answer.
+      if (j.error.code === 'missingtitle') return { ok: true, wikitext: '' };
+      return { ok: false, error: `API error ${j.error.code || '?'}` };
+    }
+    const wikitext = j?.parse?.wikitext?.['*'];
+    if (typeof wikitext !== 'string') return { ok: false, error: 'response has no wikitext' };
+    return { ok: true, wikitext };
+  } catch (e) { return { ok: false, error: e?.message || String(e) }; }
 }
 
 /**
- * Raw JP card entries for a list of Pokémon: [{jpset, jpnum, pokemonName}].
- * Used live by the browser and at build time by tools/build-data.mjs.
+ * Per-Pokémon JP results, in `names` order:
+ *   [{ name, ok: true,  entries: [{jpset, jpnum, pokemonName}] }
+ *    { name, ok: false, entries: [], error }]
+ * tools/build-data.mjs uses this one: it must not mistake "Bulbapedia blocked us" for
+ * "this Pokémon has no JP cards" (see fetchWikitext).
  */
-export async function fetchJpRaw(names, fetchImpl = fetch) {
+export async function fetchJpRawByName(names, fetchImpl = fetch) {
   // Parallel, matching legacy.js's fetchBulbaData, which requests the same pages
   // the same way — this was a sequential for/await, so a five-Pokémon list paid
   // five round-trips end to end instead of one.
   //
   // Promise.all rather than the tcgdex pool on purpose: this module imports
   // nothing, which is what lets tools/build-data.mjs run it under Node. Mapping
-  // then flattening (instead of pushing as results arrive) keeps the output order
-  // tied to `names`, so the built snapshot stays byte-stable between runs.
-  const perName = await Promise.all(names.map(async name => {
-    const wt = await fetchWikitext(name, fetchImpl);
-    if (!wt) return [];
-    return parseBulbaJPCards(wt).map(e => ({ ...e, pokemonName: name }));
+  // (instead of pushing as results arrive) keeps the output order tied to `names`,
+  // so the built snapshot stays byte-stable between runs.
+  return Promise.all(names.map(async name => {
+    const r = await fetchWikitext(name, fetchImpl);
+    if (!r.ok) return { name, ok: false, entries: [], error: r.error };
+    return { name, ok: true, entries: parseBulbaJPCards(r.wikitext).map(e => ({ ...e, pokemonName: name })) };
   }));
-  return perName.flat();
+}
+
+/**
+ * Raw JP card entries for a list of Pokémon: [{jpset, jpnum, pokemonName}].
+ * Used live by the browser (via router.getJpRaw). A Pokémon whose fetch failed just
+ * contributes nothing, exactly as before — the browser has no older copy to fall back
+ * to, and an empty JP list for one session is the least-bad answer there.
+ */
+export async function fetchJpRaw(names, fetchImpl = fetch) {
+  return (await fetchJpRawByName(names, fetchImpl)).flatMap(r => r.entries);
 }

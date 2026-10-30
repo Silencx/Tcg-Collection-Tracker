@@ -22,8 +22,9 @@ import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { DEFAULT_POKEMON, SCHEMA_VERSION } from '../js/config.js';
 import { getCards, getSetMeta } from '../js/api/providers/tcgdex.js';
-import { fetchJpRaw } from '../js/api/bulba-jp.js';
+import { fetchJpRawByName } from '../js/api/bulba-jp.js';
 import { uniqueSlug } from '../js/slug.js';
+import { planJpSnapshot } from './lib/jp-keep.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const DATA_DIR = resolve(ROOT, 'data');
@@ -50,6 +51,10 @@ function resolvePokemon() {
 const POKEMON = resolvePokemon();
 
 const writeJSON = (file, obj) => writeFileSync(resolve(DATA_DIR, file), JSON.stringify(obj));
+// null for a missing or unparseable file: either way there is no committed copy to keep.
+const readJSON = (file) => {
+  try { return JSON.parse(readFileSync(resolve(DATA_DIR, file), 'utf8')); } catch { return null; }
+};
 
 async function main() {
   console.log(`[build-data] Pokémon (${POKEMON.length}): ${POKEMON.join(', ')}`);
@@ -114,8 +119,35 @@ async function main() {
   }
 
   console.log('[build-data] fetching Japanese cards from Bulbapedia…');
-  const jpCardsData = await fetchJpRaw(POKEMON);
-  console.log(`[build-data]   → ${jpCardsData.length} JP entries`);
+  const jpResults = await fetchJpRawByName(POKEMON);
+  const jpFailed = jpResults.filter(r => !r.ok).length;
+  console.log(`[build-data]   → ${jpResults.reduce((n, r) => n + r.entries.length, 0)} JP entries` +
+    (jpFailed ? ` (${jpFailed}/${POKEMON.length} fetch(es) FAILED)` : ''));
+
+  // Slugs are fixed up front rather than in the shard loop: the JP guard below has to
+  // read each Pokémon's COMMITTED shard before anything is written over it.
+  const taken = new Set();
+  const slugs = POKEMON.map(name => uniqueSlug(name, taken));
+
+  // ── JP: NEVER TRADE COMMITTED DATA FOR A BAD FETCH ──
+  // A blocked Bulbapedia used to come back as "no JP cards" and get committed as such
+  // (61 entries → 0 on 2026-09-14). See tools/lib/jp-keep.mjs for the rule. A shard only
+  // counts as committed data under the same test snapshot.js applies (builtAt + array),
+  // plus the name: reordering data/prebuilt.json can hand a colliding slug ("nidoran-2")
+  // to the other Nidoran, and keeping that file would file one's cards under the other.
+  const previousJp = {};
+  POKEMON.forEach((name, i) => {
+    const prev = readJSON(`jp/${slugs[i]}.json`);
+    previousJp[name] = prev?.builtAt && prev.pokemon === name && Array.isArray(prev.jpCardsData)
+      ? prev.jpCardsData : null;
+  });
+  const prevJpCombined = readJSON('jp.json');
+  const jp = planJpSnapshot(POKEMON, jpResults, previousJp,
+    prevJpCombined?.builtAt && Array.isArray(prevJpCombined.pokemon) ? prevJpCombined.pokemon : null);
+  POKEMON.forEach((name, i) => {
+    const { warning } = jp.shards[name];
+    if (warning) console.warn(`[build-data]   ! JP ${name}: ${warning} — data/jp/${slugs[i]}.json`);
+  });
 
   const builtAt = new Date().toISOString();
   mkdirSync(DATA_DIR, { recursive: true });
@@ -138,7 +170,14 @@ async function main() {
     logos: meta.logos, counts: meta.counts,
     setSeries: meta.setSeries, series: meta.series, lang: meta.lang,
   });
-  writeJSON('jp.json', { schemaVersion: SCHEMA_VERSION, builtAt, pokemon: POKEMON, jpCardsData });
+  // `pokemon` is jp.json's coverage claim, so it lists only Pokémon that have JP data
+  // (fresh or kept) — see planJpSnapshot. Skipped entirely when nothing fresh came in.
+  if (jp.combined.write) {
+    writeJSON('jp.json', {
+      schemaVersion: SCHEMA_VERSION, builtAt,
+      pokemon: jp.combined.pokemon, jpCardsData: jp.combined.jpCardsData,
+    });
+  }
 
   // ── PER-POKÉMON SHARDS ──
   // Each shard is fetched INDEPENDENTLY rather than sliced out of the combined result.
@@ -146,10 +185,9 @@ async function main() {
   // Pokémon, so slicing would leave that card out of the other's shard — and a visitor
   // who asked for only that Pokémon would get fewer cards from the snapshot than from a
   // live fetch. Independent shards make a partial hit identical to the live answer.
-  const taken = new Set();
   const index = { schemaVersion: SCHEMA_VERSION, builtAt, pokemon: {} };
-  for (const name of POKEMON) {
-    const slug = uniqueSlug(name, taken);
+  for (const [i, name] of POKEMON.entries()) {
+    const slug = slugs[i];
     index.pokemon[name] = slug;
     let own = [];
     try {
@@ -159,16 +197,27 @@ async function main() {
       own = cards.filter(c => (c.species || c.name) === name);
     }
     writeJSON(`cards/${slug}.json`, { schemaVersion: SCHEMA_VERSION, builtAt, pokemon: name, cards: own });
-    writeJSON(`jp/${slug}.json`, {
-      schemaVersion: SCHEMA_VERSION, builtAt, pokemon: name,
-      jpCardsData: jpCardsData.filter(e => e.pokemonName === name),
-    });
-    console.log(`[build-data]   shard ${slug}: ${own.length} cards`);
+    // A kept JP shard is left byte-identical (not rewritten with a new builtAt), so a
+    // blocked run produces no data/jp* diff for the weekly job to commit.
+    const jpShard = jp.shards[name];
+    if (jpShard.write) {
+      writeJSON(`jp/${slug}.json`, {
+        schemaVersion: SCHEMA_VERSION, builtAt, pokemon: name, jpCardsData: jpShard.entries,
+      });
+    }
+    console.log(`[build-data]   shard ${slug}: ${own.length} cards, ` +
+      (jpShard.write ? `${jpShard.entries.length} JP`
+        : jpShard.entries ? `${jpShard.entries.length} JP (KEPT, not refreshed)` : 'no JP shard (fetch failed)'));
   }
   writeJSON('index.json', index);
 
-  console.log(`[build-data] wrote cards.json, sets.json, jp.json, index.json ` +
-    `+ ${POKEMON.length} shard pair(s) @ ${builtAt}`);
+  const jpKept = POKEMON.filter(n => !jp.shards[n].write);
+  console.log(`[build-data] wrote cards.json, sets.json, ${jp.combined.write ? 'jp.json, ' : ''}` +
+    `index.json + ${POKEMON.length} card shard(s), ${POKEMON.length - jpKept.length} JP shard(s) @ ${builtAt}`);
+  if (jpKept.length) {
+    console.warn(`[build-data] ! JP data NOT refreshed for ${jpKept.length}/${POKEMON.length} ` +
+      `Pokémon (${jpKept.join(', ')}); committed copies kept — see the JP warnings above`);
+  }
 }
 
 main().catch((err) => {
