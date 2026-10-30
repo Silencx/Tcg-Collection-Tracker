@@ -26,13 +26,12 @@
  * The badge ends at the FIRST underscore; the set id ends at the LAST hyphen, because
  * TCGdex local ids are hyphen-free while set ids are not always (`swshp-SWSH001`).
  *
- * THE JP EXCEPTION. Master-Set JP ids are built as `JP_jp_${pokemon}_${set}_${index}`
- * (see fetchAndInjectJPCards) — e.g. 'JP_jp_Seedot_Miracle of the Desert_0'. They come
- * from Bulbapedia, not TCGdex: they carry no TCGdex set id at all, and they embed a
- * render-order ordinal, so two runs can disagree. Applying the last-hyphen rule to them
- * does not fail loudly — it invents a set id out of whatever punctuation the Japanese
- * set name happens to contain. So JP is bucketed explicitly: it counts toward the
- * language histogram and toward the card total, and is excluded from "sets touched".
+ * THE JP EXCEPTION. JP ids are `JP_{setKey}_{numKey}` (api/jp-model.js) — e.g.
+ * 'JP_miracle-of-the-desert_1' — and older profiles may still hold the pre-migration
+ * 'JP_jp_Seedot_Miracle of the Desert_0'. Neither carries a TCGdex set id: the set key is
+ * a slug of a Japanese set name, and the last-hyphen rule would not fail loudly — it
+ * would invent a set id out of that slug. So JP is bucketed explicitly: it counts toward
+ * the language histogram and toward the card total, and is excluded from "sets touched".
  *
  * @returns {{badge:string|null, setId:string|null}}
  */
