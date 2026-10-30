@@ -1,14 +1,18 @@
 // =============================================================================
 // api/router.js — provider failover per the rebuild brief's ROUTING TABLE.
 //
-//   Master card index   : TCGdex EN   → fallback legacy (Bulbapedia + pokemontcg.io)
-//   Set names/dates/syms : TCGdex      → fallback legacy (names only)
-//   JA cards/images      : legacy only (handled directly by masterset's JP path)
+//   Master card index   : snapshot → TCGdex EN (no further fallback)
+//   Set names/dates/syms : snapshot → TCGdex → fallback legacy (TCGdex /sets, names only)
+//   JA cards             : snapshot data/jp.json → live Bulbapedia
+//
+// The card index used to fall back to a legacy chain (Bulbapedia EN + pokemontcg.io).
+// pokemontcg.io is shutting down and that chain's last step was TCGdex anyway, so it
+// was removed on 2026-10-30; see providers/legacy.js.
 //
 // Behaviour (per brief):
 //   • try primary with an ~8s timeout (AbortController);
-//   • on timeout / HTTP error / empty result → fall back + caller shows a
-//     non-blocking "using backup data source" banner;
+//   • on timeout / HTTP error / empty result → fall back where a fallback exists,
+//     otherwise throw so the caller shows its failure banner with Retry;
 //   • remember per-source health for the SESSION so we don't re-timeout on every
 //     call; a forced refresh resets health to re-attempt the primary;
 //   • report the source used so the caller can tag the cache and re-try later.
@@ -23,7 +27,8 @@ import { mergeCardSets, mergeSource } from './merge.js';
 const TIMEOUT_MS = 8000;
 
 // Session health for the primary (TCGdex). Once it fails, later calls in the
-// same session skip straight to the fallback until a forced refresh resets it.
+// same session skip straight to the fallback (or, for cards, straight to failing)
+// until a forced refresh resets it.
 let primaryHealthy = true;
 export function resetHealth() { primaryHealthy = true; }
 
@@ -34,46 +39,52 @@ function withTimeout(factory) {
   return Promise.resolve(factory(ctrl.signal)).finally(() => clearTimeout(timer));
 }
 
-/**
- * Master card index for the given Pokémon names.
- * Order: pre-built snapshot (instant, no API) → live TCGdex → legacy fallback.
- * A forced refresh skips the snapshot to fetch live.
- * @returns {Promise<{cards:Array, source:'snapshot'|'tcgdex'|'legacy'}>}
- */
-/** The live half of the chain: TCGdex (8s timeout) → legacy. Factored out so a PARTIAL
- *  snapshot hit can run it for just the uncovered names. */
+/** The live half of the chain: TCGdex (8s timeout), and nothing after it. Factored out
+ *  so a PARTIAL snapshot hit can run it for just the uncovered names. */
 async function liveCards(names) {
-  if (primaryHealthy) {
-    try {
-      const cards = await withTimeout(signal => tcgdex.getCards(names, { signal }));
-      if (cards && cards.length) return { cards, source: 'tcgdex' };
-      throw new Error('empty result');
-    } catch (err) {
-      console.warn('[router] TCGdex card index unavailable → legacy fallback:', err.message);
-      primaryHealthy = false;
-    }
+  if (!primaryHealthy) throw new Error('TCGdex unavailable this session');
+  try {
+    const cards = await withTimeout(signal => tcgdex.getCards(names, { signal }));
+    if (cards && cards.length) return { cards, source: 'tcgdex' };
+    throw new Error('empty result');
+  } catch (err) {
+    console.warn('[router] TCGdex card index unavailable:', err.message);
+    primaryHealthy = false;
+    throw err;
   }
-  // fetchEnCards takes no argument — it serves the whole configured list, which is a
-  // superset of `names`. mergeCardSets dedups, so that is harmless.
-  const cards = await legacy.fetchEnCards();   // throws only if every legacy source fails too
-  return { cards, source: 'legacy' };
 }
 
+/**
+ * Master card index for the given Pokémon names.
+ * Order: pre-built snapshot (instant, no API) → live TCGdex.
+ * A forced refresh skips the snapshot to fetch live.
+ *
+ * `missing` is set only when a PARTIAL snapshot hit could not be completed live: the
+ * snapshot's cards are served rather than thrown away, and the caller must neither
+ * cache the result as complete nor stay silent about the names it lacks.
+ * @returns {Promise<{cards:Array, source:'snapshot'|'tcgdex', missing?:string[]}>}
+ */
 export async function getCards(names, { forceRefresh = false } = {}) {
   if (forceRefresh) primaryHealthy = true;
   if (!forceRefresh) {
-    try {
-      const hit = await snapshot.getCardsPartial(names);
-      if (hit.cards.length && !hit.missing.length) return { cards: hit.cards, source: 'snapshot' };
-      if (hit.cards.length) {
-        // Partial: the whole point of sharding — fetch ONLY what the snapshot lacks.
+    let hit = null;
+    try { hit = await snapshot.getCardsPartial(names); }
+    catch (e) { /* snapshot miss/absent → go live */ }
+    if (hit && hit.cards.length && !hit.missing.length) return { cards: hit.cards, source: 'snapshot' };
+    if (hit && hit.cards.length) {
+      // Partial: the whole point of sharding — fetch ONLY what the snapshot lacks.
+      try {
         const live = await liveCards(hit.missing);
         return {
           cards: mergeCardSets(names, [hit.cards, live.cards]),
           source: mergeSource(['snapshot', live.source]),
         };
+      } catch (err) {
+        // With no fallback left behind TCGdex, failing here would discard the
+        // snapshot's cards too and show an empty page for a mostly-covered list.
+        return { cards: hit.cards, source: 'snapshot', missing: hit.missing };
       }
-    } catch (e) { /* snapshot miss/absent → go live */ }
+    }
   }
   return liveCards(names);
 }
@@ -104,7 +115,7 @@ export async function getSetMeta({ forceRefresh = false, setIds = [] } = {}) {
       primaryHealthy = false;
     }
   }
-  // legacy.fetchAllSetNames is itself TCGdex-backed but carries no dates/art/counts.
+  // legacy.fetchAllSetNames is TCGdex /sets per language: names only, no dates/art/counts.
   const names = await legacy.fetchAllSetNames();
   return { ...setMetaShape({ names }), source: 'legacy' };
 }
