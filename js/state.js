@@ -18,8 +18,10 @@ import {
   CHKSTORE, POKESTORE, FILTERSTORE, BANNERSTORE, CACHESTORE, SORTSTORE,
   MODESTORE, TMSSTORE, TMSFILTERSTORE, TMSCACHESTORE,
   SETTARGETSTORE, SETCHKSTORE, SETPICKERSTORE,
-  BADGE_ORDER, DEFAULT_POKEMON, DEFAULT_MODE,
+  CHKPRINTSTORE, SETCHKPRINTSTORE, TMSPRINTSTORE, PRINTVIEWSTORE,
+  BADGE_ORDER, DEFAULT_POKEMON, DEFAULT_MODE, DEFAULT_PRINT_VIEW, isValidPrintView,
 } from './config.js';
+import { prunePrints } from './ui/prints-model.js';
 
 // Persisted blobs are read back defensively. `new Set(nonIterable)` throws, and
 // this module runs at import time — so one corrupt localStorage value (a manual
@@ -80,6 +82,15 @@ export const state = {
   ssPickerLang:     pickerPrefs.lang || 'en',
   ssPickerAsc:      !!pickerPrefs.asc,   // false = newest first, matching sortDesc
 
+  // — Per-print tracking, persisted (see js/ui/prints-model.js) —
+  // One print set per card checklist, ids `${cardId}#${printKey}`. Filled below, once the
+  // card sets exist, because a print whose card is not ticked is dropped on the way in.
+  msPrints:         new Set(),  // Set<printId>, Master Set     (beside `checked`)
+  ssPrints:         new Set(),  // Set<printId>, Single set     (beside `ssChecked`)
+  tmsPrints:        new Set(),  // Set<printId>, True Master Set (beside `tmsIncluded`)
+  // 'off' | 'chips' | 'tiles'. A shareable setting, like the language filters.
+  printView:        (v => isValidPrintView(v) ? v : DEFAULT_PRINT_VIEW)(storage.get(PRINTVIEWSTORE)),
+
   // — Runtime only (never persisted) —
   _meta:            new Map(),  // cardId → render metadata
   setBlockNamesMap: new Map(),
@@ -91,6 +102,13 @@ export const state = {
   _tmsPopupAllCards: [],
   _tmsPopupActive:  new Set(),
 };
+
+// Restore the three print sets. prunePrints keeps the first rule true on load: a print
+// whose card is not ticked (a hand edit, a partial import) would otherwise show as owned
+// on a card that is not.
+state.msPrints  = new Set(prunePrints(persistedArray(CHKPRINTSTORE, []), state.checked));
+state.ssPrints  = new Set(prunePrints(persistedArray(SETCHKPRINTSTORE, []), state.ssChecked));
+state.tmsPrints = new Set(prunePrints(persistedArray(TMSPRINTSTORE, []), state.tmsIncluded));
 
 // Restore the persisted TMS per-Pokémon card cache (array of [pokeName, card[]]),
 // rebuilding the reverse cardId → pokeName index as we go.
@@ -148,12 +166,25 @@ const [saveTmsInner, flushTms] = debouncedWrite(TMSSTORE, () => [...state.tmsInc
 const [saveTmsCacheInner, flushTmsCache, cancelTmsCache] = debouncedWrite(TMSCACHESTORE, () => [...state.tmsPokeCache.entries()]);
 // Same treatment as the other two checklists: one write per burst of ticks, not one per tick.
 const [saveSetChkInner, flushSetChk] = debouncedWrite(SETCHKSTORE, () => [...state.ssChecked]);
+// The print sets change on the same clicks as their card sets, so they are debounced the
+// same way and flushed alongside them.
+const [saveMsPrintsInner, flushMsPrints] = debouncedWrite(CHKPRINTSTORE, () => [...state.msPrints]);
+const [saveSsPrintsInner, flushSsPrints] = debouncedWrite(SETCHKPRINTSTORE, () => [...state.ssPrints]);
+const [saveTmsPrintsInner, flushTmsPrints] = debouncedWrite(TMSPRINTSTORE, () => [...state.tmsPrints]);
 
 export { flushChk, flushTms, flushTmsCache, flushSetChk };
 export function saveChk() { saveChkInner(); }
+// Print sets. No event of their own: each is only ever saved together with its card
+// set, whose save already fires the event the UI listens for.
+export function saveMsPrints()  { saveMsPrintsInner(); }
+export function saveSsPrints()  { saveSsPrintsInner(); }
+export function saveTmsPrints() { saveTmsPrintsInner(); }
 
 /** Write every pending debounced blob out. */
-export function flushAll() { flushChk(); flushTms(); flushTmsCache(); flushSetChk(); }
+export function flushAll() {
+  flushChk(); flushTms(); flushTmsCache(); flushSetChk();
+  flushMsPrints(); flushSsPrints(); flushTmsPrints();
+}
 
 if (typeof window !== 'undefined') {
   // pagehide covers the bfcache case that 'unload' misses; visibilitychange
@@ -167,6 +198,7 @@ export function saveDismissed()  { storage.setJSON(BANNERSTORE,    [...state.dis
 export function saveSort()       { storage.set(SORTSTORE,          state.sortDesc ? 'desc' : 'asc'); settingsChanged(); }
 export function saveMode()       { storage.set(MODESTORE,          state.appMode);                settingsChanged(); }
 export function saveTmsFilter()  { storage.setJSON(TMSFILTERSTORE, [...state.tmsActiveLangs]);     settingsChanged(); }
+export function savePrintView()  { storage.set(PRINTVIEWSTORE,     state.printView);              settingsChanged(); }
 // Single set. The chosen set and its language filter are shareable SETTINGS (they ride
 // the #s= hash); the checklist is data, so it is debounced like the other two and fires
 // its own event instead.

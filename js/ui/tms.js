@@ -11,7 +11,7 @@
 // =============================================================================
 
 import {
-  state, saveTms, saveTmsFilter, saveTmsCache, removeTmsCache,
+  state, saveTms, saveTmsPrints, saveTmsFilter, saveTmsCache, removeTmsCache,
 } from '../state.js';
 import {
   LANGUAGES, PLACEHOLDER_LANGS, NATIVE_NAMES, BADGE_ORDER, POKEMON_CATALOG,
@@ -27,6 +27,29 @@ import { jpImageKeyFor } from '../api/jp-model.js';
 import { langColor, buildPlaceholderHTML, mkPlaceholderEl, variantBadgesHtml } from './masterset.js';
 import { escapeHtml } from './html.js';
 import { openLanguagePicker, renderLangSummary } from './pickers.js';
+import {
+  printsOf, tracksPrints, printId, applyPrint, applyCard, clearPrintsOf, printUnset, slotCount,
+} from './prints-model.js';
+import { mkPrintChips, syncChips, markUnset, mkPrintTag } from './prints-ui.js';
+
+// Per-print tracking in the popup: TMS card id → its prints, for the open Pokémon's cards
+// that have two or more. Rebuilt by renderTmsPopupCards. In this mode a print is a binder
+// SLOT to include, exactly as a card is — the three rules in prints-model.js are the same.
+const popupPrints=new Map();
+const popupKeys=id=>(popupPrints.get(id)||[]).map(p=>p.key);
+
+/** Make one popup tile's classes match tmsIncluded / tmsPrints. */
+function syncTmsTile(el){
+  if(el.dataset.print){
+    const on=state.tmsPrints.has(el.dataset.id);
+    el.classList.toggle('tms-in',on);
+    markUnset(el,printUnset(state.tmsIncluded,state.tmsPrints,el.dataset.card,popupKeys(el.dataset.card)));
+    return;
+  }
+  const on=state.tmsIncluded.has(el.dataset.id);
+  el.classList.toggle('tms-in',on);
+  syncChips(el,state.tmsPrints,el.dataset.id,popupKeys(el.dataset.id),on);
+}
 
 function tmsCountForPoke(pokeName){
   let n=0;
@@ -295,6 +318,13 @@ function renderTmsPopupCards(pokeName){
     e.textContent='No cards match the selected languages.'; grid.appendChild(e);
   }
 
+  popupPrints.clear();
+  for(const c of visible){
+    const list=printsOf(c.variants);
+    if(tracksPrints(list)) popupPrints.set(c.id,list);
+  }
+  const pv=state.printView;
+
   sorted.forEach(si=>{
     // Set divider
     const div=document.createElement('div'); div.className='tms-popup-set-divider';
@@ -307,37 +337,10 @@ function renderTmsPopupCards(pokeName){
     grid.appendChild(div);
 
     si.cards.forEach(c=>{
-      const isIn=state.tmsIncluded.has(c.id);
-      const el=document.createElement('div'); el.className='tms-popup-card'+(isIn?' tms-in':''); el.dataset.id=c.id;
-      // Image
-      // Placeholder-first (mirrors mkImgWrap in masterset.js): paint the stand-in
-      // immediately and let the image load underneath it, so a popup full of
-      // missing-language prints never shows a grid of empty boxes while the 404s land.
-      const wrap=document.createElement('div'); wrap.className='img-wrap';
-      const nat=(NATIVE_NAMES[c.lang]||{})[pokeName]||null;
-      const ph=mkPlaceholderEl(c.symSrc,c.lang,c.langColor,pokeName,nat,c.setName,c.localId);
-      wrap.appendChild(ph);
-      // Known-missing artwork is skipped without a request (img-cache.js), the same as
-      // the Master-Set grid — this popup renders every language for a Pokémon, so it hit
-      // the TCGdex language gaps hardest.
-      // A JP card falls back to our hosted copy when Limitless has none (or 403s).
-      const srcs=viableSources([c.imgSrc, c.imgKey?localImage(c.imgKey,'low'):null].filter(Boolean));
-      if(srcs.length){
-        ph.classList.add('ph-over');
-        const img=document.createElement('img'); img.className='card-img';
-        img.loading='lazy'; img.decoding='async'; img.fetchPriority='low';
-        img.alt=`${pokeName} #${c.localId} ${c.lang}`;
-        let i=0;
-        img.onload=()=>{ ph.remove(); markGood(srcs[i]); };
-        img.onerror=()=>{ markBad(srcs[i]); if(++i<srcs.length){ img.src=srcs[i]; return; } img.remove(); ph.classList.remove('ph-over'); };
-        img.src=srcs[0];
-        wrap.appendChild(img);
-      }
-      const footer=document.createElement('div'); footer.className='card-footer';
-      footer.innerHTML=`<span class="card-num">#${escapeHtml(c.localId)}</span>${variantBadgesHtml(c.variants)}<span class="lang" style="background:${escapeHtml(c.langColor)}">${escapeHtml(c.lang)}</span>`;
-      el.appendChild(wrap); el.appendChild(footer);
-      el.onclick=()=>toggleTmsCard(c.id,el,pokeName);
-      grid.appendChild(el);
+      const list=pv!=='off'?popupPrints.get(c.id):null;
+      // Tiles view: one tile per print, in place of the card's single tile.
+      if(list&&pv==='tiles'){ list.forEach(pr=>grid.appendChild(tmsPopupTile(c,pokeName,pr,null))); return; }
+      grid.appendChild(tmsPopupTile(c,pokeName,null,list));
     });
   });
 
@@ -348,10 +351,83 @@ function renderTmsPopupCards(pokeName){
   if(subEl) subEl.textContent=`${inc} card${inc===1?'':'s'} in TMS · ${visible.length} visible`;
 }
 
+/**
+ * One popup tile: a card, or (tiles view) one print `pr` of it. `chips` is the card's
+ * print list when the chips view should give it a chip row.
+ */
+function tmsPopupTile(c,pokeName,pr,chips){
+  const id=pr?printId(c.id,pr.key):c.id;
+  const isIn=pr?state.tmsPrints.has(id):state.tmsIncluded.has(c.id);
+  const el=document.createElement('div'); el.className='tms-popup-card'+(pr?' card-print':'')+(isIn?' tms-in':''); el.dataset.id=id;
+  if(pr){ el.dataset.card=c.id; el.dataset.print=pr.key; }
+  // Image
+  // Placeholder-first (mirrors mkImgWrap in masterset.js): paint the stand-in
+  // immediately and let the image load underneath it, so a popup full of
+  // missing-language prints never shows a grid of empty boxes while the 404s land.
+  const wrap=document.createElement('div'); wrap.className='img-wrap';
+  const nat=(NATIVE_NAMES[c.lang]||{})[pokeName]||null;
+  const ph=mkPlaceholderEl(c.symSrc,c.lang,c.langColor,pokeName,nat,c.setName,c.localId);
+  wrap.appendChild(ph);
+  // Known-missing artwork is skipped without a request (img-cache.js), the same as
+  // the Master-Set grid — this popup renders every language for a Pokémon, so it hit
+  // the TCGdex language gaps hardest.
+  // A JP card falls back to our hosted copy when Limitless has none (or 403s).
+  const srcs=viableSources([c.imgSrc, c.imgKey?localImage(c.imgKey,'low'):null].filter(Boolean));
+  if(srcs.length){
+    ph.classList.add('ph-over');
+    const img=document.createElement('img'); img.className='card-img';
+    img.loading='lazy'; img.decoding='async'; img.fetchPriority='low';
+    img.alt=`${pokeName} #${c.localId} ${c.lang}`;
+    let i=0;
+    img.onload=()=>{ ph.remove(); markGood(srcs[i]); };
+    img.onerror=()=>{ markBad(srcs[i]); if(++i<srcs.length){ img.src=srcs[i]; return; } img.remove(); ph.classList.remove('ph-over'); };
+    img.src=srcs[0];
+    wrap.appendChild(img);
+  }
+  const footer=document.createElement('div'); footer.className='card-footer';
+  // With prints tracked, the chips / the print tag say what the badges did.
+  const badges=(pr||chips)?'':variantBadgesHtml(c.variants);
+  footer.innerHTML=`<span class="card-num">#${escapeHtml(c.localId)}</span>${badges}<span class="lang" style="background:${escapeHtml(c.langColor)}">${escapeHtml(c.lang)}</span>`;
+  if(pr) footer.insertBefore(mkPrintTag(pr),footer.querySelector('.lang'));
+  el.appendChild(wrap);
+  if(chips) el.appendChild(mkPrintChips(chips));
+  el.appendChild(footer);
+  syncTmsTile(el);
+  el.onclick=e=>{
+    const chip=e.target.closest('.pchip');
+    if(chip){ toggleTmsPrint(c.id,chip.dataset.key,[el],pokeName); return; }
+    if(pr) toggleTmsPrint(c.id,pr.key,null,pokeName);
+    else toggleTmsCard(c.id,el,pokeName);
+  };
+  return el;
+}
+
 // ── TMS: Toggle a single card in/out of TMS ───────────────────────────────────
 function toggleTmsCard(cardId,el,pokeName){
-  if(state.tmsIncluded.has(cardId)){ state.tmsIncluded.delete(cardId); el.classList.remove('tms-in'); }
-  else{ state.tmsIncluded.add(cardId); el.classList.add('tms-in'); state._tmsCardPokemon.set(cardId,pokeName||state._tmsOpenPoke); }
+  // applyCard: excluding a card also drops the prints of it you had included.
+  const on=!state.tmsIncluded.has(cardId);
+  applyCard(state.tmsIncluded,state.tmsPrints,cardId,on);
+  if(on) state._tmsCardPokemon.set(cardId,pokeName||state._tmsOpenPoke);
+  syncTmsTile(el);
+  afterTmsToggle();
+}
+
+/**
+ * Include/exclude one print. `tiles` are the elements to re-sync — the chip's own tile,
+ * or null for every print tile of the card (tiles view: one tick can change a sibling's
+ * "which print?" hint).
+ */
+function toggleTmsPrint(cardId,printKey,tiles,pokeName){
+  const on=!state.tmsPrints.has(printId(cardId,printKey));
+  applyPrint(state.tmsIncluded,state.tmsPrints,cardId,printKey,on,popupKeys(cardId));
+  if(on) state._tmsCardPokemon.set(cardId,pokeName||state._tmsOpenPoke);
+  const els=tiles||[...document.querySelectorAll(`#tms-popup-body .tms-popup-card[data-card="${CSS.escape(cardId)}"]`)];
+  els.forEach(syncTmsTile);
+  afterTmsToggle();
+}
+
+function afterTmsToggle(){
+  saveTmsPrints();
   saveTms();
   // Update subtitle + tile count
   const sub=document.getElementById('tms-popup-sub');
@@ -367,10 +443,21 @@ function toggleTmsCard(cardId,el,pokeName){
 // ── TMS: Bulk include/exclude all visible popup cards ─────────────────────────
 function tmsPopupBulk(include){
   const visible=state._tmsPopupAllCards.filter(c=>state._tmsPopupActive.has(c.lang));
+  // In the tiles view a print tile is what you see, so "include all" includes every print.
+  const everyPrint=include&&state.printView==='tiles';
   visible.forEach(c=>{
-    if(include){ state.tmsIncluded.add(c.id); state._tmsCardPokemon.set(c.id,state._tmsOpenPoke); }
+    if(include){
+      state.tmsIncluded.add(c.id); state._tmsCardPokemon.set(c.id,state._tmsOpenPoke);
+      if(everyPrint){
+        const keys=popupKeys(c.id);
+        for(const k of keys) applyPrint(state.tmsIncluded,state.tmsPrints,c.id,k,true,keys);
+      }
+    }
     else state.tmsIncluded.delete(c.id);
   });
+  // Excluded cards lose their prints — one pass, not one per card.
+  if(!include) clearPrintsOf(state.tmsPrints,new Set(visible.map(c=>c.id)));
+  saveTmsPrints();
   saveTms();
   renderTmsPopupCards(state._tmsOpenPoke);
   _updateTmsTile(state._tmsOpenPoke);
@@ -395,7 +482,17 @@ function _updateTmsTile(pokeName){
 function _updateTmsStats(){
   const t=state.tmsIncluded.size;
   const el=document.getElementById('stats');
-  if(el&&state.appMode==='tms') el.textContent=`${t} card${t===1?'':'s'} included`;
+  if(el&&state.appMode==='tms'){
+    el.textContent=`${t} card${t===1?'':'s'} included`;
+    if(state.printView!=='off'){
+      // A TMS has no fixed size, so no denominator: this is the number of binder slots —
+      // one per included print, one per included card with no print chosen.
+      const sp=document.createElement('span'); sp.className='stats-prints';
+      const n=slotCount(state.tmsIncluded,state.tmsPrints);
+      sp.textContent=` · ${n} print${n===1?'':'s'}`;
+      el.appendChild(sp);
+    }
+  }
 }
 
 // ── TMS: Close popup ──────────────────────────────────────────────────────────
@@ -409,7 +506,8 @@ function closeTmsPopup(e){
 function resetTms(){
   if(!state.tmsIncluded.size){ alert('No cards selected.'); return; }
   if(!confirm('Reset all TMS selections? Card data cache is kept.')) return;
-  state.tmsIncluded.clear(); saveTms();
+  state.tmsIncluded.clear(); state.tmsPrints.clear();
+  saveTmsPrints(); saveTms();
   renderTMS(); updateTmsPrintSelBtn();
 }
 
@@ -424,7 +522,16 @@ function clearTmsCache(){
 // ── TMS: Update Print Selected button count ───────────────────────────────────
 function updateTmsPrintSelBtn(){
   const btn=document.getElementById('btn-tms-print-sel'); if(!btn) return;
-  btn.textContent=`Print selected (${state.tmsIncluded.size})`;
+  // With prints on, the sheet prints one cell per included print (print.js).
+  const n=state.printView!=='off'?slotCount(state.tmsIncluded,state.tmsPrints):state.tmsIncluded.size;
+  btn.textContent=`Print selected (${n})`;
+}
+
+/** Re-render the open popup in the current print view (js/ui/printview.js). */
+function rerenderTmsPopup(){
+  if(state._tmsOpenPoke) renderTmsPopupCards(state._tmsOpenPoke);
+  updateTmsPrintSelBtn();
+  _updateTmsStats();
 }
 
 // ── TMS: Language filter pills (sticky bar) ───────────────────────────────────
@@ -473,5 +580,5 @@ document.addEventListener('tcg:tms-changed', updateTmsPrintSelBtn);
 
 export {
   renderTMS, buildTmsPillsTms, updateTmsPrintSelBtn, tmsAutoPopulate,
-  resetTms, clearTmsCache, closeTmsPopup,
+  resetTms, clearTmsCache, closeTmsPopup, rerenderTmsPopup,
 };

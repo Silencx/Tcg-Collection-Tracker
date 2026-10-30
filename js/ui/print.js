@@ -16,6 +16,8 @@
 // A "meta" is the render metadata shape state._meta holds:
 //   { name:{en,native}|string, setName, num, lang, langColor, symSrc,
 //     imgSources, hiSources, imgOk }
+// plus, with per-print tracking on, `print: {key, label, short}` — one meta per ticked
+// print (prints-model.expandMeta), so a card owned in two prints prints two cells.
 // The three image fields are built by img-cache.imgMeta and read via metaSources —
 // candidates plus the url that actually decoded, never a bare guess.
 //
@@ -32,6 +34,7 @@ import { buildPlaceholderHTML } from './masterset.js';
 import { imgMeta, metaSources } from '../api/img-cache.js';
 import { setModeMetas, openSetName } from './setmode.js';
 import { escapeHtml, escapeUrl } from './html.js';
+import { expandMeta, printsOf } from './prints-model.js';
 
 // Card-placeholder CSS injected into the image-print documents (mm-sized for A4).
 const PLACEHOLDER_PRINT_CSS = [
@@ -51,6 +54,9 @@ const PLACEHOLDER_PRINT_CSS = [
   '.cp-set{font-size:8px;color:#a5d6a7;line-height:1.2;}',
   '.cp-num{font-size:7px;color:#81c784;font-style:italic;}',
   '.pw .custom-placeholder{width:63.5mm!important;height:88.9mm!important;border-radius:3.5mm!important;}',
+  // Which print a cell is for. Sits over the art too, which is the same for every print.
+  '.ptag-print{position:absolute;top:2mm;right:2mm;z-index:2;font:bold 8pt Arial,sans-serif;' +
+  'background:#3a2f00;color:#ffd54f;border:.3mm solid #c8a400;border-radius:1mm;padding:.3mm 1.2mm;}',
 ].join('');
 
 const CHECKLIST_CSS = [
@@ -61,6 +67,7 @@ const CHECKLIST_CSS = [
   '.set-row td{font-weight:bold;font-size:6.5pt;background:#ebebeb;padding:.8mm 1.5mm;' +
   'border-top:.5px solid #bbb;color:#444;text-transform:uppercase;letter-spacing:.3px;}',
   '.name-col{max-width:60mm;}',
+  '.print-col{color:#7a5c00;font-weight:bold;}',
   'tr:not(.set-row) td{padding:.35mm 1.5mm;border-bottom:.15mm solid #f2f2f2;' +
   'vertical-align:middle;line-height:1.3;}',
   '.chk-col{width:4mm;text-align:center;}.sep{width:1.5mm;border-left:.2mm solid #ddd;}',
@@ -124,7 +131,8 @@ const enNameOf  = m => (typeof m.name === 'object' ? m.name.en     : m.name);
 const natNameOf = m => (typeof m.name === 'object' ? m.name.native : null);
 
 function printPlaceholderCard(m) {
-  const localId = (m.num || '').replace('#', '');
+  const num = (m.num || '').replace('#', '');
+  const localId = m.print ? `${num} · ${m.print.short}` : num;
   // buildPlaceholderHTML escapes its own inputs.
   return buildPlaceholderHTML(m.symSrc, m.lang, m.langColor, enNameOf(m), natNameOf(m), m.setName, localId, false);
 }
@@ -169,7 +177,9 @@ function buildChecklistDoc(metas, heading, title) {
     const nat = natNameOf(m) ? ` <span style="color:#999">${escapeHtml(natNameOf(m))}</span>` : '';
     return '<td class="chk-col"><input type="checkbox" disabled></td>'
          + `<td class="name-col">${escapeHtml(enNameOf(m))}${nat} `
-         + `<span class="badge" style="background:${escapeHtml(m.langColor)}">${escapeHtml(m.lang)}</span></td>`
+         + `<span class="badge" style="background:${escapeHtml(m.langColor)}">${escapeHtml(m.lang)}</span>`
+         + (m.print ? ` <span class="print-col">· ${escapeHtml(m.print.label)}</span>` : '')
+         + '</td>'
          + `<td class="num-col">${escapeHtml(m.num)}</td>`;
   };
 
@@ -208,7 +218,8 @@ function buildCardSheetDoc(metas) {
     const img = imgUrl
       ? `<img src="${imgUrl}" class="pi pi-ov" style="display:none" onload="this.style.display='block'" onerror="this.remove()">`
       : '';
-    return `<div class="pw">${printPlaceholderCard(m)}${img}</div>`;
+    const tag = m.print ? `<span class="ptag-print">${escapeHtml(m.print.short)}</span>` : '';
+    return `<div class="pw">${printPlaceholderCard(m)}${img}${tag}</div>`;
   }).join('');
 
   return '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Print</title>'
@@ -220,9 +231,21 @@ function buildCardSheetDoc(metas) {
 
 // ── COLLECTING METAS ──────────────────────────────────────────────────────────
 
-/** Master Set: the checked ids, resolved through the live render index. */
+const printsOn = () => state.printView !== 'off';
+
+/**
+ * Master Set: the checked ids, resolved through the live render index. With prints on,
+ * each card becomes one entry per ticked print; the print list is the one the render
+ * stored on the card's _meta entry.
+ */
 function masterMetas() {
-  return [...state.checked].map(id => state._meta.get(id)).filter(Boolean);
+  const metas = [];
+  for (const id of state.checked) {
+    const m = state._meta.get(id); if (!m) continue;
+    if (printsOn()) metas.push(...expandMeta(m, id, m.printList || [], state.msPrints));
+    else metas.push(m);
+  }
+  return metas;
 }
 
 /**
@@ -236,11 +259,13 @@ function tmsMetas() {
     const poke = state._tmsCardPokemon.get(id); if (!poke) return;
     const pc = state.tmsPokeCache.get(poke);    if (!pc) return;
     const c = pc.find(x => x.id === id);        if (!c) return;
-    metas.push({
+    const m = {
       name: { en: poke, native: (NATIVE_NAMES[c.lang] || {})[poke] || null },
       setName: c.setName, num: `#${c.localId}`, lang: c.lang, langColor: c.langColor,
       symSrc: c.symSrc, ...imgMeta([c.imgSrc], [c.hiSrc]),
-    });
+    };
+    if (printsOn()) metas.push(...expandMeta(m, id, printsOf(c.variants), state.tmsPrints));
+    else metas.push(m);
   });
   return metas;
 }

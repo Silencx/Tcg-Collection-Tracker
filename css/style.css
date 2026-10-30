@@ -1243,6 +1243,31 @@ main{width:min(100%,var(--page-w));margin:0 auto;padding:12px;}
 /* Inferred from the era rule, not listed by TCGdex (api/variants.js REVERSE_GAP): same
    pill, dashed outline, so "very likely" reads differently from "listed". */
 .vbadge-inferred{border-style:dashed;}
+
+/* ── PER-PRINT TRACKING (js/ui/prints-ui.js) ──
+   Chips view: a row of toggles under the art, one per print. Same gold-on-dark pill as
+   .vbadge when ticked, outline-only when not, so the row reads as "which of these do I
+   have" at a glance. Sized in container units like the rest of the tile, with a floor on
+   the tap target: these are the smallest controls in the app. */
+.pchips{width:100%;display:flex;flex-wrap:wrap;justify-content:center;gap:clamp(2px,1.5cqw,4px);padding:clamp(2px,1.5cqw,4px) 0 1px;}
+.pchip{
+  font-family:inherit;font-size:clamp(7px,4.6cqw,11px);font-weight:bold;line-height:1.2;letter-spacing:.3px;cursor:pointer;
+  min-height:clamp(16px,11cqw,24px);min-width:clamp(18px,13cqw,30px);
+  padding:1px clamp(3px,2.4cqw,7px);border-radius:4px;
+  border:1px solid rgba(200,164,0,.6);background:transparent;color:var(--c-text-muted,#6b6b6b);
+  -webkit-print-color-adjust:exact;print-color-adjust:exact;
+}
+.pchip[aria-pressed="true"]{background:#3a2f00;color:#ffd54f;border-color:#c8a400;}
+.pchip-inferred{border-style:dashed;}
+.pchip:focus-visible{outline:2px solid var(--c-accent-ink);outline-offset:1px;}
+@media (hover:hover){ .pchip:hover{border-color:#c8a400;color:var(--c-text,#222);} .pchip[aria-pressed="true"]:hover{color:#ffe082;} }
+/* Tiles view: the print a tile stands for, in the footer where the badges were. */
+.ptag{font-size:clamp(6px,4cqw,10px);font-weight:bold;line-height:1.4;padding:1px clamp(2px,1.8cqw,5px);border-radius:3px;background:#3a2f00;color:#ffd54f;border:1px solid rgba(255,213,79,.45);letter-spacing:.3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+.ptag-inferred{border-style:dashed;}
+/* Owned, but no print recorded yet — every checklist saved before this feature. A hint,
+   not an error: dashed gold outline on the tile (chips view) or on each print tile. */
+.card.prints-unset,.tms-popup-card.prints-unset{border-style:dashed;border-color:#c8a400;}
+#btn-print-view[hidden]{display:none;}
 /* (.chk / .chk-hit removed with the per-card checkbox — the whole tile is the toggle
    now and colour is the state. The print sheet keeps its own .chk-col checkbox, which
    is a different thing: a box to tick with a pen.) */
@@ -1327,6 +1352,7 @@ main{width:min(100%,var(--page-w));margin:0 auto;padding:12px;}
   #page-title{display:none;}
   .mode-long{display:none;}
   .stats-word{display:none;}
+  .stats-prints{display:none;}
   /* Reclaims 12px of horizontal padding and 4px of gaps — the identity row needed 349px
      in a 338px box, so these are what let it stay a single line. */
   .header{padding:8px;gap:6px;}

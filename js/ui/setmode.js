@@ -19,7 +19,7 @@
 // tests/pill-scope.test.mjs has nothing to say about it.
 // =============================================================================
 
-import { state, saveSetChk, saveSetTarget, saveSetPicker } from '../state.js';
+import { state, saveSetChk, saveSsPrints, saveSetTarget, saveSetPicker } from '../state.js';
 import { LANGUAGES, PLACEHOLDER_LANGS, BADGE_ORDER, NATIVE_NAMES } from '../config.js';
 import { router } from '../api/router.js';
 import { tcgdexAssetBase, tcgdexSerieSegment } from '../api/images.js';
@@ -34,6 +34,11 @@ import {
   belongsToSet, pickerLanguages,
 } from './setmode-model.js';
 import { formatSetDate } from './dashboard-model.js';
+import {
+  printsOf, tracksPrints, printId, applyPrint, applyCard, clearPrintsOf, printTotals,
+  printUnset, expandMeta, splitPrintId,
+} from './prints-model.js';
+import { mkPrintChips, syncChips, markUnset, mkPrintTag } from './prints-ui.js';
 
 // Cards for the currently-open set, so a language-pill click re-filters without refetching.
 let openSet = null;      // { id, name, releaseDate, symbol, serie, count, lang }
@@ -42,6 +47,9 @@ let pickerMeta = null;   // data/sets.json, loaded once
 let pickerRows = [];     // buildSetList output for rowsCacheKey
 let rowsCacheKey = null; // the language pickerRows was built for
 let pickerQuery = '';
+// Per-print tracking: checklist card id → its prints, for the open set's cards that have
+// two or more. Rebuilt by paintSet; read by the tiles, the stats and the print sheet.
+const openPrints = new Map();
 
 const app = () => document.getElementById('set-app');
 
@@ -304,17 +312,29 @@ function cardMeta(card, def) {
   };
 }
 
-/** One tile per card per ACTIVE language, mirroring Master Set's checklist unit. */
-function cardTile(card, badge, color, code) {
-  const id = `${badge}_${card.id}`;
-  const isDone = state.ssChecked.has(id);
-  const tile = el('div', 'card' + (isDone ? ' done' : ''));
+/**
+ * One tile per card, mirroring Master Set's checklist unit — or, in the tiles view of
+ * per-print tracking, one tile per PRINT (`pr`), with the same data-card / data-print
+ * shape Master Set uses (see the note above its togglePrint).
+ */
+function cardTile(card, badge, color, code, pr = null) {
+  const cardId = `${badge}_${card.id}`;
+  const list = openPrints.get(cardId) || [];
+  const chips = !pr && state.printView === 'chips' && tracksPrints(list);
+  const id = pr ? printId(cardId, pr.key) : cardId;
+  const isDone = pr ? state.ssPrints.has(id) : state.ssChecked.has(id);
+  const tile = el('div', 'card' + (pr ? ' card-print' : '') + (isDone ? ' done' : ''));
   tile.dataset.id = id;
   tile.dataset.lang = badge;
+  if (pr) {
+    tile.dataset.card = cardId;
+    tile.dataset.print = pr.key;
+  }
   // Owning a card is shown by the artwork being in full colour, which a screen reader
   // cannot see and a keyboard cannot reach — so the tile carries the role the deleted
   // checkbox used to. Shared with Master Set so both grids announce the same thing.
   markCardToggle(tile, isDone);
+  if (pr) tile.setAttribute('aria-label', pr.label);
 
   const wrap = el('div', 'img-wrap');
   const nat = (NATIVE_NAMES[badge] || {})[card.species || card.name] || null;
@@ -343,33 +363,91 @@ function cardTile(card, badge, color, code) {
 
   const footer = el('div', 'card-footer');
   // innerHTML with escaped interpolation, matching mkCardFooter and the TMS popup.
+  // With prints tracked, the chips / the print tag say what the badges did.
   footer.innerHTML = `<span class="card-num">#${escapeHtml(card.localId)}</span>`
-    + variantBadgesHtml(card.variants)
+    + (chips || pr ? '' : variantBadgesHtml(card.variants))
     + `<span class="lang lang-${escapeHtml(badge)}" style="background:${escapeHtml(color)}">${escapeHtml(badge)}</span>`;
+  if (pr) footer.insertBefore(mkPrintTag(pr), footer.querySelector('.lang'));
 
-  tile.append(wrap, footer);
+  tile.append(wrap);
+  if (chips) tile.append(mkPrintChips(list));
+  tile.append(footer);
+  syncSetTile(tile);
   // Single click ticks; double click opens the preview and UNDOES the first click's
   // tick, so a double-click is net-zero on the checklist. Same contract as Master Set's
   // delegated handler — see installCardDelegation — including why this is not done by
   // delaying the single click: the core loop here is ticking a whole set.
   tile.addEventListener('click', e => {
+    // A chip ticks its print, never the card under it; a double-tap on one is one toggle.
+    const chip = e.target.closest('.pchip');
+    if (chip) { if (e.detail <= 1) toggleSetPrint(tile, cardId, chip.dataset.key); return; }
     if (e.detail > 1) return;                 // second click of a double-click
-    toggleCard(id, tile);
+    toggleSetTile(tile);
   });
-  tile.addEventListener('dblclick', () => {
-    toggleCard(id, tile);                     // revert the first click of this double
+  tile.addEventListener('dblclick', e => {
+    if (e.target.closest('.pchip')) return;
+    toggleSetTile(tile);                      // revert the first click of this double
     openPreviewMeta(cardMeta(card, { badge, color, code }));
   });
   return tile;
 }
 
-function toggleCard(id, tile) {
-  const on = !state.ssChecked.has(id);
-  if (on) state.ssChecked.add(id); else state.ssChecked.delete(id);
+/** One click on a tile: a print tile toggles its print, a card tile its card. */
+function toggleSetTile(tile) {
+  if (tile.dataset.print) { toggleSetPrint(tile, tile.dataset.card, tile.dataset.print); return; }
+  const id = tile.dataset.id;
+  applyCard(state.ssChecked, state.ssPrints, id, !state.ssChecked.has(id));
+  syncSetTile(tile);
+  saveSsPrints(); saveSetChk();
+  renderSetStats();
+}
+
+/** Tick/untick one print (chip or print tile); prints-model.js has the rules. */
+function toggleSetPrint(tile, cardId, printKey) {
+  const keys = keysFor(cardId);
+  applyPrint(state.ssChecked, state.ssPrints, cardId, printKey,
+    !state.ssPrints.has(printId(cardId, printKey)), keys);
+  // In the tiles view one tick can change a sibling's "which print?" hint.
+  const tiles = tile.dataset.print
+    ? [...tile.parentNode.querySelectorAll(`.card[data-card="${CSS.escape(cardId)}"]`)]
+    : [tile];
+  tiles.forEach(syncSetTile);
+  saveSsPrints(); saveSetChk();
+  renderSetStats();
+}
+
+const keysFor = cardId => (openPrints.get(cardId) || []).map(p => p.key);
+
+/** Make one tile's classes match the two sets. */
+function syncSetTile(tile) {
+  if (tile.dataset.print) {
+    const on = state.ssPrints.has(tile.dataset.id);
+    tile.classList.toggle('done', on);
+    tile.setAttribute('aria-checked', on ? 'true' : 'false');
+    markUnset(tile, printUnset(state.ssChecked, state.ssPrints, tile.dataset.card, keysFor(tile.dataset.card)));
+    return;
+  }
+  const id = tile.dataset.id, on = state.ssChecked.has(id);
   tile.classList.toggle('done', on);
   tile.setAttribute('aria-checked', on ? 'true' : 'false');
-  saveSetChk();
-  renderSetStats();
+  syncChips(tile, state.ssPrints, id, keysFor(id), on);
+}
+
+/**
+ * The open set's "P / Q prints" and its print-sheet size, in its own language.
+ * Q counts every card (min one print each); P the prints ticked; `slots` is one per
+ * ticked print plus one per owned card with no print recorded — what Print selected prints.
+ */
+function setPrintStats(badge) {
+  let total = 0, done = 0, slots = 0;
+  for (const card of openCards) {
+    const id = `${badge}_${card.id}`;
+    const keys = keysFor(id);
+    const [t, d] = printTotals(state.ssChecked, state.ssPrints, id, keys);
+    total += t; done += d;
+    if (state.ssChecked.has(id)) slots += tracksPrints(keys) ? Math.max(1, d) : 1;
+  }
+  return { total, done, slots };
 }
 
 /** The one place that recomputes the header numbers, from the checklist. */
@@ -381,8 +459,12 @@ function renderSetStats() {
   const official = openSet?.count?.official || state.ssCardCounts[state.ssTarget]?.official || 0;
   const pct = percentComplete(prog.cards, official);
 
+  const pr = state.printView !== 'off' && openSet?.id === state.ssTarget ? setPrintStats(badge) : null;
   const stats = document.getElementById('stats');
-  if (stats) stats.textContent = official ? `${prog.cards} / ${official} cards` : `${prog.cards} cards`;
+  if (stats) {
+    stats.textContent = official ? `${prog.cards} / ${official} cards` : `${prog.cards} cards`;
+    if (pr) stats.appendChild(el('span', 'stats-prints', ` · ${pr.done} / ${pr.total} prints`));
+  }
 
   const bar = document.getElementById('set-progress-fill');
   if (bar) bar.style.width = `${pct ?? 0}%`;
@@ -390,12 +472,13 @@ function renderSetStats() {
   if (label) {
     const lang = (LANGUAGES.find(l => l.badge === badge)
       || PLACEHOLDER_LANGS.find(l => l.badge === badge) || {}).label || badge;
-    label.textContent = pct === null
+    label.textContent = (pct === null
       ? `${prog.cards} collected · ${lang}`
-      : `${pct}% complete · ${prog.cards} of ${official} · ${lang}`;
+      : `${pct}% complete · ${prog.cards} of ${official} · ${lang}`)
+      + (pr ? ` · ${pr.done} of ${pr.total} prints` : '');
   }
   const pb = document.getElementById('btn-set-print-sel');
-  if (pb) pb.textContent = `Print selected (${prog.cards})`;
+  if (pb) pb.textContent = `Print selected (${pr ? pr.slots : prog.cards})`;
 }
 
 // NO IN-PAGE SET HEADER, DELIBERATELY. The symbol/name/date block that used to open the
@@ -426,12 +509,22 @@ export function selectAllSet() {
   if (!root) return;
   const tiles = [...root.querySelectorAll('.card[data-lang]')];
   if (!tiles.length) return;
-  const allDone = tiles.every(t => state.ssChecked.has(t.dataset.id));
+  // .done is the tile's own unit — its card, or in the tiles view its print.
+  const allDone = tiles.every(t => t.classList.contains('done'));
+  const dropped = new Set();
   for (const t of tiles) {
-    if (allDone) { state.ssChecked.delete(t.dataset.id); t.classList.remove('done'); }
-    else { state.ssChecked.add(t.dataset.id); t.classList.add('done'); }
+    if (t.dataset.print) {
+      const { cardId, key: printKey } = splitPrintId(t.dataset.id);
+      if (state.ssPrints.has(t.dataset.id) === allDone) {
+        applyPrint(state.ssChecked, state.ssPrints, cardId, printKey, !allDone, keysFor(cardId));
+      }
+    } else if (allDone) { state.ssChecked.delete(t.dataset.id); dropped.add(t.dataset.id); }
+    else state.ssChecked.add(t.dataset.id);
   }
-  saveSetChk();
+  // Unticked cards lose their prints, in one pass rather than one per card.
+  if (dropped.size) clearPrintsOf(state.ssPrints, dropped);
+  tiles.forEach(syncSetTile);
+  saveSsPrints(); saveSetChk();
   renderSetStats();
 }
 
@@ -445,8 +538,9 @@ export function resetSet() {
       state.ssChecked.delete(id);
     }
   }
-  saveSetChk();
-  app()?.querySelectorAll('.card.done').forEach(t => t.classList.remove('done'));
+  clearPrintsOf(state.ssPrints, cardId => belongsToSet(cardId, state.ssTarget));
+  saveSsPrints(); saveSetChk();
+  app()?.querySelectorAll('.card[data-id]').forEach(syncSetTile);
   renderSetStats();
 }
 
@@ -593,7 +687,9 @@ export function setModeMetas() {
     const def = LANGUAGES.find(l => l.badge === badge)
              || PLACEHOLDER_LANGS.find(l => l.badge === badge);
     if (!def) continue;
-    metas.push(cardMeta(card, def));
+    // With prints tracked: one sheet entry per ticked print (prints-model.expandMeta).
+    if (state.printView !== 'off') metas.push(...expandMeta(cardMeta(card, def), id, openPrints.get(id) || [], state.ssPrints));
+    else metas.push(cardMeta(card, def));
   }
   return metas;
 }
@@ -611,9 +707,33 @@ function paintSet(root) {
            || PLACEHOLDER_LANGS.find(l => l.code === code)
            || LANGUAGES[0];
   const grid = el('div', 'cards-grid');
+  openPrints.clear();
   for (const card of openCards) {
-    grid.appendChild(cardTile(card, def.badge, def.color, def.code || null));
+    const list = printsOf(card.variants);
+    if (tracksPrints(list)) openPrints.set(`${def.badge}_${card.id}`, list);
+  }
+  for (const card of openCards) {
+    const list = openPrints.get(`${def.badge}_${card.id}`);
+    // Tiles view: one tile per print, in place of the card's single tile.
+    if (list && state.printView === 'tiles') {
+      for (const pr of list) grid.appendChild(cardTile(card, def.badge, def.color, def.code || null, pr));
+    } else {
+      grid.appendChild(cardTile(card, def.badge, def.color, def.code || null));
+    }
   }
   root.appendChild(grid);
   renderSetStats();
+}
+
+/**
+ * Repaint the open set in the current print view (js/ui/printview.js). Nothing to do on
+ * the picker, or before the set's cards have arrived — the first paint will use it.
+ */
+export function repaintSet() {
+  const root = app();
+  // Only while this mode is ON SCREEN: paintSet also shows this mode's bars. Entering
+  // the mode later repaints the open set anyway (renderSetMode), in whatever view is set.
+  if (state.appMode !== 'set') return;
+  if (!root || !state.ssTarget || openSet?.id !== state.ssTarget || !openCards.length) return;
+  paintSet(root);
 }

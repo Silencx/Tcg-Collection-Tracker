@@ -140,3 +140,50 @@ test('groups tolerates junk entries instead of producing NaN', () => {
   const h = estimateGridHeight({ cards: 10, groups: [5, -3, 0], cols: 5, tilePx: 100 });
   assert.ok(Number.isFinite(h) && h > 0);
 });
+
+// ── per-print tracking (js/ui/prints-model.js) ────────────────────────────────
+// In the tiles view one card is several tiles; only its first counts toward the card
+// tallies, every tile counts toward the prints figure. Without the options the pass
+// must behave exactly as before.
+test('without the print options the tallies are unchanged and prints are 0', () => {
+  const p = planGridVisibility(...grid('d EN en DE', ['EN']));
+  assert.equal(p.cards, 3);
+  assert.equal(p.visible, 2);
+  assert.equal(p.done, 1);
+  assert.equal(p.prints, 0);
+  assert.equal(p.printsDone, 0);
+});
+
+test('countedAt keeps extra print tiles out of the card tallies but still shows them', () => {
+  // d | card A: 3 print tiles (first counted) | card B: 1 tile, all EN.
+  const items = ['d', 'A1', 'A2', 'A3', 'B'];
+  const counted = new Set([1, 4]);
+  const done = new Set([2, 4]);   // A's 2nd print, and card B
+  const p = planGridVisibility(items.length,
+    i => (items[i] === 'd' ? KIND_DIVIDER : KIND_CARD),
+    () => true,
+    i => i === 1 || done.has(i),   // card-level: A is owned (it has a print), B is owned
+    {
+      countedAt: i => counted.has(i),
+      printsAt: i => [1, done.has(i) ? 1 : 0],
+    });
+  assert.deepEqual([...p.show], [1, 1, 1, 1, 1]);
+  assert.equal(p.cards, 2);
+  assert.equal(p.visible, 2);
+  assert.equal(p.done, 2);
+  assert.equal(p.prints, 4);
+  assert.equal(p.printsDone, 2);
+});
+
+test('printsAt only totals VISIBLE cards, like done', () => {
+  const p = planGridVisibility(...grid('EN DE', ['EN']), { printsAt: () => [2, 1] });
+  assert.equal(p.prints, 2);
+  assert.equal(p.printsDone, 1);
+});
+
+test('a divider is still revealed by an uncounted print tile', () => {
+  const p = planGridVisibility(2, i => (i === 0 ? KIND_DIVIDER : KIND_CARD), () => true, () => false,
+    { countedAt: () => false });
+  assert.equal(p.show[0], 1);
+  assert.equal(p.cards, 0);
+});

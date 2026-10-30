@@ -114,8 +114,14 @@ export function jpEra(code, isoDate) {
 }
 
 // ── migration of the old ids ──────────────────────────────────────────────────
+// A per-print id (`${cardId}#${printKey}`, ui/prints-model.js PRINT_SEP) is never an old
+// card id, whatever card it belongs to: `JP_x_1#reverse` would otherwise parse as an old
+// TMS id with localId "1#reverse". No old JP set name or code contains '#'.
+const isPrintId = s => s.includes('#');
+
 /** 'JP_jp_Seedot_Miracle of the Desert_0' → {pokemonName, jpset, index}. */
 export function parseOldMasterId(id) {
+  if (isPrintId(String(id))) return null;
   const m = /^JP_jp_([^_]+)_(.+)_(\d+)$/.exec(String(id));
   return m ? { pokemonName: m[1], jpset: m[2], index: Number(m[3]) } : null;
 }
@@ -123,7 +129,7 @@ export function parseOldMasterId(id) {
 /** 'JP_SV5M_003' / 'JP_Miracle of the Desert_001' → {setRef, localId}. */
 export function parseOldTmsId(id) {
   const s = String(id);
-  if (!s.startsWith('JP_') || s.startsWith('JP_jp_') || isStableJpId(s)) return null;
+  if (!s.startsWith('JP_') || s.startsWith('JP_jp_') || isStableJpId(s) || isPrintId(s)) return null;
   const rest = s.slice(3);
   const u = rest.lastIndexOf('_');
   return u > 0 ? { setRef: rest.slice(0, u), localId: rest.slice(u + 1) } : null;

@@ -63,6 +63,16 @@
           <button class="theme-opt" data-palette="palette-dark" onclick="setPalette(this,'palette-dark')"><span class="theme-dot" style="background:linear-gradient(135deg,#0f1216,#3a4552)"></span>Dark</button>
         </div>
       </div>
+      <!-- Per-print tracking (js/ui/printview.js). One choice for all three checklists;
+           Off is the plain "have this card" checklist. -->
+      <div class="settings-section">
+        <span class="settings-label">Print variants</span>
+        <div class="theme-grid pv-grid" role="group" aria-label="How to track print variants">
+          <button class="theme-opt pv-opt" data-pv="off" aria-pressed="true" onclick="setPrintView('off')" title="Tick cards only — the plain checklist">Off</button>
+          <button class="theme-opt pv-opt" data-pv="chips" aria-pressed="false" onclick="setPrintView('chips')" title="One tile per card, with a chip to tick each print (normal, reverse holo, holo…)">Chips</button>
+          <button class="theme-opt pv-opt" data-pv="tiles" aria-pressed="false" onclick="setPrintView('tiles')" title="Every print gets its own tile">Tiles</button>
+        </div>
+      </div>
       <div class="settings-section">
         <span class="settings-label">Your data</span>
         <div class="settings-actions">
@@ -99,6 +109,10 @@
        and a copy in each would be three copies of one button. -->
   <div class="header-row2">
   <button class="btn btn-secondary sb-toggle" id="set-nav-toggle" aria-expanded="false" aria-controls="set-nav" title="Show the set list" onclick="toggleSetNav()">&#9776; Sets</button>
+  <!-- Chips ⇄ tiles, while per-print tracking is on. Outside the control rows for the
+       same reason as Sets: one button serves all three checklist modes. Its label is
+       written by js/ui/printview.js syncPrintViewUI. -->
+  <button class="btn btn-secondary" id="btn-print-view" hidden onclick="swapPrintView()">&#9638; Prints as tiles</button>
   <!-- Master Set controls. Everyday actions only, in one row that scrolls sideways
        rather than wrapping — settings and destructive actions live in the gear panel
        above. Collapse all and Print checklist were promoted out of the old ⋯ More
