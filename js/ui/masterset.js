@@ -508,9 +508,11 @@ function mkEra(parent,text,series){
 // failure banner with a Retry button — because both describe the page you are looking
 // at; everything merely informational goes to the bell (notify.js) instead. Neither
 // expires on a timer: the loading one is removed when the work finishes, and the failure
-// one owns a control. Every banner is also RECORDED to the notification log.
+// one owns a control.
+//
+// NOT recorded to the bell: "Loading…" is not news, and logging it put one more unread
+// row in the bell on every Master render. The failure path records its own message.
 function mkBanner(parent,html,cls){
-  recordNotice(html,cls);
   const e=document.createElement('div'); e.className=`banner ${cls}`;
   const body=document.createElement('div'); body.className='banner-body'; body.innerHTML=html;
   e.appendChild(body);
@@ -824,9 +826,8 @@ function renderBySet(enCards, setNamesAll, container, setMeta = { dates: {}, sym
   //
   // "Korean cards exist but no public image database yet" is a standing fact about the
   // data, not an event: it was true before you opened the page and will be true after.
-  // As an in-flow banner it was two permanent amber strips pinned above the sets on every
-  // single render, saying the same thing every time — and mkBanner's dismissKey only hid
-  // them until the next Clear cache. The notification log is exactly the right home for a
+  // As an in-flow banner it would be a permanent strip above the sets on every render,
+  // saying the same thing every time. The notification log is the right home for a
   // message you read once and go back to when you wonder why KR tiles are blank.
   for(const pl of PLACEHOLDER_LANGS){
     const links=pl.sources.map(s=>`<a href="${s.url}" target="_blank" style="color:inherit;font-weight:bold">${s.name}</a>`).join(' · ');
@@ -1360,8 +1361,7 @@ async function buildAll(forceRefresh){
     const body=errBanner.querySelector('.banner-body');
     const msg=`Failed: ${err.message} `;
     body.textContent=msg;   // textContent: err.message is not ours to trust as HTML
-    // mkBanner recorded an empty string above (the body is filled here, after the
-    // fact), so log the real message explicitly or the failure is missing from the bell.
+    // mkBanner records nothing, so log the failure here or it is missing from the bell.
     recordNotice(msg,'banner-error');
     const retry=document.createElement('button');
     retry.id='retry-btn'; retry.className='banner-retry-btn'; retry.textContent='↺ Retry';

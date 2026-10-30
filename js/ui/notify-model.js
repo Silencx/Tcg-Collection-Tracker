@@ -21,10 +21,9 @@ export function pushNotice(list, notice, cap = 30) {
   return next.length > cap ? next.slice(next.length - cap) : next;
 }
 
-// LOAD-BEARING: entries are identified by this counter, NOT by their ts.
-// The fetch-failure path records twice within the same tick — once from mkBanner and
-// once from the explicit recordNotice(msg,'banner-error') in masterset.js's catch — so
-// Date.now() collides and a ts-keyed dismiss would remove both rows at once.
+// LOAD-BEARING: entries are identified by this counter, NOT by their ts. Two notices
+// recorded within the same tick (buildAll can raise several back to back) share a
+// Date.now(), and a ts-keyed dismiss would remove all of them at once.
 let noticeSeq = 0;
 
 /** Next id for a log entry. Monotonic within the session; unique even within one tick. */

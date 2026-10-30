@@ -4,8 +4,8 @@
 // Status messages ("Loaded from cache", "N new cards", partial results, the
 // placeholder-language notes) live here rather than as in-flow banners, which pushed
 // the grid around and scrolled out of sight. The bell keeps an unread count until the
-// panel is opened. The two remaining in-flow banners (masterset mkBanner) are logged
-// here too.
+// panel is opened. Of the two remaining in-flow banners (masterset mkBanner), only the
+// failure is logged here; "Loading…" is not.
 //
 // NOT persisted, deliberately. Every entry describes THIS session's fetch, so a
 // stored "Loaded from cache (5m ago)" would resurface days later, stale and wrong.
@@ -77,7 +77,7 @@ function renderList() {
     row.className = `notif-item notif-${n.level}`;
     const text = document.createElement('span');
     text.className = 'notif-text';
-    text.textContent = n.text;              // textContent, not innerHTML — see mkBanner
+    text.textContent = n.text;              // textContent, not innerHTML: stored as plain text
     const when = document.createElement('time');
     when.className = 'notif-when';
     when.dateTime = new Date(n.ts).toISOString();

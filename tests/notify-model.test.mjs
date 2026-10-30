@@ -43,9 +43,8 @@ test('unreadCount counts only entries newer than the last open', () => {
 
 // ── dismissal ─────────────────────────────────────────────────────────────────
 test('ids are unique even for entries recorded in the same tick', () => {
-  // This is the whole reason entries are not keyed on ts: the fetch-failure path
-  // records twice within one tick (mkBanner, then masterset.js's catch), so both
-  // land on the same Date.now() and a ts-keyed dismiss would take out both rows.
+  // This is the whole reason entries are not keyed on ts: two notices recorded within
+  // one tick land on the same Date.now(), and a ts-keyed dismiss would take out both.
   const ts = Date.now();
   const a = { id: nextNoticeId(), ts, text: 'boom' };
   const b = { id: nextNoticeId(), ts, text: 'boom' };
