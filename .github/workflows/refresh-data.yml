@@ -23,7 +23,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
 
       # A manual run APPENDS to data/prebuilt.json rather than building a one-off
       # snapshot, which the next scheduled run would silently overwrite; widening
