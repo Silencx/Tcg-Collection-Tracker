@@ -176,7 +176,7 @@ async function openTmsPopup(pokeName){
 async function fetchTmsCardsForPoke(pokeName){
   if(state.tmsPokeCache.has(pokeName)) return state.tmsPokeCache.get(pokeName);
 
-  // Intl card index now comes through the ROUTER (snapshot → TCGdex → legacy), so
+  // Intl card index now comes through the ROUTER (snapshot → TCGdex), so
   // TMS ids match the Master Set (TCGdex format) and the popup gets the same
   // failover path. JP also goes through the router (snapshot data/jp.json → live
   // Bulbapedia), exactly like the Master-Set JP injection.
