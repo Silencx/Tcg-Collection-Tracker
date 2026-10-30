@@ -14,6 +14,17 @@ import {
 } from '../config.js';
 
 /**
+ * Does this checklist id belong to `setId`?
+ *
+ * state.ssChecked holds ids for EVERY set ever ticked, not just the open one, so every
+ * consumer — progress, select-all, clear, print — has to filter. One predicate rather
+ * than four copies of the same slice-and-compare.
+ */
+export function belongsToSet(id, setId) {
+  return !!setId && parseCardId(id).setId === setId;
+}
+
+/**
  * Progress within one set.
  *
  * TWO numbers, because they answer different questions and conflating them is how a
@@ -26,18 +37,8 @@ import {
  *
  * @param {Iterable<string>} ids   state.ssChecked
  * @param {string} setId
+ * @param {string|null} [badge] count only this language's printings
  */
-/**
- * Does this checklist id belong to `setId`?
- *
- * state.ssChecked holds ids for EVERY set ever ticked, not just the open one, so every
- * consumer — progress, select-all, clear, print — has to filter. One predicate rather
- * than four copies of the same slice-and-compare.
- */
-export function belongsToSet(id, setId) {
-  return !!setId && parseCardId(id).setId === setId;
-}
-
 export function setProgress(ids, setId, badge = null) {
   let printings = 0;
   const distinct = new Set();
@@ -203,7 +204,3 @@ export function matchesSetQuery(row, query) {
   return String(row.name || '').toLowerCase().includes(q)
       || String(row.id || '').toLowerCase().includes(q);
 }
-
-// (groupSetsByYear removed: series groups are themselves date-ordered, so a year
-// grouping on top of them was a second axis saying the same thing. groupSetsBySeries
-// replaces it.)

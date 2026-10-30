@@ -15,7 +15,7 @@
 // =============================================================================
 
 export const JP_BULBA_SET_MAP = {
-  // ── EX / PCG era ── Limitless ORB blocked → placeholder
+  // ── EX / PCG era ── no Limitless scans → placeholder
   'Movie Commemoration VS Pack':      {code:null,  era:'ex',   date:'2003-07-01', sym:'https://assets.tcgdex.net/univ/ex/ex2/symbol.webp'},
   'Miracle of the Desert':            {code:null,  era:'ex',   date:'2004-01-16', sym:'https://assets.tcgdex.net/univ/ex/ex2/symbol.webp'},
   'Latios ex Half Deck':              {code:null,  era:'ex',   date:'2004-01-16', sym:'https://assets.tcgdex.net/univ/ex/ex2/symbol.webp'},
@@ -24,11 +24,11 @@ export const JP_BULBA_SET_MAP = {
   'Mirage Forest':                    {code:null,  era:'ex',   date:'2004-10-22', sym:'https://assets.tcgdex.net/univ/ex/ex12/symbol.webp'},
   'Miracle Crystal':                  {code:null,  era:'ex',   date:'2005-11-25', sym:'https://assets.tcgdex.net/univ/ex/ex14/symbol.webp'},
   'World Champions Pack':             {code:null,  era:'ex',   date:'2006-08-20', sym:'https://assets.tcgdex.net/univ/ex/ex16/symbol.webp'},
-  // ── DP era ── Limitless ORB blocked → placeholder
+  // ── DP era ── no Limitless scans → placeholder
   'Bonds to the End of Time':         {code:null,  era:'dp',   date:'2008-07-10', sym:'https://assets.tcgdex.net/univ/dp/dp5/symbol.webp'},
-  // ── BW era ── Limitless ORB blocked → placeholder
+  // ── BW era ── no Limitless scans → placeholder
   'Psycho Drive':                     {code:null,  era:'bw',   date:'2011-09-16', sym:'https://assets.tcgdex.net/univ/bw/bw3/symbol.webp'},
-  // ── XY era ── mixed (split sets ORB-blocked)
+  // ── XY era ── mixed (no Limitless scans for the split sets)
   'Wild Blaze':                       {code:'XY2', era:'xy',   date:'2014-02-08', sym:'https://assets.tcgdex.net/univ/xy/xy2/symbol.webp'},
   'Fever-Burst Fighter':              {code:null,  era:'xy',   date:'2014-10-25', sym:'https://assets.tcgdex.net/univ/xy/xy5/symbol.webp'},
   'XY-P Promotional cards':           {code:'XYP', era:'xy',   date:'2013-10-12', sym:'https://assets.tcgdex.net/univ/xy/xyp/symbol.webp'},
@@ -95,9 +95,8 @@ async function fetchWikitext(pokeName, fetchImpl) {
  * "this Pokémon has no JP cards" (see fetchWikitext).
  */
 export async function fetchJpRawByName(names, fetchImpl = fetch) {
-  // Parallel, as the old legacy.js fetchBulbaData requested the same pages — this
-  // was a sequential for/await, so a five-Pokémon list paid
-  // five round-trips end to end instead of one.
+  // Parallel: a sequential for/await makes a five-Pokémon list pay five round-trips
+  // end to end instead of one.
   //
   // Promise.all rather than the tcgdex pool on purpose: this module imports
   // nothing, which is what lets tools/build-data.mjs run it under Node. Mapping

@@ -1,7 +1,7 @@
 // =============================================================================
 // providers/tcgdex.js — PRIMARY provider (master card index + set metadata).
 //
-// Live facts (verified 2026-06-11, see rebuild brief — do not re-verify here):
+// Live facts (verified 2026-06-11):
 //   Base https://api.tcgdex.net/v2/{lang}/… — keyless, CORS-open, fast.
 //   /{lang}/cards?name=X  → [{ id, localId, name, image }]  (contains-match on the
 //                           LOCALIZED name; image may be absent on list items).
@@ -90,7 +90,7 @@ const GQL_QUERY = 'query($f:CardsFilters,$p:Int!,$k:Int){ cards(filters:$f, pagi
 
 // Variants are a footer badge; the card list is the page. Give the variant step its own
 // budget inside the caller's, so a slow GraphQL answer costs the badges, never the cards
-// (the router aborts the WHOLE call at 8 s and falls back to legacy).
+// (the router aborts the WHOLE call at 8 s, and the card index has no fallback).
 const VARIANT_BUDGET_MS = 4000;
 function budgetSignal(signal) {
   if (typeof AbortSignal === 'undefined' || !AbortSignal.timeout || !AbortSignal.any) return signal;

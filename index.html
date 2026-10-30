@@ -115,8 +115,7 @@
   <button class="btn btn-secondary" id="btn-print-view" hidden onclick="swapPrintView()">&#9638; Prints as tiles</button>
   <!-- Master Set controls. Everyday actions only, in one row that scrolls sideways
        rather than wrapping — settings and destructive actions live in the gear panel
-       above. Collapse all and Print checklist were promoted out of the old ⋯ More
-       menu; they are used often enough that hiding them behind a click was wrong. -->
+       above. -->
   <!-- ORDER IS AN INVARIANT: every mode's control row opens with Print selected then
        Print checklist, so the two controls people look for are in the same place
        whichever mode they are in. tests/palette-manifest.test.mjs enforces it. -->
@@ -155,14 +154,10 @@
      set and single set all had a light one, and switching into Master set looked like a
      theme change.
 
-     Master Set is the one mode with TWO. They were merged into a single 34px row for a
-     while to keep every mode's sticky chrome exactly the same height, and it did not
-     survive contact with real content: three Pokémon chips, an add field and twelve
-     language pills in one row left the pills clipped mid-badge and nothing legible.
-     Equal heights are not worth an unusable row. -->
-<!-- Adding a Pokémon is a MODAL (js/ui/pickers.js), not a field in this row. The old
-     "Add Pokémon…" input asked you to already know the name, matched on prefix only,
-     and showed eight results in a dropdown clipped by a 34px bar. -->
+     Master Set is the one mode with TWO (Pokémon, language): one row could not hold
+     both legibly, and equal heights are not worth an unusable row. -->
+<!-- Adding a Pokémon is a MODAL (js/ui/pickers.js), not a field in this row: it
+     searches the whole catalogue with room to show the results. -->
 <div class="filter-bar mode-bar" id="poke-bar">
   <span class="filter-label">Pokémon:</span>
   <div class="poke-chips" id="poke-chips"></div>
@@ -191,7 +186,7 @@
 <div class="filter-bar mode-bar" id="set-bar"></div>
 
 <!-- Home's one bar: a live summary line. Real content rather than reserved blank
-     space — see the ONE CONTEXT BAR note above. Filled by js/ui/dashboard.js. -->
+     space — see the CONTEXT BARS note above. Filled by js/ui/dashboard.js. -->
 <div class="filter-bar mode-bar" id="dash-bar"></div>
 </div><!-- /sticky-top -->
 
@@ -210,14 +205,9 @@
 </main>
 
 <!-- SINGLE-SET STATUS BAR — docked to the BOTTOM of the viewport, not stacked under the
-     header. "← All sets · Pitch Black · 0% complete · 0 of 84 · English" as a third
-     sticky strip read as a seam: the header's gradient, then the white bar, then the
-     page — three surfaces in 110px, and in the dark palettes the bar's surface colour is
-     close enough to the header's that the join looked like a rendering fault.
-     It is also the only strip in the app that is pure STATUS: the back button repeats
-     "Change set" in the control row and the set name repeats the h1, so nothing here
-     needs to be adjacent to the controls. Down here it frames the grid instead of
-     interrupting it, and the progress track finally has somewhere full-width to live.
+     header, where a third sticky strip read as a seam between surfaces. It is pure
+     STATUS (the back button repeats "Change set", the name repeats the h1), so nothing
+     here needs to sit next to the controls, and the progress track gets the full width.
      Shown by js/ui/setmode.js only while a set is open. -->
 <div class="set-status-bar" id="set-status-bar">
   <div class="set-status-track"><div class="set-status-fill" id="set-progress-fill"></div></div>
@@ -251,8 +241,8 @@
 </div>
 
 
-<!-- Data sources. PokéWallet's line is a condition of using its card list (README,
-     "Japanese card catalogue"); the others are credited because the app is built on them. -->
+<!-- Data sources. PokéWallet is credited per its terms for using its card list (README,
+     "Japanese card catalogue"); the others because the app is built on them. -->
 <footer class="site-credits">
   Card data &amp; images: <a href="https://www.tcgdex.net/" target="_blank" rel="noopener">TCGdex</a>
   · Japanese card data: <a href="https://pokewallet.io/" target="_blank" rel="noopener">PokéWallet</a>
@@ -261,7 +251,7 @@
   <br>Not affiliated with, endorsed or sponsored by Nintendo, The Pokémon Company or The Pokémon Company International.
 </footer>
 
-<!-- App boot. ES modules require http(s):// — use dev.sh / dev.bat (python http.server),
+<!-- App boot. ES modules require http(s):// — use `npm run dev`, dev.sh or dev.bat;
      they do NOT load from a file:// path opened directly in the browser. -->
 <script type="module" src="js/main.js"></script>
 </body>

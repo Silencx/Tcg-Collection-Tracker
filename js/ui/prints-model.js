@@ -16,8 +16,8 @@
 // checklist saved before this feature is in that state, and it stays valid.
 //
 // Only cards with TWO OR MORE prints are tracked per print. A card with one print, or
-// with no variant data at all (KR/SC placeholders, JP, the legacy path), is one unit as
-// before: its card tick IS its print.
+// with no variant data at all (KR/SC placeholders, JP), is one unit: its card tick IS
+// its print.
 // =============================================================================
 
 import { printLabel } from '../api/variants.js';

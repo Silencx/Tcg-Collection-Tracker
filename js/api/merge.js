@@ -2,11 +2,8 @@
 // api/merge.js — combining a partial snapshot hit with a live fetch, as pure
 // functions.
 //
-// Split out of router.js for the usual reason (see filter-pass.js, setnav-index.js,
-// collapse-model.js): importing router.js pulls in legacy.js → state.js → storage.js,
-// which touches localStorage at import time, so `node --test` cannot reach it without
-// a jsdom or a shim. These two rules are the ones most worth testing in the whole
-// partial-hit path, so they live where they can be.
+// Kept apart from router.js so the two rules most worth testing in the partial-hit
+// path can be tested on their own, with no providers or network behind them.
 // =============================================================================
 
 /**

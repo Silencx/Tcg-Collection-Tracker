@@ -22,7 +22,7 @@
 // Imports nothing from masterset.js or setnav.js — it is told about containers and
 // announces changes on the document, matching the tcg:tms-changed / tcg:settings-
 // changed convention in state.js. That is what lets both "collapse all" controls
-// (the sidebar's and the ⋯ More menu's) relabel without either module importing the
+// (the sidebar's and the Master control row's) relabel without either module importing the
 // other.
 // =============================================================================
 
@@ -64,9 +64,6 @@ function announce() {
   document.dispatchEvent(new CustomEvent('tcg:collapse-changed', { detail: { allCollapsed } }));
 }
 
-/** @returns {boolean} whether every set block is currently collapsed. */
-export function isCollapsedAll() { return allCollapsed; }
-
 /** Toggle a single set block. The per-set affordance the app never had. */
 export function toggleBlockCollapsed(block) {
   if (!block) return;
@@ -74,7 +71,7 @@ export function toggleBlockCollapsed(block) {
   sync();
 }
 
-/** Inline-onclick target (⋯ More menu) and the sidebar button's handler. */
+/** Inline-onclick target (Master control row) and the sidebar button's handler. */
 export function toggleCollapseAll() {
   const blocks = allBlocks();
   const next = nextAllCollapsed(blocks.length, collapsedCount(blocks));

@@ -98,8 +98,3 @@ export function nextTcgdexSymbolUrl(url) {
 export function tcgdexAssetBase(lang, series, setId, localId) {
   return `https://assets.tcgdex.net/${lang}/${series}/${setId}/${localId}`;
 }
-/** Card image. quality: 'low' → low.webp, 'high' → high.png. */
-export function tcgdexAssetUrl(lang, series, setId, localId, quality = 'low') {
-  const ext = quality === 'high' ? 'high.png' : 'low.webp';
-  return `${tcgdexAssetBase(lang, series, setId, localId)}/${ext}`;
-}

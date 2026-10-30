@@ -1,13 +1,12 @@
 // =============================================================================
 // providers/snapshot.js — serves the pre-built static data committed to the repo
-// (data/cards.json + data/sets.json), so the common case needs zero external API
-// calls (instant, no rate limits, any number of users). Built weekly by
-// tools/build-data.mjs via GitHub Actions.
+// (data/index.json → data/cards/<slug>.json + data/jp/<slug>.json, and
+// data/sets.json), so the common case needs zero external API calls (instant, no rate
+// limits, any number of users). Built weekly by tools/build-data.mjs via GitHub Actions.
 //
 // This is a thin READ layer; the router tries it FIRST and falls back to the live
-// TCGdex provider on any miss — so the app works even before the
-// first build (the shipped placeholder files report builtAt:null → treated as a
-// miss). A user-triggered refresh bypasses the snapshot to fetch live.
+// TCGdex provider on any miss — a missing or unbuilt file (no builtAt) is a miss, so
+// the app works without it. A user-triggered refresh bypasses the snapshot.
 //
 // The snapshot is generated FROM TCGdex, so its card ids/shape are identical to the
 // live tcgdex provider's — checklist ids line up either way.
@@ -16,10 +15,8 @@
 // data/ sits at the site root; this module is js/api/providers/snapshot.js.
 const DATA_BASE = new URL('../../../data/', import.meta.url);
 
-// Session-lifetime memo, keyed by filename. Every read used to re-fetch AND
-// re-parse: buildAll reads all three files, and each TMS popup read all three
-// again, so opening five popups meant five more parses of sets.json (47 KB, 214
-// set names). A sort flip re-fetched jp.json for nothing.
+// Session-lifetime memo, keyed by filename, so buildAll and every TMS popup share one
+// fetch and one parse of each file (sets.json alone is ~94 KB).
 //
 // Safe for the whole session by construction: router.js skips the snapshot layer
 // entirely when forceRefresh is set, and clearCache() ends in location.reload() —
@@ -45,37 +42,14 @@ async function loadJSON(file) {
 }
 
 /**
- * EN master card index from the snapshot, IF it covers every requested Pokémon.
- * Throws (→ router falls back to live) when the file is missing, a placeholder
- * (builtAt null), or doesn't include one of the requested names.
- */
-export async function getCards(names) {
-  const snap = await loadJSON('cards.json');
-  if (!snap || !snap.builtAt) throw new Error('snapshot not built yet');
-  const have = new Set(snap.pokemon || []);
-  if (!names.every(n => have.has(n))) throw new Error('snapshot does not cover requested Pokémon');
-  const wanted = new Set(names);
-  // Filter on `species` (the Pokémon the card was matched for), NOT `name` —
-  // `name` is now the card's real printed name, so a cameo like
-  // "Seedot & Nuzleaf-GX" would not equal any requested species. Snapshots built
-  // before `species` existed carry only `name`, which held the species then, so
-  // fall back to it and keep older data/cards.json readable.
-  const cards = (snap.cards || []).filter(c => wanted.has(c.species || c.name));
-  if (!cards.length) throw new Error('snapshot empty for requested Pokémon');
-  return cards;
-}
-
-/**
  * Set metadata from the snapshot, IF it has a release date for every set asked
  * about. Throws when missing/placeholder/uncovered → live fallback.
  *
- * The date coverage check is the important half. `names` and `symbols` are built
- * for every set that exists, but `dates` only covers the sets the build's own
- * Pokémon appear in — currently 20 entries against 214 EN set names. Returning
- * the snapshot regardless would hand back a date-less map for anyone who picked
- * their own Pokémon, and every one of their sets would take the '1999/01/01'
- * fallback in buildSetsMap: one giant fake era, in arbitrary order. A gap is
- * therefore a miss, mirroring the coverage check in getCards above.
+ * The date coverage check is the important half. The build fills a date for every
+ * set it can (tools/build-data.mjs), but a set TCGdex adds between two builds has
+ * none. Returning the snapshot regardless would put every such set on the
+ * '1999/01/01' fallback in buildSetsMap: one giant fake era, in arbitrary order.
+ * A gap is therefore a miss.
  *
  * @param {string[]} [setIds] set ids the caller needs dates for
  */
@@ -105,43 +79,11 @@ export async function getSetMeta(setIds = []) {
   };
 }
 
-/**
- * Every card in one set, from the committed shard if it is there.
- *
- * There is no shard for arbitrary sets today — the build only ships the demo Pokémon —
- * so this throws and the router goes live. It exists so the snapshot-first ordering is
- * the same for this path as for every other one, and so shipping per-set shards later
- * is a build change with no app change.
- */
-export async function getSetCards(setId) {
-  const idx = await loadJSON('index.json').catch(() => null);
-  const have = idx && Array.isArray(idx.sets) ? new Set(idx.sets) : null;
-  if (!have || !have.has(setId)) throw new Error(`no snapshot shard for set ${setId}`);
-  const shard = await loadJSON(`sets/${setId}.json`);
-  if (!shard?.cards?.length) throw new Error(`empty snapshot shard for set ${setId}`);
-  return { cards: shard.cards, set: shard.set || { id: setId } };
-}
-
-/**
- * Raw Bulbapedia JP entries [{jpset, jpnum, pokemonName}] from the snapshot, IF it
- * covers every requested Pokémon. Throws (→ live Bulbapedia) when missing/placeholder/
- * uncovered.
- */
-export async function getJpRaw(names) {
-  const snap = await loadJSON('jp.json');
-  if (!snap || !snap.builtAt) throw new Error('JP snapshot not built yet');
-  const have = new Set(snap.pokemon || []);
-  if (!names.every(n => have.has(n))) throw new Error('JP snapshot does not cover requested Pokémon');
-  const wanted = new Set(names);
-  return (snap.jpCardsData || []).filter(e => wanted.has(e.pokemonName));
-}
-
-// ── PARTIAL HITS ──────────────────────────────────────────────────────────────
+// ── PER-POKÉMON SHARDS ────────────────────────────────────────────────────────
 //
-// The all-or-nothing checks above mean a visitor tracking three Pokémon, two of which
-// are pre-built, fetched all three live. The per-Pokémon shards written by
-// tools/build-data.mjs fix that: serve what we have, report what we don't, and let the
-// router fetch only the remainder.
+// Coverage is per Pokémon: serve what the shards have, report what they don't, and let
+// the router fetch only the remainder — a visitor tracking three Pokémon, two of them
+// pre-built, fetches one live.
 //
 // data/index.json is the authoritative name → filename map. Probing shard URLs by
 // re-deriving the slug in the client was rejected: it fills a non-prebuilt visitor's
@@ -231,4 +173,4 @@ export async function getJpRawPartial(names) {
   return { data, covered, missing: names.filter(n => !covered.includes(n)) };
 }
 
-export const snapshot = { getCards, getSetCards, getSetMeta, getJpRaw, getCardsPartial, getJpRawPartial };
+export const snapshot = { getSetMeta, getCardsPartial, getJpRawPartial };

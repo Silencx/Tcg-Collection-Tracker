@@ -20,7 +20,7 @@
 // =============================================================================
 
 import { state, saveSetChk, saveSsPrints, saveSetTarget, saveSetPicker } from '../state.js';
-import { LANGUAGES, PLACEHOLDER_LANGS, BADGE_ORDER, NATIVE_NAMES } from '../config.js';
+import { LANGUAGES, PLACEHOLDER_LANGS, NATIVE_NAMES } from '../config.js';
 import { router } from '../api/router.js';
 import { tcgdexAssetBase, tcgdexSerieSegment } from '../api/images.js';
 import {
@@ -29,6 +29,7 @@ import {
 import { expansionCard } from './dashboard.js';
 import { viableSources, markGood, markBad, imgMeta } from '../api/img-cache.js';
 import { escapeHtml } from './html.js';
+import { el } from './dom.js';
 import {
   setProgress, percentComplete, buildSetList, matchesSetQuery, groupSetsBySeries,
   belongsToSet, pickerLanguages,
@@ -52,13 +53,6 @@ let pickerQuery = '';
 const openPrints = new Map();
 
 const app = () => document.getElementById('set-app');
-
-function el(tag, cls, text) {
-  const e = document.createElement(tag);
-  if (cls) e.className = cls;
-  if (text != null) e.textContent = text;
-  return e;
-}
 
 // ── SET PICKER ────────────────────────────────────────────────────────────────
 
@@ -533,10 +527,7 @@ export function resetSet() {
   if (!state.ssTarget) return;
   if (!confirm(`Clear every tick in ${openSet?.name || state.ssTarget}?`)) return;
   for (const id of [...state.ssChecked]) {
-    if (id.slice(id.indexOf('_') + 1).lastIndexOf('-') > 0
-        && id.slice(id.indexOf('_') + 1, id.lastIndexOf('-')) === state.ssTarget) {
-      state.ssChecked.delete(id);
-    }
+    if (belongsToSet(id, state.ssTarget)) state.ssChecked.delete(id);
   }
   clearPrintsOf(state.ssPrints, cardId => belongsToSet(cardId, state.ssTarget));
   saveSsPrints(); saveSetChk();

@@ -24,6 +24,7 @@ import { POKEMON_CATALOG } from '../config.js';
 import { getSetMeta } from '../api/providers/snapshot.js';
 import { summarise, languageBars, plural, formatSetDate, expansionRows } from './dashboard-model.js';
 import { langColor } from './masterset.js';
+import { el } from './dom.js';
 
 // Session-lifetime, and deliberately not invalidated: sets.json is a build artefact, so
 // within one document it cannot change. A failure is remembered as `null` rather than
@@ -43,13 +44,6 @@ async function loadSetMeta() {
   return setMeta;
 }
 
-function el(tag, cls, text) {
-  const e = document.createElement(tag);
-  if (cls) e.className = cls;
-  if (text != null) e.textContent = text;
-  return e;
-}
-
 /** A titled box. The top row is two of these side by side. */
 function panel(title) {
   const p = el('section', 'dash-panel');
@@ -65,26 +59,17 @@ function stat(label, value, hint) {
   return box;
 }
 
-/**
- * One of the three ways in.
- *
- * `mode` null renders the card inert — that is single-set mode, which does not exist
- * yet. It is shown rather than hidden so the row does not reflow when it lands.
- */
+/** One of the three ways in: a button that switches to `mode`. */
 function modeCard({ mode, icon, title, count, blurb, accent }) {
-  const card = el(mode ? 'button' : 'div', 'dash-card' + (accent ? ' accent' : '') + (mode ? '' : ' disabled'));
-  if (mode) {
-    card.type = 'button';
-    // An event, not an import of setMode: main.js imports this module, so calling back
-    // into it directly would close a cycle. Same decoupling as 'tcg:collapse-changed'
-    // and 'tcg:tms-changed' — and unlike window.setMode it does not depend on the
-    // inline-handler bridge, which exists for the MARKUP, not for other modules.
-    card.addEventListener('click', () => {
-      document.dispatchEvent(new CustomEvent('tcg:set-mode', { detail: { mode } }));
-    });
-  } else {
-    card.setAttribute('aria-disabled', 'true');
-  }
+  const card = el('button', 'dash-card' + (accent ? ' accent' : ''));
+  card.type = 'button';
+  // An event, not an import of setMode: main.js imports this module, so calling back
+  // into it directly would close a cycle. Same decoupling as 'tcg:collapse-changed'
+  // and 'tcg:tms-changed' — and unlike window.setMode it does not depend on the
+  // inline-handler bridge, which exists for the MARKUP, not for other modules.
+  card.addEventListener('click', () => {
+    document.dispatchEvent(new CustomEvent('tcg:set-mode', { detail: { mode } }));
+  });
   const head = el('div', 'dash-card-head');
   head.append(el('span', 'dash-card-icon', icon), el('span', 'dash-card-title', title));
   card.append(head, el('div', 'dash-card-count', count), el('div', 'dash-card-blurb', blurb));
@@ -133,14 +118,6 @@ function distributionPanel(sum) {
   return p;
 }
 
-/**
- * "Expansions": one card per set you hold, with its symbol, release date and progress
- * against the set's official size.
- *
- * The denominator is `counts` from data/sets.json — the field threaded through the
- * provider chain for single-set mode. A snapshot built before it existed carries no
- * counts, and those sets show a card total with no bar rather than a fake 0%.
- */
 /**
  * One expansion card: art, name, date, progress, "N of M".
  *
@@ -224,6 +201,14 @@ function openSet(setId) {
   document.dispatchEvent(new CustomEvent('tcg:set-mode', { detail: { mode: 'set' } }));
 }
 
+/**
+ * "Expansions": one card per set you hold, with its symbol, release date and progress
+ * against the set's official size.
+ *
+ * The denominator is `counts` from data/sets.json — the field threaded through the
+ * provider chain for single-set mode. A snapshot built before it existed carries no
+ * counts, and those sets show a card total with no bar rather than a fake 0%.
+ */
 function expansionsSection(sum, meta) {
   const wrap = el('section', 'dash-section');
   const head = el('div', 'dash-section-head');
@@ -245,14 +230,6 @@ function expansionsSection(sum, meta) {
   return wrap;
 }
 
-/**
- * Render the start page into #dash.
- *
- * Synchronous as far as the caller is concerned: the metrics and the three cards are
- * painted immediately from localStorage, and the set NAMES are filled in when
- * data/sets.json resolves. That ordering is the point — nothing the user reads first
- * has to wait on a file read.
- */
 /**
  * Home's context bar — the one every mode has, so the sticky chrome is a constant
  * height. Real content rather than a reserved blank: a live one-line summary.
@@ -281,6 +258,14 @@ function renderDashBar(sum) {
   bar.appendChild(line);
 }
 
+/**
+ * Render the start page into #dash.
+ *
+ * Synchronous as far as the caller is concerned: the metrics and the three cards are
+ * painted immediately from localStorage, and the set NAMES are filled in when
+ * data/sets.json resolves. That ordering is the point — nothing the user reads first
+ * has to wait on a file read.
+ */
 export function renderDashboard() {
   const root = document.getElementById('dash');
   if (!root) return;

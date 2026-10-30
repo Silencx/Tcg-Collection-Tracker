@@ -3,11 +3,9 @@
 // card popup (include/exclude individual prints), the sticky language filter, and
 // reset/clear/auto-populate. Print views live in print.js.
 //
-// The popup fetches its own data via the legacy pipeline (Bulbapedia + pokemontcg.io
-// + Limitless/TCGdex images) — independent of the router — exactly as the old tool
-// did. Ported verbatim; state names rewritten to state.<name>; the inline
-// assets.tcgdex.net URL now uses the images.js builder; the old direct
-// localStorage cache-clear now uses state.removeTmsCache().
+// The popup's cards come through the same paths as Master Set — the router for the
+// TCGdex languages, api/jp-source.js for Japanese — so ids match across the two modes.
+// Each Pokémon's built card list is cached in state.tmsPokeCache (persisted).
 // =============================================================================
 
 import {
@@ -24,7 +22,7 @@ import { viableSources, markBad, markGood } from '../api/img-cache.js';
 import { loadImageIndex, localImage } from '../api/local-images.js';
 import { getJpCards } from '../api/jp-source.js';
 import { jpImageKeyFor } from '../api/jp-model.js';
-import { langColor, buildPlaceholderHTML, mkPlaceholderEl, variantBadgesHtml } from './masterset.js';
+import { langColor, mkPlaceholderEl, variantBadgesHtml } from './masterset.js';
 import { escapeHtml } from './html.js';
 import { openLanguagePicker, renderLangSummary } from './pickers.js';
 import {
@@ -206,10 +204,9 @@ async function fetchTmsCardsForPoke(pokeName){
     if(!cached.some(c=>c&&c.lang==='JP'&&!c.imgKey)) return cached;
   }
 
-  // Intl card index now comes through the ROUTER (snapshot → TCGdex), so
-  // TMS ids match the Master Set (TCGdex format) and the popup gets the same
-  // failover path. JP also goes through the router (snapshot data/jp.json → live
-  // Bulbapedia), exactly like the Master-Set JP injection.
+  // Intl card index through the ROUTER (snapshot → TCGdex), so TMS ids match the
+  // Master Set (TCGdex format) and the popup gets the same failover path. JP through
+  // api/jp-source.js (catalogue → Bulbapedia), exactly like the Master-Set JP injection.
   const [cardRes, jp]=await Promise.all([
     router.getCards([pokeName]).catch(()=>({cards:[]})),
     getJpCards([pokeName]).catch(()=>({rows:[],sets:new Map()}))

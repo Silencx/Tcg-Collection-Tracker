@@ -28,7 +28,7 @@ export function isAllCollapsed(total, collapsedCount) {
   return total > 0 && collapsedCount === total;
 }
 
-/** Label for the "collapse all" control, which exists in the sidebar AND the ⋯ More menu. */
+/** Label for the "collapse all" control, which exists in the sidebar AND the Master control row. */
 export function collapseButtonLabel(allCollapsed) {
   return allCollapsed ? '▸ Expand all' : '▾ Collapse all';
 }

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  cacheAge, ttlFor, pushNotice, unreadCount, bellLabel, toPlainText,
+  cacheAge, pushNotice, unreadCount, bellLabel, toPlainText,
   nextNoticeId, dropNotice,
 } from '../js/ui/notify-model.js';
 
@@ -17,33 +17,6 @@ test('cacheAge picks the coarsest unit that applies', () => {
   assert.equal(ago(23 * 60 * 60 * 1000), '23h ago');
   assert.equal(ago(24 * 60 * 60 * 1000), '1d ago');
   assert.equal(ago(3 * 24 * 60 * 60 * 1000), '3d ago');
-});
-
-// ── ttlFor: which banners are allowed to disappear on their own ──────────────
-test('purely informational banners auto-dismiss', () => {
-  assert.equal(ttlFor('banner-blue'), 8000);    // "Loaded from cache"
-  assert.equal(ttlFor('banner-green'), 6000);   // "No new cards"
-  assert.equal(ttlFor('banner-new'), 20000);    // "N new cards found"
-});
-
-test('a banner with its own control never auto-dismisses', () => {
-  // The fetch-failure banner carries a Retry button.
-  assert.equal(ttlFor('banner-error'), 0);
-  assert.equal(ttlFor('banner-blue', { hasAction: true }), 0);
-});
-
-test('a dismissKey outranks any TTL', () => {
-  // dismissKey means the user decides and the decision persists; a timer would
-  // silently override that.
-  assert.equal(ttlFor('banner-blue', { dismissKey: 'src-fallback' }), 0);
-  assert.equal(ttlFor('banner-amber', { dismissKey: 'plang-KR' }), 0);
-});
-
-test('an in-progress banner is never put on a timer', () => {
-  // banner-load is removed programmatically when the work finishes; expiring it would
-  // hide a spinner while the work was still running.
-  assert.equal(ttlFor('banner-load'), 0);
-  assert.equal(ttlFor('something-unknown'), 0);
 });
 
 // ── log ───────────────────────────────────────────────────────────────────────

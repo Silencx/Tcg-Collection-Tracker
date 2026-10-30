@@ -1,11 +1,8 @@
 // =============================================================================
-// ui/banners.js — shared user notices.
+// ui/banners.js — the cross-cutting STORAGE-QUOTA banner.
 //
-// The router's failover notice ("using backup data source") is rendered by
-// masterset.buildAll via its existing mkBanner (so it matches the in-container
-// banner styling exactly). This module owns the cross-cutting STORAGE-QUOTA
-// banner: it replaces storage.js's bare fallback with a consistent fixed banner,
-// wired once at boot from main.js.
+// Replaces storage.js's bare fallback with a consistent fixed banner (with an
+// Export button), wired once at boot from main.js.
 // =============================================================================
 
 import * as storage from '../storage.js';

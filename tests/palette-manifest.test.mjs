@@ -1,16 +1,15 @@
-// A palette is declared in FOUR places that have no compile-time link to each other:
+// A palette is declared in THREE places that have no compile-time link to each other:
 //
 //   css/style.css   body.palette-<name> { … }        the actual colours
-//   index.html      data-palette="palette-<name>"    the Master "⋯ More" picker
-//   index.html      data-palette="palette-<name>"    the TMS "⋯ More" picker (a copy)
+//   index.html      data-palette="palette-<name>"    the .theme-grid picker in the gear panel
 //   js/main.js      PALETTES = [ … ]                 what setPalette can REMOVE
 //
 // Two failure modes this catches, both silent in a browser:
 //   • adding the CSS + swatches but forgetting main.js's PALETTES — the theme applies
 //     and can never be switched away from, because classList.remove(...PALETTES) does
 //     not know about it;
-//   • editing one copy of the picker and not the other — the swatch is missing in one
-//     of the two modes.
+//   • a second copy of the picker creeping back in (there used to be one per mode row,
+//     and they drifted).
 //
 // Source-scanning rather than importing, in the same zero-dependency style as
 // tests/import-graph.test.mjs: main.js touches document at import time.

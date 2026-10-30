@@ -1,17 +1,14 @@
 // =============================================================================
-// ui/print.js — print views for both modes.
+// ui/print.js — print views for the three checklist modes.
 //   • Master Set      : printSelected (9-up card images / A4) + printChecklist (2-col text)
 //   • True Master Set : printTmsSelected + printTmsChecklist (same layouts)
+//   • Single set      : printSetSelected + printSetChecklist (same layouts)
 //
-// The two modes print the SAME two documents; they differ only in where the card
+// The modes print the SAME two documents; they differ only in where the card
 // metadata comes from. That shared shape is `buildCardSheetDoc` /
-// `buildChecklistDoc`, with `openPrintDoc` doing the Blob-and-open dance. Each of
-// the four entry points is then just "collect metas, hand them over".
-//
-// They used to be four near-identical copies, ~90% the same, and the copies had
-// already drifted: TMS card printing hardcoded low-res images while Master Set
-// asked for high-res, and one of the two checklists escaped its closing script
-// tag while the other did not.
+// `buildChecklistDoc`, with `openPrintDoc` doing the Blob-and-open dance. Each entry
+// point is then just "collect metas, hand them over" — one copy of each document, so
+// the modes cannot drift apart (image resolution, script-tag escaping).
 //
 // A "meta" is the render metadata shape state._meta holds:
 //   { name:{en,native}|string, setName, num, lang, langColor, symSrc,
@@ -134,7 +131,7 @@ function printPlaceholderCard(m) {
   const num = (m.num || '').replace('#', '');
   const localId = m.print ? `${num} · ${m.print.short}` : num;
   // buildPlaceholderHTML escapes its own inputs.
-  return buildPlaceholderHTML(m.symSrc, m.lang, m.langColor, enNameOf(m), natNameOf(m), m.setName, localId, false);
+  return buildPlaceholderHTML(m.symSrc, m.lang, m.langColor, enNameOf(m), natNameOf(m), m.setName, localId);
 }
 
 /**

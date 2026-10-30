@@ -2,12 +2,10 @@
 // storage.js — the ONLY module that talks to localStorage directly.
 //
 // Why a wrapper: a future migration to a server / IndexedDB backend should only
-// need to edit this file. Also, the old single-file tool wrapped every setItem
-// in `try{}catch(e){}` and SWALLOWED quota errors silently — so a full quota
-// could make checklist/TMS data appear to vanish with no warning. Here, write
-// failures are surfaced through a replaceable handler (banners.js installs a
-// nicer one in Phase 5); until then a minimal always-on red banner guarantees
-// the failure is never silent.
+// need to edit this file. And a swallowed quota error makes checklist/TMS data
+// appear to vanish with no warning, so write failures go through a replaceable
+// handler: banners.js installs the real one at boot, and until then a minimal
+// always-on red banner guarantees the failure is never silent.
 // =============================================================================
 
 /**

@@ -1,15 +1,14 @@
 // =============================================================================
-// api/router.js — provider failover per the rebuild brief's ROUTING TABLE.
+// api/router.js — provider failover.
 //
-//   Master card index   : snapshot → TCGdex EN (no further fallback)
-//   Set names/dates/syms : snapshot → TCGdex → fallback legacy (TCGdex /sets, names only)
-//   JA cards             : snapshot data/jp.json → live Bulbapedia
+//   Master card index    : snapshot shards → TCGdex EN (no further fallback)
+//   Set names/dates/syms : snapshot → TCGdex → legacy (TCGdex /sets, names only)
+//   Set cards (one set)  : TCGdex
+//   JA raw rows          : snapshot shards → live Bulbapedia. The app reads Japanese
+//                          cards through api/jp-source.js, which tries the PokéWallet
+//                          catalogue first and only then comes here.
 //
-// The card index used to fall back to a legacy chain (Bulbapedia EN + pokemontcg.io).
-// pokemontcg.io is shutting down and that chain's last step was TCGdex anyway, so it
-// was removed on 2026-10-30; see providers/legacy.js.
-//
-// Behaviour (per brief):
+// Behaviour:
 //   • try primary with an ~8s timeout (AbortController);
 //   • on timeout / HTTP error / empty result → fall back where a fallback exists,
 //     otherwise throw so the caller shows its failure banner with Retry;
@@ -139,44 +138,31 @@ function setMetaShape(meta = {}) {
 }
 
 /**
- * Every card in one set (single-set mode).
- * Order: snapshot shard → live TCGdex. NO legacy fallback: the legacy sources are
- * indexed by Pokémon, so neither of them can answer "what is in this set" at all —
- * a fallback that cannot serve the request is worse than a clean failure.
- * @returns {Promise<{cards:Array, set:Object, source:'snapshot'|'tcgdex'}>}
+ * Every card in one set (single-set mode), live from TCGdex. The snapshot ships no
+ * per-set shards, and the per-Pokémon ones cannot answer "what is in this set".
+ * @returns {Promise<{cards:Array, set:Object, source:'tcgdex'}>}
  */
 export async function getSetCards(setId, { forceRefresh = false, lang = 'en' } = {}) {
   if (forceRefresh) primaryHealthy = true;
-  // Shards are EN-only. Consulting one for a zh-Hant set id cannot hit today (the id
-  // namespaces are disjoint), but it would be an EN answer to a non-EN question the
-  // moment per-language shards ship, which is exactly the bug that is hard to see.
-  if (!forceRefresh && lang === 'en') {
-    try {
-      const hit = await snapshot.getSetCards(setId);
-      return { ...hit, source: 'snapshot' };
-    } catch (e) { /* no shard for this set → go live */ }
-  }
   const live = await withTimeout(signal => tcgdex.getSetCards(setId, { signal, lang }));
   return { ...live, source: 'tcgdex' };
 }
 
 /**
  * Raw Bulbapedia JP entries [{jpset, jpnum, pokemonName}] for the given Pokémon.
- * Order: pre-built snapshot (data/jp.json) → live Bulbapedia. A forced refresh skips
- * the snapshot. JP has no further fallback (TCGdex JA is unusable).
+ * Order: pre-built snapshot shards → live Bulbapedia for whatever they lack. JP has no
+ * further fallback (TCGdex JA is unusable).
  */
-export async function getJpRaw(names, { forceRefresh = false } = {}) {
-  if (!forceRefresh) {
-    try {
-      const hit = await snapshot.getJpRawPartial(names);
-      if (!hit.missing.length) return hit.data;
-      // Easier to split than the card index: JP rows are per-Pokémon with no
-      // cross-set metadata, and fetchJpRaw already fetches per name.
-      const live = await bulbaJp.fetchJpRaw(hit.missing);
-      return [...hit.data, ...live];
-    } catch (e) { /* snapshot miss/absent → live Bulbapedia */ }
-  }
+export async function getJpRaw(names) {
+  try {
+    const hit = await snapshot.getJpRawPartial(names);
+    if (!hit.missing.length) return hit.data;
+    // Easier to split than the card index: JP rows are per-Pokémon with no
+    // cross-set metadata, and fetchJpRaw already fetches per name.
+    const live = await bulbaJp.fetchJpRaw(hit.missing);
+    return [...hit.data, ...live];
+  } catch (e) { /* snapshot miss/absent → live Bulbapedia */ }
   return bulbaJp.fetchJpRaw(names);
 }
 
-export const router = { getCards, getSetCards, getSetMeta, getJpRaw, resetHealth, mergeCardSets, mergeSource };
+export const router = { getCards, getSetCards, getSetMeta, getJpRaw };
