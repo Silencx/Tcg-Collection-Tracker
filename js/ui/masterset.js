@@ -21,12 +21,9 @@ import {
 } from '../state.js';
 import {
   LANGUAGES, PLACEHOLDER_LANGS, NATIVE_NAMES, BADGE_ORDER, ERA_MAP,
-  PTCGIO_SERIES_ERA, POKEMON_CATALOG, CACHE_TTL,
+  POKEMON_CATALOG, CACHE_TTL,
 } from '../config.js';
-import {
-  limitlessIntlUrl, ptcgioToTcgdexSetId, ptcgioToTcgdexLocalId, limitlessJpUrl,
-  tcgdexAssetBase, tcgdexSymbolUrl,
-} from '../api/images.js';
+import { limitlessJpUrl, tcgdexAssetBase, tcgdexSymbolUrl } from '../api/images.js';
 import { detectNew } from '../api/providers/legacy.js';
 import { router } from '../api/router.js';
 import { variantBadges, printsSummary } from '../api/variants.js';
@@ -600,18 +597,15 @@ function mkSetBlock(nameText,symSrc,headClass,parent){
 function updCount(block,n){ const e=block.querySelector('.set-count'); if(e) e.textContent=`${n} ${n===1?'entry':'entries'}`; }
 
 // ── IMAGE WRAP ────────────────────────────────────────────────────────────────
-// Priority chain per language:
-//   EN:     pokemontcg.io PNG  → TCGdex CDN (fallbackSrc) → placeholder
-//   Non-EN: TCGdex CDN (loSrc) → placeholder
-//   JP:     handled separately in fetchAndInjectJPCards
-//
-// fallbackSrc: optional secondary URL tried when loSrc fails (used for EN TCGdex fallback)
+// Image per language:
+//   EN + the other TCGdex languages: TCGdex asset CDN (loSrc) → placeholder
+//   JP: handled separately in fetchAndInjectJPCards
 //
 // PLACEHOLDER-FIRST: the placeholder is painted immediately, and the candidate image
 // loads *underneath* it — the placeholder is what gets absolutely positioned (.ph-over),
 // not the image. The old order was image-then-placeholder-on-error, so a card sat as an
-// empty box for the whole of its image load, and through up to two sequential 404s when
-// it had no artwork at all.
+// empty box for the whole of its image load, and through a 404 when it had no artwork
+// at all.
 //
 // The image deliberately keeps its original normal-flow layout: `width:100%` +
 // `aspect-ratio` means it reserves its full box even before it decodes (so the wrap
@@ -624,11 +618,11 @@ function updCount(block,n){ const e=block.querySelector('.set-count'); if(e) e.t
 // A URL that has already 404'd/403'd is skipped WITHOUT a request (img-cache.js), so
 // a language TCGdex holds no artwork for costs one failed request per URL ever
 // instead of one per render. `recheck` (the retry button) ignores that memory.
-function mkImgWrap(loSrc,cardName,localId,enSetName,symSrc,badge,bColor,cardId,fallbackSrc=null,speciesName=cardName){
+function mkImgWrap(loSrc,cardName,localId,enSetName,symSrc,badge,bColor,cardId,speciesName=cardName){
   const wrap=document.createElement('div');
   wrap.className='img-wrap';
   const nat=(NATIVE_NAMES[badge]||{})[speciesName]||null;
-  const allSources=[loSrc,fallbackSrc].filter(Boolean);
+  const allSources=[loSrc].filter(Boolean);
 
   // Retry is only offered once every candidate has failed — otherwise the button would
   // flash over every card that is merely still loading.
@@ -775,8 +769,8 @@ function footerTemplate(){
  * @param {string} langClass e.g. 'lang-EN' — the stylesheet carries the colour.
  * @param {string} color inline background, for badges with no stylesheet class
  *   (the placeholder languages, whose colours live in config.js).
- * @param {object} variants normalized print variants (api/variants.js); null on the
- *   legacy path and for languages TCGdex has no print data for.
+ * @param {object} variants normalized print variants (api/variants.js); null for
+ *   languages TCGdex has no print data for.
  */
 function mkCardFooter(localId,badge,{langClass=null,color=null,variants=null,isDone=false}={}){
   const f=footerTemplate().cloneNode(true);
@@ -825,99 +819,60 @@ function mkPrintTile(cardId,pr,first,badge){
 }
 
 // ── BUILD SETS MAP ────────────────────────────────────────────────────────────
-// Handles both pokemontcg.io cards and TCGdex cards. Nothing fetches pokemontcg.io
-// cards any more (the legacy provider's card index was removed); the branch only
-// reads a cache the old fallback wrote, until its 24h TTL runs out.
-// pokemontcg.io card structure: { id, name, number, set:{id,name,series,releaseDate,images}, images:{small,large} }
-// TCGdex card structure:        { id, name, image:"https://assets.tcgdex.net/en/..." }
-function isPtcgioCard(card){ return !!card.set?.id; }
-
+// Cards are TCGdex-shaped (providers/tcgdex.js getCards): { id, name, species, image,
+// localId, variants }, where `image` is the EN asset base
+// "https://assets.tcgdex.net/en/{series}/{setId}/{localId}". Series and set id are read
+// from that URL rather than sliced from the id: it is the path TCGdex actually serves,
+// and the id-slicing guess is wrong for a large minority of sets (tcgdexSerieSegment).
 function buildSetsMap(enCards, setNamesAll, setMeta = { dates: {}, symbols: {} }){
   const map = new Map();
   for(const card of enCards){
-    let ptcgioSetId, series, tcgdexSetId, localId, tcgdexLocalId,
-        enName, releaseDate, symSrc, enImgSrc, enHiImgSrc;
+    if(!card.image) continue;
+    const parts = card.image.replace(/^https?:\/\/assets\.tcgdex\.net\/[^/]+\//, '').split('/').filter(Boolean);
+    if(parts.length < 2) continue;
+    const [series, setId, localId = ''] = parts;
 
-    let era; // used for ERA_MAP display grouping (separate from TCGdex CDN series)
-    if(isPtcgioCard(card)){
-      // ── pokemontcg.io path ──
-      ptcgioSetId  = card.set.id;                         // "swsh11", "sv5", "me1"
-      // series = TCGdex CDN prefix, always derived from set ID (e.g. "me" not "xy" for me1)
-      series       = ptcgioSetId.replace(/\d.*$/,'');     // "swsh","sv","me","bw","xy"...
-      // era = display grouping, uses pokemontcg.io series name for consistent era labels
-      era          = PTCGIO_SERIES_ERA[card.set.series] || series;
-      tcgdexSetId  = ptcgioToTcgdexSetId(ptcgioSetId);   // "swsh11","sv05","me01"...
-      localId      = card.number || '';                   // "13", "003", "XY23"
-      tcgdexLocalId= ptcgioToTcgdexLocalId(localId, series);
-      enName       = card.set.name;
-      releaseDate  = card.set.releaseDate || '1999/01/01';
-      // TCGdex, not card.set.images.symbol: that is a pokemontcg.io URL, and the host
-      // is going away.
-      symSrc       = setMeta.symbols[tcgdexSetId] || tcgdexSymbolUrl(series, tcgdexSetId);
-      enImgSrc     = card.images?.small  || null;
-      enHiImgSrc   = card.images?.large  || null;
-    } else {
-      // ── TCGdex fallback path ──
-      if(!card.image) continue;
-      const stripped = card.image.replace(/^https?:\/\/assets\.tcgdex\.net\/[^/]+\//, '');
-      const parts = stripped.split('/').filter(Boolean);
-      if(parts.length < 2) continue;
-      series       = parts[0];
-      era          = PTCGIO_SERIES_ERA[series] || series;
-      tcgdexSetId  = ptcgioSetId = parts[1];
-      localId      = tcgdexLocalId = parts[2] || '';
-      releaseDate  = setMeta.dates[tcgdexSetId] || '1999/01/01';
-      enName       = (setNamesAll['en']||{})[tcgdexSetId] || tcgdexSetId;
-      symSrc       = setMeta.symbols[tcgdexSetId] || tcgdexSymbolUrl(series, tcgdexSetId);
-      enImgSrc     = `${card.image}/low.webp`;
-      enHiImgSrc   = `${card.image}/high.webp`;
-    }
-
-    if(!map.has(ptcgioSetId)){
+    if(!map.has(setId)){
+      const enName = (setNamesAll['en']||{})[setId] || setId;
       const namesByBadge = {};
       for(const lang of LANGUAGES){
-        namesByBadge[lang.badge] = (setNamesAll[lang.code]||{})[tcgdexSetId] || enName;
+        namesByBadge[lang.badge] = (setNamesAll[lang.code]||{})[setId] || enName;
       }
       for(const pl of PLACEHOLDER_LANGS) namesByBadge[pl.badge] = enName;
       namesByBadge['JP'] = enName;
       const allUnique = [...new Set(Object.values(namesByBadge))];
-      map.set(ptcgioSetId,{
-        setId:ptcgioSetId, tcgdexSetId, series, era, enName, releaseDate,
-        combined: allUnique.join(' | '), namesByBadge, symSrc, cards:[]
+      map.set(setId,{
+        setId, series, enName,
+        releaseDate: setMeta.dates[setId] || '1999/01/01',
+        combined: allUnique.join(' | '), namesByBadge,
+        symSrc: setMeta.symbols[setId] || tcgdexSymbolUrl(series, setId),
+        cards:[]
       });
     }
-    map.get(ptcgioSetId).cards.push({
-      localId, tcgdexLocalId, series,
-      setId:ptcgioSetId, tcgdexSetId,
-      // Unified checklist id = TCGdex format ("sv05-163") for BOTH providers, so a
-      // checkmark survives a TCGdex↔legacy switch. For TCGdex cards this equals
-      // card.id; for legacy cards it normalizes the pokemontcg.io id to TCGdex.
+    map.get(setId).cards.push({
+      localId, series, setId,
       // name = the card's real printed name (shown, and grouped on);
       // species = the Pokémon it was matched for (keys NATIVE_NAMES). Providers
       // that don't distinguish the two fall back to name.
       name:card.name, species:card.species||card.name,
-      id:`${tcgdexSetId}-${tcgdexLocalId}`,
-      enImgSrc, enHiImgSrc,
-      ptcgoCode: card.ptcgoCode||null,
-      variants: card.variants||null,   // api/variants.js shape: five flags (+ prints, inferred); null on the legacy path
+      // Checklist id, TCGdex format ("sv05-163").
+      id:`${setId}-${localId}`,
+      variants: card.variants||null,   // api/variants.js shape: five flags (+ prints, inferred)
     });
   }
   return map;
 }
 
-// Extract a sortable numeric key from a set ID so sets within an era sort correctly.
-// e.g. "swsh11" → 11, "sv05" → 5, "sv5M" → 5.13, "xyp" → 0
 function renderBySet(enCards, setNamesAll, container, setMeta = { dates: {}, symbols: {} }){
   if(!enCards.length) return;
 
   const setsMap=buildSetsMap(enCards,setNamesAll,setMeta);
   const gm=gridMetrics(container);
-  // Group by ERA for display — use si.era so that e.g. "me" sets appear under XY Era
+  // Group by series for display: one era label per TCGdex series (ERA_MAP names it).
   const bySeries=new Map();
   setsMap.forEach(si=>{
-    const key=si.era||si.series;
-    if(!bySeries.has(key)) bySeries.set(key,[]);
-    bySeries.get(key).push(si);
+    if(!bySeries.has(si.series)) bySeries.set(si.series,[]);
+    bySeries.get(si.series).push(si);
   });
 
   // Placeholder-language notices go to the BELL ONLY — recordNotice, not mkBanner.
@@ -933,7 +888,7 @@ function renderBySet(enCards, setNamesAll, container, setMeta = { dates: {}, sym
     recordNotice(`<strong>${pl.label} (${pl.badge})</strong>: ${pl.note} — ${links}`,'banner-amber',{once:`plang-${pl.badge}`});
   }
 
-  // Sort eras and sets by actual release date from pokemontcg.io
+  // Sort eras and sets by release date (data/sets.json, or TCGdex live)
   function relDate(si){ return new Date(si.releaseDate||'1999/01/01').getTime(); }
 
   const eraEntries = [...bySeries.entries()].sort((a,b)=>{
@@ -1006,26 +961,13 @@ function renderBySet(enCards, setNamesAll, container, setMeta = { dates: {}, sym
           // TCGdex languages
           for(const langDef of LANGUAGES){
             const id=`${langDef.badge}_${card.id}`, isDone=state.checked.has(id);
-            // All languages: Limitless TPCI CDN primary → fallback → placeholder
-            // EN fallback: pokemontcg.io PNG; non-EN fallback: TCGdex CDN
-            let loSrc, hiSrc, fallbackSrc;
-            const limitlessSrc = limitlessIntlUrl(card.ptcgoCode, card.localId, langDef.badge);
-            if(langDef.badge==='EN'){
-              loSrc = limitlessSrc || card.enImgSrc;
-              hiSrc = limitlessSrc || card.enHiImgSrc || card.enImgSrc;
-              fallbackSrc = limitlessSrc ? (card.enImgSrc||null) : `${tcgdexAssetBase('en', card.series, card.tcgdexSetId, card.tcgdexLocalId)}/low.webp`;
-            } else {
-              const tcgdexBase=tcgdexAssetBase(langDef.code, card.series, card.tcgdexSetId, card.tcgdexLocalId);
-              loSrc = limitlessSrc || `${tcgdexBase}/low.webp`;
-              hiSrc = limitlessSrc || `${tcgdexBase}/high.webp`;
-              fallbackSrc = limitlessSrc ? `${tcgdexBase}/low.webp` : null;
-            }
-            state._meta.set(id,{name:{en:card.name,native:(NATIVE_NAMES[langDef.badge]||{})[spec]||null},setName:si.enName,num:`#${card.localId}`,lang:langDef.badge,langColor:langDef.color,...imgMeta([loSrc,fallbackSrc],[hiSrc]),symSrc:si.symSrc,...pmeta});
-            // EN: TCGdex fallback; non-EN: TCGdex fallback when Limitless fails
-            // (hiSrc is not passed — mkImgWrap only renders the low-res tile; the
-            // high-res candidates reach the preview/print via _meta.hiSources above.)
-            const enFallback = fallbackSrc;
-            const mkWrap=()=>mkImgWrap(loSrc,card.name,card.localId,si.enName,si.symSrc,langDef.badge,langDef.color,id,enFallback,spec);
+            // TCGdex asset CDN for every language; a missing scan falls to the placeholder.
+            const base=tcgdexAssetBase(langDef.code, card.series, card.setId, card.localId);
+            const loSrc=`${base}/low.webp`, hiSrc=`${base}/high.webp`;
+            state._meta.set(id,{name:{en:card.name,native:(NATIVE_NAMES[langDef.badge]||{})[spec]||null},setName:si.enName,num:`#${card.localId}`,lang:langDef.badge,langColor:langDef.color,...imgMeta([loSrc],[hiSrc]),symSrc:si.symSrc,...pmeta});
+            // hiSrc is not passed — mkImgWrap only renders the low-res tile; the high-res
+            // candidate reaches the preview/print via _meta.hiSources above.
+            const mkWrap=()=>mkImgWrap(loSrc,card.name,card.localId,si.enName,si.symSrc,langDef.badge,langDef.color,id,spec);
             // Tiles view: one tile per print, in place of the card's single tile.
             if(tracked&&state.printView==='tiles'){
               plist.forEach((pr,pi)=>{
@@ -1243,22 +1185,16 @@ function updRefreshBtn(ts){
 
 // ── FETCH ─────────────────────────────────────────────────────────────────────
 //
-// Architecture:
-//   Source of truth for card lists → Bulbapedia (CORS OK, has EN + JP)
-//   EN images   → pokemontcg.io PNG  (primary) → TCGdex CDN (fallback) → placeholder
-//   JP images   → Limitless CDN      (primary) → hosted copy (img/) → placeholder
-//   Other langs → TCGdex CDN         (primary) → placeholder
-//
-// Language mapping:
-//   JP cards come from api/jp-source.js: the PokéWallet catalogue (every set) when it is
-//   deployed, otherwise Bulbapedia + the hand-made JP_BULBA_SET_MAP (21 sets). Ids are
-//   api/jp-model.js's stable `JP_{set}_{number}`, the same in TMS.
+// Sources:
+//   EN card list → router (data/ snapshot → live TCGdex)
+//   JP card list → api/jp-source.js (PokéWallet catalogue → Bulbapedia); ids are
+//                  api/jp-model.js's stable `JP_{set}_{number}`, the same in TMS
+//   Images: TCGdex CDN for EN and the other TCGdex languages; JP from the Limitless
+//   CDN → hosted copy (img/) → placeholder.
 
-// Parse EN card entries from Bulbapedia wikitext.
-// Each {{card list/release}} block yields {pokemonName, enSet, num}.
 async function fetchAndInjectJPCards(container){
-  // 1. JP cards from api/jp-source.js: the PokéWallet catalogue when it is deployed (every
-  //    set, every Pokémon), else Bulbapedia (snapshot → live). Rows carry the stable ids
+  // 1. JP cards from api/jp-source.js: the PokéWallet catalogue (every set, every
+  //    Pokémon), else Bulbapedia (snapshot → live). Rows carry the stable ids
   //    of api/jp-model.js. The hosted-image manifest loads alongside: it never rejects
   //    (a missing file is an empty index), and it must be in hand before the first JP
   //    tile picks its image.

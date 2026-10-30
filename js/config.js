@@ -1,11 +1,8 @@
 // =============================================================================
 // config.js — all static configuration: storage keys, language tables,
-// era tables, and the Pokémon catalogue. Pure data only (no DOM, no fetch).
-//
-// Data blocks below are ported VERBATIM from the old single-file tool so the
-// new site behaves identically. URL-builder helpers that used to sit next to
-// these tables (limitlessIntlUrl, ptcgioToTcgdexSetId/LocalId, LIMITLESS_LANG_CODE)
-// live in js/api/images.js instead, since they belong to the image layer.
+// era tables, and the Pokémon catalogue, plus the two validators over them
+// (isValidMode, isValidPrintView). No DOM, no fetch. URL builders live in
+// js/api/images.js.
 // =============================================================================
 
 // Bump on any breaking change to a persisted blob's shape. Stamped into state
@@ -54,7 +51,9 @@ export const CHKSTORE   = 'tcgChk_v1';
 export const POKESTORE  = 'tcgPokemon_v1';
 export const FILTERSTORE= 'tcgFilter_v1';
 export const BANNERSTORE= 'tcgBannerDismissed_v1';
-export const CACHESTORE = 'tcgData_v22';   // v22: variants for every era (+ prints, BW/XY/SM reverse inference)
+// v23: the renderer reads TCGdex-shaped cards only, so a cache the removed pokemontcg.io
+// fallback wrote under v22 must not be read back.
+export const CACHESTORE = 'tcgData_v23';
 export const SORTSTORE  = 'tcgSort_v1';
 export const MODESTORE  = 'tcgMode_v1';
 export const TMSSTORE   = 'tcgTMS_v1';
@@ -155,14 +154,6 @@ export const ERA_MAP = {
   sm:'Sun & Moon Era', xy:'XY Era', bw:'Black & White Era',
   hgss:'HeartGold & SoulSilver Era', pl:'Platinum Era',
   dp:'Diamond & Pearl Era', ex:'EX Series Era', base:'Original Era',
-};
-
-// pokemontcg.io series name → TCGdex era code (for ERA_MAP display names)
-export const PTCGIO_SERIES_ERA = {
-  'Base':'base','Gym Heroes':'base','Neo':'base','e-Card':'base','EX':'ex',
-  'Diamond & Pearl':'dp','Platinum':'pl','HeartGold & SoulSilver':'hgss',
-  'Black & White':'bw','XY':'xy','Sun & Moon':'sm',
-  'Sword & Shield':'swsh','Scarlet & Violet':'sv',
 };
 
 // Canonical era release order, newest first.

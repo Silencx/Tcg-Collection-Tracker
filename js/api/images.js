@@ -1,25 +1,11 @@
 // =============================================================================
 // images.js — pure image-URL builders. No DOM, no fetch, no state.
 //
-// Limitless CDN holds international scans (EN/DE/FR/ES/IT/PT via /tpci/, JP via
-// /tpc/). TCGdex assets CDN is the cross-language fallback. The pokemontcg.io →
-// TCGdex id/localId mappers are here too (they only shape strings for URLs).
-// Ported verbatim from the old single-file tool's config region.
+// The TCGdex asset CDN serves card art for EN and the other TCGdex languages, plus set
+// symbols; the Limitless CDN (/tpc/) serves Japanese scans. The pokemontcg.io → TCGdex
+// id mappers live here too: api/id-migration.js still needs them to upgrade checklist
+// ids from old backups and old localStorage.
 // =============================================================================
-
-// Limitless TPCI CDN language codes (international, non-JP).
-// URL form: /tpci/{PTCGO_CODE}/{PTCGO_CODE}_{NUM_3DIG}_R_{LANG_CODE}.png
-export const LIMITLESS_LANG_CODE = {
-  EN:'EN', DE:'DE', FR:'FR', ES:'ES', IT:'IT', PT:'PT',
-};
-
-export function limitlessIntlUrl(ptcgoCode, num, langBadge){
-  const langCode = LIMITLESS_LANG_CODE[langBadge];
-  if(!ptcgoCode || !langCode) return null;
-  const n = String(parseInt(num,10)).padStart(3,'0');
-  if(!n || n==='NaN') return null;
-  return `https://limitlesstcg.nyc3.cdn.digitaloceanspaces.com/tpci/${ptcgoCode}/${ptcgoCode}_${n}_R_${langCode}.png`;
-}
 
 // pokemontcg.io setId → TCGdex CDN setId (SV and ME series need zero-padding).
 export function ptcgioToTcgdexSetId(setId){
@@ -45,9 +31,7 @@ export function limitlessJpUrl(code, jpnum){
   return `https://limitlesstcg.nyc3.cdn.digitaloceanspaces.com/tpc/${code}/${code}_${num}_R_JP_SM.png`;
 }
 
-// ── TCGdex asset CDN builders (fallback images + set symbols) ─────────────────
-// The Master-Set render still inlines these URLs verbatim from the old tool;
-// these helpers centralize the pattern for Phase 3's image-routing pass.
+// ── TCGdex asset CDN builders (card images + set symbols) ─────────────────────
 
 /**
  * The CDN path segment for a set's assets — its TCGdex SERIES, not a slice of its id.
