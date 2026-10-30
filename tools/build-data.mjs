@@ -13,9 +13,10 @@
 //
 // It imports the SAME tcgdex provider the browser uses, so the snapshot shape can
 // never drift from the live shape. Requires Node 18+ (global fetch) and network access.
-// Run: `node tools/build-data.mjs` (or `npm run build-data`). Pass a comma-separated
-// list to build a different snapshot instead, e.g. `node tools/build-data.mjs "Pikachu,Eevee"`.
-// CI runs the no-arg (default) form weekly.
+// Run: `node tools/build-data.mjs` (or `npm run build-data`); CI runs it weekly. It takes
+// no arguments: to build more Pokémon, add them to data/prebuilt.json (or use the
+// workflow's `add` input). A one-off list would rewrite data/index.json to just that
+// list, and committing it would drop every other Pokémon's shards from the snapshot.
 // =============================================================================
 
 import { writeFileSync, mkdirSync, existsSync, readFileSync } from 'node:fs';
@@ -31,12 +32,10 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const DATA_DIR = resolve(ROOT, 'data');
 
 // Which Pokémon to build.
-//   1. an explicit comma-separated CLI arg, e.g. `node tools/build-data.mjs "Pikachu,Eevee"`
-//   2. otherwise data/prebuilt.json — the checked-in list the weekly job builds, which
-//      is how coverage grows by PR rather than by editing this file
-//   3. otherwise DEFAULT_POKEMON (the demo list)
+//   1. data/prebuilt.json — the checked-in list the weekly job builds, which is how
+//      coverage grows by PR rather than by editing this file
+//   2. otherwise DEFAULT_POKEMON (the demo list)
 function resolvePokemon() {
-  if (process.argv[2]) return process.argv[2].split(',').map(s => s.trim()).filter(Boolean);
   const listFile = resolve(DATA_DIR, 'prebuilt.json');
   if (existsSync(listFile)) {
     try {

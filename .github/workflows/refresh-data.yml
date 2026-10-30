@@ -26,9 +26,8 @@ jobs:
           node-version: 20
 
       # A manual run APPENDS to data/prebuilt.json rather than building a one-off
-      # snapshot. Passing the names straight to build-data.mjs would produce a snapshot
-      # that the next scheduled run silently overwrites; widening coverage has to be
-      # durable to be worth anything.
+      # snapshot, which the next scheduled run would silently overwrite; widening
+      # coverage has to be durable to be worth anything.
       - name: Extend the prebuilt list
         if: ${{ inputs.add != '' }}
         env:
