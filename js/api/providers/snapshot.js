@@ -79,6 +79,16 @@ export async function getSetMeta(setIds = []) {
   };
 }
 
+/**
+ * data/sets.json's set id → CDN series map, or {} when there is no snapshot. Never
+ * throws: the live card index uses it only to build image URLs for cards TCGdex lists
+ * without one, and must not fail for want of it.
+ */
+export async function getSetSeries() {
+  try { return (await loadJSON('sets.json'))?.setSeries || {}; }
+  catch { return {}; }
+}
+
 // ── PER-POKÉMON SHARDS ────────────────────────────────────────────────────────
 //
 // Coverage is per Pokémon: serve what the shards have, report what they don't, and let
@@ -173,4 +183,4 @@ export async function getJpRawPartial(names) {
   return { data, covered, missing: names.filter(n => !covered.includes(n)) };
 }
 
-export const snapshot = { getSetMeta, getCardsPartial, getJpRawPartial };
+export const snapshot = { getSetMeta, getSetSeries, getCardsPartial, getJpRawPartial };

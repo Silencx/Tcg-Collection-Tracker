@@ -59,20 +59,9 @@ const readJSON = (file) => {
 async function main() {
   console.log(`[build-data] Pokémon (${POKEMON.length}): ${POKEMON.join(', ')}`);
 
-  console.log('[build-data] fetching card index from TCGdex…');
-  const cards = await getCards(POKEMON);
-  console.log(`[build-data]   → ${cards.length} cards`);
-  // Variants are best effort in the provider (a footer badge must never cost the card
-  // list), so a GraphQL outage would quietly bake a snapshot with no badges at all. Say so.
-  const noVariants = cards.filter(c => !c.variants);
-  const inferred = cards.filter(c => c.variants?.inferred).length;
-  console.log(`[build-data]   → variants on ${cards.length - noVariants.length}/${cards.length} ` +
-    `(${inferred} BW/XY/SM reverse holo inferred)`);
-  if (noVariants.length) {
-    console.warn(`[build-data]   ! ${noVariants.length} card(s) have no variant data: ` +
-      noVariants.slice(0, 8).map(c => c.id).join(', '));
-  }
-
+  // Set metadata FIRST: its setSeries map is what the card index needs to build the
+  // image URL of a card TCGdex lists without one (see tcgdex.getCards).
+  //
   // allEnSets, NOT the set ids these cards happen to touch. snapshot.getSetMeta rejects
   // a date map with ANY gap (a missing date collapses a set to the 1999 sort fallback,
   // i.e. one giant fake era), so deriving the list from the build's own Pokémon made the
@@ -116,6 +105,21 @@ async function main() {
   if (dateCount < nameCount) {
     console.warn(`[build-data]   ! ${nameCount - dateCount} EN set(s) have no release date; ` +
       'snapshot.getSetMeta will miss for anyone whose cards land in one of them');
+  }
+
+  console.log('[build-data] fetching card index from TCGdex…');
+  const setSeries = meta.setSeries || {};
+  const cards = await getCards(POKEMON, { setSeries });
+  console.log(`[build-data]   → ${cards.length} cards`);
+  // Variants are best effort in the provider (a footer badge must never cost the card
+  // list), so a GraphQL outage would quietly bake a snapshot with no badges at all. Say so.
+  const noVariants = cards.filter(c => !c.variants);
+  const inferred = cards.filter(c => c.variants?.inferred).length;
+  console.log(`[build-data]   → variants on ${cards.length - noVariants.length}/${cards.length} ` +
+    `(${inferred} BW/XY/SM reverse holo inferred)`);
+  if (noVariants.length) {
+    console.warn(`[build-data]   ! ${noVariants.length} card(s) have no variant data: ` +
+      noVariants.slice(0, 8).map(c => c.id).join(', '));
   }
 
   console.log('[build-data] fetching Japanese cards from Bulbapedia…');
@@ -191,7 +195,7 @@ async function main() {
     index.pokemon[name] = slug;
     let own = [];
     try {
-      own = await getCards([name]);
+      own = await getCards([name], { setSeries });
     } catch (e) {
       console.warn(`[build-data]   ! ${name}: shard fetch failed (${e.message}); falling back to a slice`);
       own = cards.filter(c => (c.species || c.name) === name);

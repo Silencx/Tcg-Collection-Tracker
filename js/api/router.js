@@ -41,8 +41,11 @@ function withTimeout(factory) {
  *  so a PARTIAL snapshot hit can run it for just the uncovered names. */
 async function liveCards(names) {
   if (!primaryHealthy) throw new Error('TCGdex unavailable this session');
+  // The snapshot's series map, for the image URL of a card TCGdex lists without one.
+  // sets.json is memoised and read for set meta straight after anyway.
+  const setSeries = await snapshot.getSetSeries();
   try {
-    const cards = await withTimeout(signal => tcgdex.getCards(names, { signal }));
+    const cards = await withTimeout(signal => tcgdex.getCards(names, { signal, setSeries }));
     if (cards && cards.length) return { cards, source: 'tcgdex' };
     throw new Error('empty result');
   } catch (err) {

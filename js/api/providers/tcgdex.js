@@ -28,7 +28,6 @@ const API = 'https://api.tcgdex.net/v2';
 // Every serie lookup in this file goes through tcgdexSerieSegment — the id-slicing rule
 // it falls back to is wrong for 48 of the sets that carry art, and getting it wrong
 // yields 404 image URLs and silently skipped variant data. See that function.
-const serieOf = setId => tcgdexSerieSegment(setId);
 
 // Split a card id "sv05-163" → { setId:"sv05", localId:"163" }.
 function splitId(id) {
@@ -37,10 +36,13 @@ function splitId(id) {
 }
 
 // Construct an EN asset base from a card id, for when the list omits `image`.
-// Format matches what buildSetsMap's TCGdex branch parses: /en/{serie}/{setId}/{localId}.
-function imageBaseFromId(id) {
+// Format matches what buildSetsMap parses: /en/{serie}/{setId}/{localId}. The serie
+// comes from `setSeries` (data/sets.json's map); the id-slicing guess is only the last
+// resort for a set the map does not know yet. buildSetsMap also groups the card's era
+// by this segment, so a wrong guess filed the card under a stray era of its own.
+function imageBaseFromId(id, setSeries) {
   const { setId, localId } = splitId(id);
-  return tcgdexAssetBase('en', serieOf(setId), setId, localId);
+  return tcgdexAssetBase('en', tcgdexSerieSegment(setId, setSeries), setId, localId);
 }
 
 async function getJSON(url, signal) {
@@ -192,8 +194,11 @@ export function namesSpecies(cardName, species) {
  *   the snapshot's coverage filter). `image` is ALWAYS a valid asset base url
  *   (filled from the id if the list omits it), so no card is ever dropped for a
  *   missing image.
+ * @param {object} [opts]
+ * @param {Object<string,string>|null} [opts.setSeries] set id → CDN series (data/sets.json),
+ *   used for the image base of a card the list returns without one
  */
-export async function getCards(names, { signal, withVariants = true } = {}) {
+export async function getCards(names, { signal, withVariants = true, setSeries = null } = {}) {
   const out = [];
   const seen = new Set();
   // One request per name, in parallel — they are independent, and awaiting them
@@ -217,7 +222,7 @@ export async function getCards(names, { signal, withVariants = true } = {}) {
         // Mewtwo card claim to be "Mew", and erased the real names of cameo cards.
         name: c.name,
         species: name,
-        image: c.image || imageBaseFromId(c.id),
+        image: c.image || imageBaseFromId(c.id, setSeries),
         localId: c.localId != null ? String(c.localId) : splitId(c.id).localId,
       });
     }
