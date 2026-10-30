@@ -252,6 +252,64 @@ A user-triggered **Refresh** in the app bypasses the snapshot and fetches live.
 > files and accepts no writes, so "the host remembers cards people found" can only
 > mean CI pre-building them. A genuinely crowd-sourced cache would need a backend.
 
+### Japanese card catalogue (optional, build-time only, not live yet)
+
+Japanese cards come from Bulbapedia today, which only covers the pre-built Pokémon and
+the 21 sets in `JP_BULBA_SET_MAP` (and blocks our builds). `tools/build-jp-catalog.mjs`
+reads every Japanese set from PokéWallet instead (~490 requests once, resumable) and
+writes what the app needs:
+
+```
+data/jp-cat/sets.json            # 457 sets: name, code, date, era, Limitless code
+data/jp-cat/cards-{a-z,0}.json   # ~30,000 cards, split by name letter (~15–60 KB gzipped each)
+```
+
+When those files are present, `js/api/jp-source.js` uses them for **any** Pokémon (and
+still adds what Bulbapedia's snapshot has that they lack); when absent — the live site
+today — it falls back to Bulbapedia exactly as before. Japanese checklist ids are now
+`JP_{set}_{number}` (`js/api/jp-model.js`), the same in Master Set and TMS; older ids are
+moved over once at boot (`js/ui/jp-migrate.js`), and an id it cannot place with certainty
+is kept, never dropped. Like the images, `data/jp-cat/` stays gitignored until PokéWallet
+agrees to republishing.
+
+```bash
+node tools/build-jp-catalog.mjs              # fetch (needs the key)
+node tools/build-jp-catalog.mjs --emit-only  # rebuild data/jp-cat/ from the cache, no requests
+```
+
+### Hosted card images (optional, build-time only, not live yet)
+
+11 of the 21 Japanese sets the app knows have no scans on the Limitless CDN, so their
+cards show a placeholder. `tools/build-images.mjs` fills exactly that gap from
+[PokéWallet](https://pokewallet.io) and stores the files with the site:
+
+```
+img/jp/<set-slug>/<number>-low.jpg    # 200×280, ~13 KB — the grid
+img/jp/<set-slug>/<number>-high.jpg   # 500×699, ~57 KB — the preview
+data/img-index.json                   # manifest: which cards have a file, and from where
+```
+
+- **Gaps only, write once.** A card that already has art elsewhere is never fetched, and
+  a file that exists is never fetched or overwritten again, so a normal run costs 0
+  requests and git history only grows when new cards appear.
+- **Our ids, not theirs.** Paths come from our set names and card numbers, so the source
+  can change without moving a file. Every manifest entry names its `source`, which is how
+  one source's images can be removed in a single pass.
+- **Key:** `POKEWALLET_IO_PROD_KEY` in `.env.local` (gitignored, unreadable to the
+  assistant) or a repo secret. The build reads the live quota from PokéWallet's response
+  headers and stops before the hourly limit; run it again to continue.
+
+```bash
+node tools/build-images.mjs --dry-run   # what would be fetched
+node tools/build-images.mjs             # fetch it (cap: --max N requests, default 400)
+```
+
+**Not published yet.** `img/` and `data/img-index.json` are gitignored until PokéWallet
+agrees to us republishing their images; until then the files only show up in your local
+dev server, and the live site is unchanged (a missing manifest is treated as empty). To
+go live: delete those two lines from `.gitignore`, add `POKEWALLET_IO_PROD_KEY` as a repo
+secret, and run `node tools/build-images.mjs` in `refresh-data.yml` after `build-data`.
+
 ### Deploy (GitHub Pages)
 
 1. Push to `main`.

@@ -92,7 +92,6 @@ export const state = {
   printView:        (v => isValidPrintView(v) ? v : DEFAULT_PRINT_VIEW)(storage.get(PRINTVIEWSTORE)),
 
   // — Runtime only (never persisted) —
-  _bulbaData:       null,       // cached Bulbapedia wikitext, shared EN+JP fetch
   _meta:            new Map(),  // cardId → render metadata
   setBlockNamesMap: new Map(),
   totalCards:       0,

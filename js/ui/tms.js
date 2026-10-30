@@ -19,11 +19,11 @@ import {
 import {
   limitlessJpUrl, tcgdexAssetBase, tcgdexSymbolUrl,
 } from '../api/images.js';
-import {
-  JP_BULBA_SET_MAP,
-} from '../api/providers/legacy.js';
 import { router } from '../api/router.js';
 import { viableSources, markBad, markGood } from '../api/img-cache.js';
+import { loadImageIndex, localImage } from '../api/local-images.js';
+import { getJpCards } from '../api/jp-source.js';
+import { jpImageKeyFor } from '../api/jp-model.js';
 import { langColor, buildPlaceholderHTML, mkPlaceholderEl, variantBadgesHtml } from './masterset.js';
 import { escapeHtml } from './html.js';
 import { openLanguagePicker, renderLangSummary } from './pickers.js';
@@ -186,7 +186,9 @@ async function openTmsPopup(pokeName){
   toolbar.innerHTML=''; body.innerHTML='<div style="padding:24px;text-align:center;color:#999;font-size:11px">Fetching card data…</div>';
   overlay.classList.add('open');
   try{
-    const cards=await fetchTmsCardsForPoke(pokeName);
+    // The hosted-image manifest never rejects; it is read at RENDER time (see
+    // renderTmsPopupCards) so entries already in the persisted TMS cache pick it up too.
+    const [cards]=await Promise.all([fetchTmsCardsForPoke(pokeName), loadImageIndex()]);
     state._tmsPopupAllCards=cards;
     renderTmsPopup(pokeName);
   }catch(e){
@@ -197,15 +199,20 @@ async function openTmsPopup(pokeName){
 
 // ── TMS: Fetch card data for one Pokémon ─────────────────────────────────────
 async function fetchTmsCardsForPoke(pokeName){
-  if(state.tmsPokeCache.has(pokeName)) return state.tmsPokeCache.get(pokeName);
+  // A cached list from before the stable JP ids (no `imgKey` on its JP cards) is stale:
+  // it predates the catalogue, so refetch rather than show the old, shorter JP list.
+  if(state.tmsPokeCache.has(pokeName)){
+    const cached=state.tmsPokeCache.get(pokeName);
+    if(!cached.some(c=>c&&c.lang==='JP'&&!c.imgKey)) return cached;
+  }
 
-  // Intl card index now comes through the ROUTER (snapshot → TCGdex → legacy), so
+  // Intl card index now comes through the ROUTER (snapshot → TCGdex), so
   // TMS ids match the Master Set (TCGdex format) and the popup gets the same
   // failover path. JP also goes through the router (snapshot data/jp.json → live
   // Bulbapedia), exactly like the Master-Set JP injection.
-  const [cardRes, jpRaw]=await Promise.all([
+  const [cardRes, jp]=await Promise.all([
     router.getCards([pokeName]).catch(()=>({cards:[]})),
-    router.getJpRaw([pokeName]).catch(()=>[])
+    getJpCards([pokeName]).catch(()=>({rows:[],sets:new Map()}))
   ]);
   const tcgCards=cardRes.cards||[];
   const setIds=[...new Set(tcgCards.map(c=>(typeof c.id==='string'&&c.id.includes('-'))?c.id.slice(0,c.id.lastIndexOf('-')):null).filter(Boolean))];
@@ -238,15 +245,16 @@ async function fetchTmsCardsForPoke(pokeName){
     }
   }
 
-  // JP cards (router → snapshot/Bulbapedia) — ids stay JP_{code}_{localId}.
-  for(const {jpset,jpnum} of jpRaw){
-    const m=JP_BULBA_SET_MAP[jpset]; if(!m) continue;
-    const localId=jpnum.split('/')[0];
-    const uid=`JP_${m.code||jpset}_${localId}`;
-    if(seen.has(uid)) continue; seen.add(uid);
-    const imgSrc=m.code?limitlessJpUrl(m.code,jpnum):null;
-    state._tmsCardPokemon.set(uid,pokeName);
-    cards.push({id:uid,pokeName,setId:m.code||jpset,setName:jpset,releaseDate:m.date||'1999/01/01',localId,lang:'JP',langColor:'#4527a0',imgSrc,hiSrc:null,symSrc:m.sym||null});
+  // JP cards (api/jp-source.js: catalogue → Bulbapedia) — the same stable
+  // JP_{setKey}_{numKey} ids as the Master Set. `imgKey` is the hosted-image key, read at
+  // render time (see renderTmsPopupCards) so a cached entry picks up images added later.
+  for(const r of jp.rows){
+    const m=jp.sets.get(r.setKey); if(!m||seen.has(r.id)) continue;
+    seen.add(r.id);
+    const localId=r.number?r.number.split('/')[0]:'—';
+    const imgSrc=m.limitless&&r.number?limitlessJpUrl(m.limitless,r.number):null;
+    state._tmsCardPokemon.set(r.id,pokeName);
+    cards.push({id:r.id,pokeName,setId:r.setKey,setName:m.name,releaseDate:m.date||'1999/01/01',localId,lang:'JP',langColor:'#4527a0',imgSrc,hiSrc:null,symSrc:m.sym||null,imgKey:jpImageKeyFor(r.setKey,r.numKey)});
   }
 
   state.tmsPokeCache.set(pokeName,cards);
@@ -363,14 +371,17 @@ function tmsPopupTile(c,pokeName,pr,chips){
   // Known-missing artwork is skipped without a request (img-cache.js), the same as
   // the Master-Set grid — this popup renders every language for a Pokémon, so it hit
   // the TCGdex language gaps hardest.
-  if(c.imgSrc && viableSources([c.imgSrc]).length){
+  // A JP card falls back to our hosted copy when Limitless has none (or 403s).
+  const srcs=viableSources([c.imgSrc, c.imgKey?localImage(c.imgKey,'low'):null].filter(Boolean));
+  if(srcs.length){
     ph.classList.add('ph-over');
     const img=document.createElement('img'); img.className='card-img';
     img.loading='lazy'; img.decoding='async'; img.fetchPriority='low';
     img.alt=`${pokeName} #${c.localId} ${c.lang}`;
-    img.onload=()=>{ ph.remove(); markGood(c.imgSrc); };
-    img.onerror=()=>{ img.remove(); markBad(c.imgSrc); ph.classList.remove('ph-over'); };
-    img.src=c.imgSrc;
+    let i=0;
+    img.onload=()=>{ ph.remove(); markGood(srcs[i]); };
+    img.onerror=()=>{ markBad(srcs[i]); if(++i<srcs.length){ img.src=srcs[i]; return; } img.remove(); ph.classList.remove('ph-over'); };
+    img.src=srcs[0];
     wrap.appendChild(img);
   }
   const footer=document.createElement('div'); footer.className='card-footer';
