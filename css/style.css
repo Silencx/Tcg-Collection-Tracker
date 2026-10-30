@@ -56,8 +56,8 @@ body{font-family:Arial,Helvetica,sans-serif;background:var(--c-body-bg,#ecf5ec);
 
   /* Banner triples (the loading and the failure banner). Pale pastels are unreadable
      on a dark surface, so each variant needs a real per-theme value rather than a
-     shared neutral. Only the dark palette
-     overrides them; the four light palettes inherit these and are unaffected. */
+     shared neutral. Only the dark palette overrides them; the four light palettes
+     inherit these and are unaffected. */
   --c-bn-load-bg:#f3e5f5;--c-bn-load-bd:#ce93d8;--c-bn-load-fg:#4a148c;
   --c-bn-error-bg:#fce4ec;--c-bn-error-bd:#f48fb1;--c-bn-error-fg:#880e4f;
 
@@ -410,7 +410,7 @@ body{background:var(--c-body-bg);}
      size now reads these, INCLUDING .set-nav's parked position below, which needs half
      the column width to park the sidebar beside it.
 
-     These reproduce dex.tcg's card ladder, measured off their pages:
+     These reproduce DexTCG's card ladder (app.dextcg.com), measured off their pages:
        502px → 3 columns   788px → 4   1928px → 6   2560px → 6 (their column caps too)
      --tile-min is the readability knob; it scales on vw rather than stepping at
      breakpoints, which is what let the old 380px and 600px grid overrides be deleted.

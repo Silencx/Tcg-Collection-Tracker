@@ -5,40 +5,42 @@ across every set, era, and language. No account, no install, no cost.
 
 **🔗 Live site:** https://silencx.github.io/Tcg-Collection-Tracker/
 
-The Seedot → Nuzleaf → Shiftry line is just the default demo list — type any
-Pokémon's name in and it builds your checklist for you.
-
-![Screenshot](docs/screenshot.png)
+The Seedot → Nuzleaf → Shiftry line is just the default demo list — pick your own
+Pokémon and it builds the checklist for you.
 
 ---
 
 ## For collectors
 
-### Master Set vs. True Master Set
-- **Master Set** — the classic checklist: one entry per Pokémon, per set, per
-  language. Good for "have I got this card at all" tracking.
-- **True Master Set (TMS)** — binder-level detail: pick individual *prints*
-  (holo, reverse holo, 1st edition, promos, etc.) rather than just the card.
+### Four modes
+- **Home** — where the app opens: what you have collected so far, by language and by
+  expansion, and the way into the other three modes.
+- **Master set** — the classic checklist: every card of your Pokémon, in every set,
+  once per language. Good for "have I got this card at all" tracking.
+- **True master set** — a binder you curate: browse the Pokémon catalogue, open a
+  Pokémon and hand-pick exactly which of its cards, in which languages, belong in it.
+- **Single set** — pick one expansion (and one language) and complete it card by card.
 
-Switch between the two any time with the toggle at the top — each keeps its
-own checklist and settings.
+The three checklists are kept separately, so ticking a card in one never changes another.
+In Master set a **☰ Sets** sidebar jumps between sets; the 🔔 bell keeps the app's messages.
 
 ### Pick your own Pokémon
-Type a name into the **Add Pokémon** box to add it to your tracked list, or
-remove ones you don't want. Your list is saved locally and can include as many
-Pokémon as you like.
-
-Autocomplete draws on a built-in catalog of 357 species spanning Gens 1–9 — a
-popular subset, not the full National Dex. You can still type any Pokémon not in
-the catalog and it will be looked up normally; only the suggestions and the True
-Master Set browser are limited to catalog entries.
+**+ Add Pokémon** opens a picker over a built-in catalogue of 357 species spanning
+Gens 1–9 — a popular subset, not the full National Dex. Your list is saved locally and
+can hold as many Pokémon as you like. The True master set browser uses the same
+catalogue.
 
 ### Languages, and cameo appearances
-Filter by language: English, German, French, Spanish, Italian, Portuguese,
-Traditional Chinese, Thai, and Indonesian all show real card images; Japanese
-is sourced separately (via Bulbapedia) as its own column; Korean and
-Simplified Chinese show as placeholders for now since no public card-image
-database exists yet for them.
+- **English, German, French, Spanish, Italian, Portuguese** show real card images from
+  TCGdex wherever it has a scan.
+- **Japanese** cards come from a catalogue of every Japanese set (see below), with scans
+  from Limitless TCG where it has them.
+- **Traditional Chinese, Thai and Indonesian** cards are listed, but TCGdex has no images
+  for them yet; **Korean and Simplified Chinese** have no public card database at all.
+  All five show a placeholder tile with the card's name, set and number.
+
+Native Pokémon names on placeholder tiles cover only the three demo Pokémon so far;
+anything else shows its English name.
 
 Search also catches **cameo** appearances — cards where your Pokémon shows up
 alongside another (Tag Team cards, partner promos, etc.) — since matching is
@@ -70,23 +72,24 @@ they are included in Export / Import.
 
 ### Printable checklists
 Print a photo-accurate 9-up sheet of your current selection, or a compact
-2-column text checklist — handy for binders, want lists, or trades. Both
-print views work in Master Set and True Master Set mode.
+2-column text checklist — handy for binders, want lists, or trades. Both work in
+all three checklist modes.
 
-### Backup, transfer & sharing
-- **Export data** downloads everything you've checked off as one JSON file;
-  **Import data** restores it on another device (old exports are migrated
-  automatically).
-- **Share view** copies a link capturing your current mode, filters, Pokémon
-  list, sort order, and theme — anyone who opens it sees the same view.
-  **Restore view** applies a shared link (or reloads your last saved one).
-  Your checked-off progress itself travels via Export/Import, not the link.
+### Backup, transfer, sharing and themes
+- **Export** downloads everything you have ticked as one JSON file; **Import**
+  restores it on another device (old exports are migrated automatically).
+- **Share view** copies a link capturing your current mode, filters, Pokémon list,
+  sort order, theme, chosen set and print view — anyone who opens it sees the same
+  view. **Restore view** applies a shared link (or reloads your last saved one). Your
+  ticks themselves travel via Export/Import, not the link.
+- Six themes under ⚙ (Forest, Ocean, Dusk, Fire, Mono, Dark); until you pick one, the
+  app follows your system's light/dark setting.
 
 ---
 
 ## For developers
 
-No build step, no framework, no API keys — plain ES modules served as static
+No build step, no framework, no dependencies — plain ES modules served as static
 files. Runs from any static host (GitHub Pages) or a local web server.
 
 ### Run locally
@@ -98,159 +101,65 @@ npm run dev          # python3 -m http.server 8000
 # or: ./dev.sh   (macOS/Linux)   |   dev.bat   (Windows)
 ```
 
-Then open <http://localhost:8000>.
-
-Syntax-check every module (portable — pure Node, no bash, no dependencies):
+Then open <http://localhost:8000>. The checks and tests need only Node (CI runs 24):
 
 ```bash
-npm run check
+npm run check        # syntax check + the `state.` prefix scan
+npm test             # node --test, tests/*.test.mjs
 ```
 
-### How it's organized
+### How it fits together
 
 ```
-index.html              # markup only; boots js/main.js as a module
-css/style.css           # all styles
-js/
-  config.js             # constants, storage keys, language tables, Pokémon catalog
-  storage.js            # the only module that touches localStorage (+ quota handling)
-  state.js              # the single shared `state` object + persistence helpers
-  main.js               # boot + mode switching + the window handler manifest
-  api/
-    images.js           # pure image-URL builders (Limitless, TCGdex)
-    variants.js         # pure print-variant normalizer + badge data (incl. BW/XY/SM reverse rule)
-    router.js            # provider failover: snapshot → live TCGdex → legacy
-    bulba-jp.js          # pure Bulbapedia JP parser/fetcher — shared by browser + build-data
-    providers/
-      snapshot.js        # reads pre-built data/*.json (instant, no API)
-      tcgdex.js          # live TCGdex (primary card index + set metadata; variants via GraphQL)
-      legacy.js          # FROZEN Bulbapedia pipeline (fallback + JA)
-  ui/
-    masterset.js         # Master-Set render, filters, Pokémon chips, preview
-    tms.js                # True-Master-Set browser + per-Pokémon card popup
-    print.js              # print views (cards 9-up + text checklist), both modes
-    html.js               # HTML/URL escaping for the string-built markup (print, placeholders)
-    banners.js            # storage-quota banner
-    io.js                 # export / import (+ id migration) and shareable sessions
-    prints-model.js       # pure per-print tracking rules (print keys, card ↔ print, totals)
-    prints-ui.js          # print chips / print-tile labels shared by the three grids
-    printview.js          # the off / chips / tiles setting and its switch
-data/                    # pre-built snapshots (committed; refreshed by CI)
-  cards.json, sets.json  # EN card index + set metadata (from TCGdex)
-  jp.json                # Japanese card index (from Bulbapedia)
-tools/
-  build-data.mjs         # regenerates data/*.json from TCGdex + Bulbapedia
-  check.mjs              # portable syntax + state-prefix checker used by `npm run check`
-  state-prefix-scan.mjs  # flags a state property used bare instead of `state.<name>`
-diagnostics/index.html   # TCGdex API diagnostics harness
-reference/old-tool.html  # original single-file prototype, kept for history
+index.html            markup; boots js/main.js as a module
+css/style.css         all styles (six palettes, fluid type scale)
+js/                   config, state (one shared `state` object), storage, main (boot + modes)
+  api/                data: router, the TCGdex provider + data/ snapshot reader,
+                      Japanese cards (jp-source, jp-model, bulba-jp), image URLs, variants
+  ui/                 one module per mode and feature, plus DOM-free *-model.js halves
+data/                 the pre-built snapshot (committed, refreshed weekly by CI)
+tools/                build scripts, the checker, research probes; tools/lib/ helpers
+tests/                node:test suites — pure logic, plus source scans for invariants
+docs/                 design notes
+.github/workflows/    ci.yml (check + test), refresh-data.yml (weekly data build)
 ```
 
-**Data flow:** `data/*.json` (instant, no rate limits, any number of users) →
-live TCGdex as fallback / on user refresh → legacy pipeline if TCGdex is
-unavailable. Japanese cards follow the same pattern: `data/jp.json` first,
-live Bulbapedia as fallback/refresh.
+Start with `js/main.js` (boot, mode switching, the window handler manifest),
+`js/api/router.js` (where data comes from) and `js/ui/masterset.js` (the main grid).
 
-**State:** all app state lives on one exported `state` object (ES module
-bindings can't be reassigned across files). The markup keeps inline
-`onclick="fn()"` handlers; `main.js` publishes those functions on `window`.
+**Data flow:**
+- EN cards: `data/cards/<slug>.json` shards → live TCGdex for any Pokémon they lack.
+- Set names, dates, symbols: `data/sets.json` → live TCGdex.
+- Japanese cards: `data/jp-cat/` catalogue → Bulbapedia (`data/jp/` shards → live).
+- A user-triggered **Refresh** skips the snapshot and fetches EN cards and set data live.
 
-### Refresh the card data
+**State:** all app state lives on one exported `state` object (ES module bindings
+can't be reassigned across files). The markup uses inline `onclick="fn()"` handlers;
+`main.js` publishes those functions on `window`.
 
-```bash
-npm run build-data     # node tools/build-data.mjs  (needs Node 18+ and network)
-```
+### Data and the weekly build
 
-This pulls the EN card index + set metadata from TCGdex and the Japanese card
-list from Bulbapedia, and writes:
+| Script | Reads | Writes | Key |
+|---|---|---|---|
+| `tools/build-data.mjs` (`npm run build-data`) | TCGdex, Bulbapedia, `data/prebuilt.json` | `data/sets.json`, `data/index.json`, `data/cards/`, `data/jp/` | none |
+| `tools/build-jp-catalog.mjs` | PokéWallet | `data/jp-cat/` (committed), `data/jp-catalog/` + report (local) | `POKEWALLET_IO_PROD_KEY` |
+| `tools/build-images.mjs` | `data/jp-catalog/`, PokéWallet | `img/`, `data/img-index.json` (local only) | `POKEWALLET_IO_PROD_KEY` |
+| `tools/check.mjs` | `js/`, `tools/` | — | none |
+| `tools/apitcg-probe.mjs`, `tools/pokewallet-probe.mjs`, `tools/jp-gap-size.mjs` | research probes; reports stay local | — | their own |
 
-```
-data/prebuilt.json      # the Pokémon list to build — edit this to widen coverage
-data/index.json         # exact Pokémon name → shard filename (resolves slug collisions)
-data/cards/<slug>.json  # per-Pokémon EN card shard
-data/jp/<slug>.json     # per-Pokémon JP shard
-data/cards.json         # combined EN index  ) kept for one release cycle so a visitor
-data/jp.json            # combined JP index  ) with cached JS that predates the shards
-data/sets.json          # set metadata for EVERY set, in all nine languages
-```
+`.github/workflows/refresh-data.yml` runs build-data and build-jp-catalog every Monday
+and commits `data/`. Run it by hand from the **Actions** tab to widen coverage: its
+`add` input appends Pokémon to `data/prebuilt.json`, so the next scheduled run keeps
+them. A visitor tracking pre-built Pokémon makes zero API calls; coverage is
+per-Pokémon, so for three Pokémon where two are pre-built only the third is fetched live.
 
-Commit the result. `data/` is the **host-served cache**: `js/api/providers/
-snapshot.js` reads it and `js/api/router.js` tries it *before* any external API,
-so a visitor tracking pre-built Pokémon makes zero API calls. Coverage is
-per-Pokémon, so a partial match works too — ask for three Pokémon where two are
-pre-built and only the third is fetched live.
-
-Two things worth knowing if you change this:
-
-- `data/sets.json` carries a release date for **every** set, not just the ones the
-  built Pokémon appear in. `snapshot.getSetMeta` rejects a date map with any gap
-  (a missing date collapses a set into the 1999 sort fallback, i.e. one giant fake
-  era), so a partial map is a guaranteed miss for anyone with their own Pokémon —
-  and they then pay nine `/sets` sweeps plus up to ~200 detail calls, the slowest
-  thing in the boot path.
-- **Its shape is deliberately lopsided.** `dates` / `symbols` / `logos` / `counts`
-  are FLAT `{setId: value}` maps holding the *union* across all nine languages,
-  while `lang.<code>` holds only the values that actually *differ* from them.
-  That works because set ids are globally unique and release dates agree across
-  every Latin-script language (measured: zero disagreements) — only the Chinese,
-  Thai and Indonesian releases, which are separate products with their own ids,
-  need per-language values. Duplicating all five maps nine times measured 275 KB
-  against 93 KB this way, on a file fetched on every boot. `dateFor` / `countFor`
-  in `js/ui/setmode-model.js` are the two-line resolution rule; use them rather
-  than indexing the maps directly.
-- `setSeries` maps each set to its TCGdex **series**, and it is load-bearing well
-  beyond the picker's grouping: it is also the CDN path segment. Slicing digits off
-  the id — which this app did for a long time — is wrong for 48 of the sets that
-  carry artwork (`cel25`→`swsh`, `swshp`→`swsh`, `A1`→`tcgp`, every Trainer Kit)
-  and yields the empty string for the McDonald's sets. Always go through
-  `tcgdexSerieSegment` in `js/api/images.js`; `tests/images-serie.test.mjs` pins
-  the known-bad list.
-- Series listed in `DIGITAL_SERIES` (`js/config.js`) are filtered out of the
-  single-set picker — currently `tcgp`, Pokémon TCG Pocket, which is a mobile game
-  rather than something you can own. The data still ships them, so re-including
-  them is a one-word change and needs no rebuild.
-- Shards are fetched **independently**, not sliced out of the combined result: a
-  cameo card shared by two Pokémon is deduped onto the first-listed one, so a
-  slice would leave it out of the other's shard.
-
-To build a different list ad hoc:
-
-```bash
-node tools/build-data.mjs "Pikachu,Eevee"
-```
-
-### The API TCG key (optional, build-time only)
-
-API TCG needs an `x-api-key` on every request, so it is called **only** from `tools/`,
-never from the browser — a key shipped in `js/` would be readable by anyone viewing
-source. Everything still works without it; the API TCG steps just skip.
-
-- **Locally:** put `APITCG_KEY=…` in `.env.local`. That file is gitignored, and
-  `.claude/hooks/block-secrets*.mjs` blocks the assistant from reading it.
-- **In CI:** add `APITCG_KEY` under **Settings → Secrets and variables → Actions**.
-  `refresh-data.yml` passes it to the build step and nowhere else.
-
-To see what the API can do (one-off, capped at 10 requests):
-
-```bash
-node tools/apitcg-probe.mjs
-```
-
-It writes `tools/apitcg-probe-report.md` — a redacted capability report. Request headers
-are never recorded and the text is checked for the key before it is written.
-
-CI does this automatically: `.github/workflows/refresh-data.yml` runs weekly and
-on demand from the **Actions** tab. Its manual form takes an `add` input, which
-*appends* to `data/prebuilt.json` and commits it — so widening coverage is
-durable instead of being overwritten by the next scheduled run.
-`.github/workflows/ci.yml` runs `npm run check` and `npm test` on every push and
-pull request.
-
-A user-triggered **Refresh** in the app bypasses the snapshot and fetches live.
-
-> **Note:** visitors cannot contribute to this cache. GitHub Pages serves static
-> files and accepts no writes, so "the host remembers cards people found" can only
-> mean CI pre-building them. A genuinely crowd-sourced cache would need a backend.
+- `data/sets.json` carries a date for every set, because a snapshot with any gap is a
+  miss. Its maps are flat unions across languages, with per-language overrides under
+  `lang`; read them through `dateFor` / `countFor` in `js/ui/setmode-model.js`.
+- A set's CDN path segment is its TCGdex **series** (`setSeries`), never a slice of its
+  id: always go through `tcgdexSerieSegment` in `js/api/images.js`.
+- Sets in `DIGITAL_SERIES` (`js/config.js`; TCG Pocket) are left out of the single-set
+  picker.
 
 ### Japanese card catalogue
 
@@ -259,64 +168,63 @@ Japanese cards come from a catalogue of every Japanese set, built from
 
 ```
 data/jp-cat/sets.json            # 457 sets: name, code, date, era, Limitless code
-data/jp-cat/cards-{a-z,0}.json   # ~30,000 cards, split by name letter (~15–60 KB gzipped each)
+data/jp-cat/cards-{a-z,0}.json   # ~30,000 cards, split by name letter
 ```
 
 `js/api/jp-source.js` reads it for **any** Pokémon, and still adds what Bulbapedia's
 snapshot has that it lacks (World Champions Pack). Only facts are published — set names,
 card numbers, card names — never PokéWallet's own ids, which stay in the gitignored
-build-side copy (`data/jp-catalog/`). Japanese checklist ids are `JP_{set}_{number}`
-(`js/api/jp-model.js`), the same in Master Set and TMS; older ids are moved over once at
-boot (`js/ui/jp-migrate.js`), and an id it cannot place with certainty is kept, never
-dropped.
+build-side copy (`data/jp-catalog/`). The site footer credits PokéWallet as the source;
+keep that line for as long as the list is published. Japanese checklist ids are
+`JP_{set}_{number}` (`js/api/jp-model.js`), the same in Master Set and TMS; older ids
+are moved over once at boot (`js/ui/jp-migrate.js`), and an id it cannot place with
+certainty is kept, never dropped.
 
-**Weekly refresh.** `refresh-data.yml` rebuilds it with the `POKEWALLET_IO_PROD_KEY`
-repository secret (~490 requests; the free tier allows 1,000 a day). Without the secret
-the step does nothing. Only a **complete** walk replaces the committed files — a run
-stopped by the quota or an outage leaves them as they were — and a set whose Limitless
-coverage is not yet known is checked against the Limitless CDN (a few HEAD requests).
+**Weekly refresh.** The workflow step needs the `POKEWALLET_IO_PROD_KEY` repository
+secret; without it the step does nothing. A full walk is ~490 requests in one run, and
+CI starts with no cache, so the key's hourly limit has to cover that (the free tier's
+100/hour and 1,000/day do not). Only a **complete** walk replaces the committed files —
+a run stopped by the quota or an outage leaves them as they were — and a file whose
+rows did not change keeps its timestamp, so an unchanged catalogue adds nothing to the
+weekly commit.
 
 **Withdrawing it.** If PokéWallet asks, revert the commit that added `data/jp-cat/` and
 drop the workflow step. The app needs no change: with the files gone it falls back to
-Bulbapedia on its own (a single 404 for the missing set table).
+Bulbapedia on its own.
 
 ```bash
 node tools/build-jp-catalog.mjs              # fetch (needs the key)
-node tools/build-jp-catalog.mjs --emit-only  # rebuild data/jp-cat/ from the cache, no requests
+node tools/build-jp-catalog.mjs --emit-only  # rebuild data/jp-cat/ from the local copy, no requests
 ```
 
-### Hosted card images (optional, build-time only, not live yet)
+### Hosted card images (build-time only, not live yet)
 
-11 of the 21 Japanese sets the app knows have no scans on the Limitless CDN, so their
-cards show a placeholder. `tools/build-images.mjs` fills exactly that gap from
-[PokéWallet](https://pokewallet.io) and stores the files with the site:
-
-```
-img/jp/<set-slug>/<number>-low.jpg    # 200×280, ~13 KB — the grid
-img/jp/<set-slug>/<number>-high.jpg   # 500×699, ~57 KB — the preview
-data/img-index.json                   # manifest: which cards have a file, and from where
-```
+About 10,700 Japanese cards are in sets the Limitless CDN has no scans for, so they show
+a placeholder. `tools/build-images.mjs` fills exactly that gap from PokéWallet into
+`img/jp/<set>/<number>-{low,high}.<ext>` plus a manifest, `data/img-index.json`. It
+works from the local catalogue, so run build-jp-catalog first.
 
 - **Gaps only, write once.** A card that already has art elsewhere is never fetched, and
-  a file that exists is never fetched or overwritten again, so a normal run costs 0
-  requests and git history only grows when new cards appear.
-- **Our ids, not theirs.** Paths come from our set names and card numbers, so the source
-  can change without moving a file. Every manifest entry names its `source`, which is how
-  one source's images can be removed in a single pass.
-- **Key:** `POKEWALLET_IO_PROD_KEY` in `.env.local` (gitignored, unreadable to the
-  assistant) or a repo secret. The build reads the live quota from PokéWallet's response
-  headers and stops before the hourly limit; run it again to continue.
-
-```bash
-node tools/build-images.mjs --dry-run   # what would be fetched
-node tools/build-images.mjs             # fetch it (cap: --max N requests, default 400)
-```
+  a file that exists is never fetched again, so a normal run costs 0 requests.
+- **Our ids, not theirs.** Paths come from our set names and card numbers, and every
+  manifest entry names its `source`, so one source's images can be removed in one pass.
+- By default it covers the pre-built Pokémon; `--pokemon "A,B"` picks others, `--all`
+  takes every gap card. `--dry-run` shows the plan; `--max N` caps the requests
+  (default 400). It stops at the live quota reserve; run it again to continue.
 
 **Not published yet.** `img/` and `data/img-index.json` are gitignored until PokéWallet
 agrees to us republishing their images; until then the files only show up in your local
-dev server, and the live site is unchanged (a missing manifest is treated as empty). To
-go live: delete those two lines from `.gitignore`, add `POKEWALLET_IO_PROD_KEY` as a repo
-secret, and run `node tools/build-images.mjs` in `refresh-data.yml` after `build-data`.
+dev server (a missing manifest is treated as empty). To go live: delete those two lines
+from `.gitignore`, and run `node tools/build-images.mjs` in `refresh-data.yml` after the
+catalogue step.
+
+### Build keys
+
+Keys are only ever read by `tools/`, never shipped in `js/`. Locally they go in
+`.env.local` (gitignored); in CI they are repository secrets.
+`POKEWALLET_IO_PROD_KEY` serves the catalogue, image and PokéWallet probe tools;
+`APITCG_KEY` is read only by `tools/apitcg-probe.mjs`. Without a key, the build
+scripts skip their API steps and exit cleanly, so a fork's weekly job still succeeds.
 
 ### Deploy (GitHub Pages)
 
@@ -326,47 +234,13 @@ secret, and run `node tools/build-images.mjs` in `refresh-data.yml` after `build
 3. The site serves at `https://<user>.github.io/<repo>/`.
 
 Everything is static; the only "backend" is the weekly Action that refreshes
-`data/`.
+`data/`. Visitors cannot add to that cache — Pages accepts no writes, so wider
+coverage means adding Pokémon to the pre-built list.
 
-### Notes
+### Docs
 
-- TCGdex language coverage varies (EN/DE/FR solid; ES/IT/PT partial; KR/SC are
-  placeholders; JA comes from Bulbapedia). Missing-language card images
-  simply don't render — the checklist is always complete.
-- Native (non-Latin) Pokémon names shown on placeholder tiles come from a small
-  hand-maintained table, currently covering only the three demo Pokémon
-  (Seedot, Nuzleaf, Shiftry) in JP/TW/KR/SC — the Thai table is empty. Any other
-  Pokémon simply shows its English name on those tiles.
-- Autocomplete and the True Master Set browser are limited to the 357-species
-  built-in catalog; Master Set mode accepts any name you type.
-- **API TCG (apitcg.com) — works, build-time only, and it is not a JP source.**
-  Verified endpoint (this took several wrong turns, so it is written down):
-
-  ```
-  GET https://api.apitcg.com/api/products?tcg=pokemon&type=card&name=charizard&limit=50&page=2
-  header: x-api-key: <key>
-  ```
-
-  The host is **`api.apitcg.com`**, not `apitcg.com` — the latter is the marketing
-  site and redirects to `www.`, where `/api/products` answers
-  `{"error":"Please provide a TCG"}` no matter what you send it. There is no
-  `/{game}/cards` path; `tcg` is a query parameter.
-
-  What it returns that TCGdex does not: **tcgplayer prices** (low/mid/high/market),
-  `attributes.Rarity`, `Artist`, HP, attacks and card text, and `set.release_date`.
-  Coverage looks comparable — Seedot returns 20 records against TCGdex's 21.
-
-  What it does **not** do:
-  - **No Japanese.** `language=ja` is accepted and silently ignored — it returned an
-    English card. It cannot replace the Bulbapedia scrape in `js/api/bulba-jp.js`.
-  - **No variant matrix.** `Rarity` is a string like `"Holo Rare"`, not TCGdex's
-    holo / reverse / firstEdition / wPromo flags that the True Master Set picker uses.
-  - **Ids do not line up.** Cards are `_id: 37608` with `code: "013/132"` and
-    `set._id: "pokemon-me01-mega-evolution"`. The checklist keys everything on TCGdex
-    ids, so pulling cards in as gap-fill would create entries that duplicate ones the
-    user has already ticked. Any use has to JOIN on set + number, not import ids.
-
-  It is only ever called from `tools/` — see "The API TCG key" above.
+- [`docs/design-language.md`](docs/design-language.md) — this app's visual language,
+  compared with DexTCG's, and where the gaps are worth closing.
 
 ---
 
