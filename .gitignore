@@ -27,6 +27,26 @@ npm-debug.log*
 *.key
 *.pem
 
+# PokéWallet probe output holds their card data, and their terms grant no right to
+# republish it — keep it local (tools/pokewallet-probe.mjs).
+tools/pokewallet-probe-report.md
+tools/pokewallet-probe-images/
+tools/jp-gap-size-report.md
+tools/jp-gap-size.json
+
+# Hosted card images (tools/build-images.mjs). LOCAL ONLY until PokéWallet agrees to us
+# republishing them: committing either path publishes the files on GitHub Pages. To go
+# live, delete these two lines and add the build step to refresh-data.yml (README,
+# "Hosted card images").
+img/
+data/img-index.json
+# Japanese card catalogue (tools/build-jp-catalog.mjs) — same rule: PokéWallet data,
+# local until they agree. Its raw per-set cache never goes anywhere.
+data/jp-catalog/
+data/jp-cat/
+tools/jp-catalog-report.md
+tools/.cache/
+
 # Claude Code tooling (local-only, not shared with the team)
 .claude
 

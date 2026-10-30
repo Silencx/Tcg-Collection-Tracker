@@ -52,11 +52,20 @@ function fromEnvFile(name) {
   }
 }
 
+/**
+ * Any build-time key by name, from the same two places and in the same order: the process
+ * environment (CI secret), then .env.local. Same contract — null when absent, never logged.
+ * @returns {string|null}
+ */
+export function loadEnvKey(name) {
+  const fromEnv = (process.env[name] || '').trim();
+  if (fromEnv) return fromEnv;
+  return fromEnvFile(name);
+}
+
 /** @returns {string|null} the key, or null when it is not configured. */
 export function loadApiTcgKey() {
-  const fromEnv = (process.env.APITCG_KEY || '').trim();
-  if (fromEnv) return fromEnv;
-  return fromEnvFile('APITCG_KEY');
+  return loadEnvKey('APITCG_KEY');
 }
 
 /** Where a human should put the key. Safe to print — names the file, never its contents. */

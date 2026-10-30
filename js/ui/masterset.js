@@ -27,9 +27,12 @@ import {
   limitlessIntlUrl, ptcgioToTcgdexSetId, ptcgioToTcgdexLocalId, limitlessJpUrl,
   tcgdexAssetBase, tcgdexSymbolUrl,
 } from '../api/images.js';
-import { detectNew, JP_BULBA_SET_MAP } from '../api/providers/legacy.js';
+import { detectNew } from '../api/providers/legacy.js';
 import { router } from '../api/router.js';
 import { variantBadges, printsSummary } from '../api/variants.js';
+import { loadImageIndex, localImage } from '../api/local-images.js';
+import { getJpCards } from '../api/jp-source.js';
+import { jpImageKeyFor } from '../api/jp-model.js';
 import {
   viableSources, markBad, markGood, loadFirstImage, clearImgFailures,
   imgMeta, metaSources,
@@ -1073,39 +1076,41 @@ function updRefreshBtn(ts){
 // Architecture:
 //   Source of truth for card lists → Bulbapedia (CORS OK, has EN + JP)
 //   EN images   → pokemontcg.io PNG  (primary) → TCGdex CDN (fallback) → placeholder
-//   JP images   → Limitless CDN      (primary) → placeholder
+//   JP images   → Limitless CDN      (primary) → hosted copy (img/) → placeholder
 //   Other langs → TCGdex CDN         (primary) → placeholder
 //
 // Language mapping:
-//   JP is NOT hardcoded — card discovery is automatic via Bulbapedia wikitext.
-//   JP_BULBA_SET_MAP is a static data table (set names → Limitless codes + metadata)
-//   that only needs updating when new JP sets are released. The fetch/parse/inject
-//   pipeline itself is fully dynamic.
+//   JP cards come from api/jp-source.js: the PokéWallet catalogue (every set) when it is
+//   deployed, otherwise Bulbapedia + the hand-made JP_BULBA_SET_MAP (21 sets). Ids are
+//   api/jp-model.js's stable `JP_{set}_{number}`, the same in TMS.
 
 // Parse EN card entries from Bulbapedia wikitext.
 // Each {{card list/release}} block yields {pokemonName, enSet, num}.
 async function fetchAndInjectJPCards(container){
-  // 1. JP lists come only from Bulbapedia (TCGdex JA is unusable). The router serves
-  //    the pre-built data/jp.json snapshot first, falling back to a live fetch.
-  const jpCardsData = await router.getJpRaw(state.pokemonList);
+  // 1. JP cards from api/jp-source.js: the PokéWallet catalogue when it is deployed (every
+  //    set, every Pokémon), else Bulbapedia (snapshot → live). Rows carry the stable ids
+  //    of api/jp-model.js. The hosted-image manifest loads alongside: it never rejects
+  //    (a missing file is an empty index), and it must be in hand before the first JP
+  //    tile picks its image.
+  const [jp] = await Promise.all([getJpCards(state.pokemonList), loadImageIndex()]);
 
-  // 2. Parse all JP card entries grouped by JP set name
-  // jpSets: Map<bulbaSetName, {meta, cards:[{enName,jpnum,cardId}]}>
+  // 2. Group by set. jpSets: Map<setKey, {set meta, cards:[{enName,cardName,jpnum,numKey,id,setKey}]}>
   const jpSets=new Map();
-  let cardIndex=0;
-  jpCardsData.forEach(({jpset,jpnum,pokemonName})=>{
-    const meta=JP_BULBA_SET_MAP[jpset];
-    if(!meta) return; // unknown set — not in our map, skip
-    if(!jpSets.has(jpset)) jpSets.set(jpset,{...meta, bulbaName:jpset, cards:[]});
-    jpSets.get(jpset).cards.push({enName:pokemonName, jpnum, cardId:`jp_${pokemonName}_${jpset}_${cardIndex++}`});
-  });
+  for(const r of jp.rows){
+    const meta=jp.sets.get(r.setKey); if(!meta) continue;
+    if(!jpSets.has(r.setKey)) jpSets.set(r.setKey,{bulbaName:meta.name, code:meta.limitless, era:meta.era, date:meta.date, sym:meta.sym, cards:[]});
+    jpSets.get(r.setKey).cards.push({enName:r.pokemonName, cardName:r.cardName, jpnum:r.number||'', numKey:r.numKey, id:r.id, setKey:r.setKey});
+  }
 
   if(!jpSets.size) return;
 
-  // 3. Sort sets by release date, respecting state.sortDesc
+  // 3. Sort sets by release date, respecting state.sortDesc. A set with no known date
+  //    (115 of the catalogue's, mostly WotC-era) goes last either way, by name.
+  const when=d=>d?new Date(d).getTime():NaN;
   const sortedSets=[...jpSets.values()].sort((a,b)=>{
-    const diff=new Date(a.date)-new Date(b.date);
-    return state.sortDesc?-diff:diff;
+    const x=when(a.date), y=when(b.date);
+    if(Number.isNaN(x)||Number.isNaN(y)) return Number.isNaN(x)-Number.isNaN(y)||a.bulbaName.localeCompare(b.bulbaName);
+    return state.sortDesc?y-x:x-y;
   });
 
   // 4. Inject each JP set block into the correct era
@@ -1168,18 +1173,23 @@ async function fetchAndInjectJPCards(container){
       }
       grid.appendChild(divider);
 
-      cards.forEach(({enName,jpnum,cardId})=>{
-        const localId=jpnum.split('/')[0]; // "005" from "005/071"
-        const id=`JP_${cardId}`, isDone=state.checked.has(id);
-        const imgSrc=limitlessJpUrl(si.code,jpnum);
+      cards.forEach(({enName,cardName,jpnum,numKey,id,setKey})=>{
+        // "005" from "005/071"; Japanese WotC and early-DP cards print no number at all.
+        const localId=jpnum?jpnum.split('/')[0]:'—';
+        const isDone=state.checked.has(id);
+        // Limitless first; then our own hosted copy, which exists only where Limitless has
+        // no scan (api/local-images.js) — including single cards inside a covered set.
+        const limitless=jpnum?limitlessJpUrl(si.code,jpnum):null;
+        const imgKey=jpImageKeyFor(setKey,numKey);
+        const loList=[limitless,localImage(imgKey,'low')], hiList=[limitless,localImage(imgKey,'high')];
         const jpNatName=NATIVE_NAMES.JP?.[enName]||null;
 
         state._meta.set(id,{
-          name:{en:enName,native:jpNatName},
+          name:{en:cardName||enName,native:jpNatName},
           setName:si.bulbaName, num:`#${localId}`,
           lang:'JP', langColor:'#4527a0',
-          // Limitless serves one resolution for JP, so lo and hi are the same URL.
-          ...imgMeta([imgSrc],[imgSrc]), symSrc:si.sym,
+          // Limitless serves one resolution for JP, so lo and hi are the same URL there.
+          ...imgMeta(loList,hiList), symSrc:si.sym,
         });
 
         const el=document.createElement('div');
@@ -1189,19 +1199,21 @@ async function fetchAndInjectJPCards(container){
         // Placeholder-first, same as mkImgWrap: Limitless JP art 404s frequently, and
         // painting only after the error left an empty box on screen meanwhile.
         const wrap=document.createElement('div'); wrap.className='img-wrap';
-        const ph=mkPlaceholderEl(si.sym,'JP','#4527a0',enName,jpNatName,si.bulbaName,localId);
+        const ph=mkPlaceholderEl(si.sym,'JP','#4527a0',cardName||enName,jpNatName,si.bulbaName,localId);
         wrap.appendChild(ph);
-        // Skip the request outright when this scan is already known missing — Limitless
-        // 403s a lot of older JP art (SM7_105 vs SM7_6), all of it ORB-blocked noise.
-        if(imgSrc && viableSources([imgSrc]).length){
+        // Skip candidates already known missing — Limitless 403s a lot of older JP art
+        // (SM7_105 vs SM7_6), all of it ORB-blocked noise — and fall through to the next.
+        const srcs=viableSources(loList.filter(Boolean));
+        if(srcs.length){
           ph.classList.add('ph-over');
           const img=document.createElement('img');
           img.className='card-img';
           img.loading='lazy'; img.decoding='async'; img.fetchPriority='low';
-          img.alt=`${enName} JP #${localId}`;
-          img.onload=()=>{ ph.remove(); markGood(imgSrc); const mm=state._meta.get(id); if(mm) mm.imgOk=imgSrc; };
-          img.onerror=()=>{ img.remove(); markBad(imgSrc); ph.classList.remove('ph-over'); };
-          img.src=imgSrc;
+          img.alt=`${cardName||enName} JP #${localId}`;
+          let i=0;
+          img.onload=()=>{ ph.remove(); markGood(srcs[i]); const mm=state._meta.get(id); if(mm) mm.imgOk=srcs[i]; };
+          img.onerror=()=>{ markBad(srcs[i]); if(++i<srcs.length){ img.src=srcs[i]; return; } img.remove(); ph.classList.remove('ph-over'); };
+          img.src=srcs[0];
           wrap.appendChild(img);
         }
 

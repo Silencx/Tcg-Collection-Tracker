@@ -45,6 +45,7 @@ import { initNotify } from './ui/notify.js';
 import { initHScroll } from './ui/hscroll.js';
 import { renderDashboard } from './ui/dashboard.js';
 import { renderSetMode, changeSet, selectAllSet, resetSet, openSetName } from './ui/setmode.js';
+import { migrateJpIdsOnBoot } from './ui/jp-migrate.js';
 
 // LOAD-BEARING: setPalette clears the previous theme with classList.remove(...PALETTES),
 // so a palette missing from this list can be added but never removed. It must stay in
@@ -363,7 +364,10 @@ function finishBoot() {
     '| pokémon:', state.pokemonList.join(', '));
 }
 
-finishBoot();
+// Japanese ticks move to the stable id format BEFORE the first render reads them. With no
+// old-format id stored this resolves at once, without a request; a failure must never
+// block the app, so boot finishes either way.
+migrateJpIdsOnBoot().catch(err => console.warn('[boot] JP id migration skipped:', err.message)).finally(finishBoot);
 
 // ── GLOBAL HANDLERS (wiring manifest for inline onclick= in index.html) ───────
 // Add to this list as each module lands. Anything the markup calls inline MUST
