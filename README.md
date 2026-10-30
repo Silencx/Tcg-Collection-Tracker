@@ -109,7 +109,7 @@ js/
     providers/
       snapshot.js        # reads pre-built data/*.json (instant, no API)
       tcgdex.js          # live TCGdex (primary card index + set metadata; variants via GraphQL)
-      legacy.js          # FROZEN Bulbapedia + pokemontcg.io pipeline (fallback + JA)
+      legacy.js          # FROZEN Bulbapedia pipeline (fallback + JA)
   ui/
     masterset.js         # Master-Set render, filters, Pokémon chips, preview
     tms.js                # True-Master-Set browser + per-Pokémon card popup
@@ -234,25 +234,33 @@ A user-triggered **Refresh** in the app bypasses the snapshot and fetches live.
 > files and accepts no writes, so "the host remembers cards people found" can only
 > mean CI pre-building them. A genuinely crowd-sourced cache would need a backend.
 
-### Japanese card catalogue (optional, build-time only, not live yet)
+### Japanese card catalogue
 
-Japanese cards come from Bulbapedia today, which only covers the pre-built Pokémon and
-the 21 sets in `JP_BULBA_SET_MAP` (and blocks our builds). `tools/build-jp-catalog.mjs`
-reads every Japanese set from PokéWallet instead (~490 requests once, resumable) and
-writes what the app needs:
+Japanese cards come from a catalogue of every Japanese set, built from
+[PokéWallet](https://pokewallet.io/) by `tools/build-jp-catalog.mjs` and committed as:
 
 ```
 data/jp-cat/sets.json            # 457 sets: name, code, date, era, Limitless code
 data/jp-cat/cards-{a-z,0}.json   # ~30,000 cards, split by name letter (~15–60 KB gzipped each)
 ```
 
-When those files are present, `js/api/jp-source.js` uses them for **any** Pokémon (and
-still adds what Bulbapedia's snapshot has that they lack); when absent — the live site
-today — it falls back to Bulbapedia exactly as before. Japanese checklist ids are now
-`JP_{set}_{number}` (`js/api/jp-model.js`), the same in Master Set and TMS; older ids are
-moved over once at boot (`js/ui/jp-migrate.js`), and an id it cannot place with certainty
-is kept, never dropped. Like the images, `data/jp-cat/` stays gitignored until PokéWallet
-agrees to republishing.
+`js/api/jp-source.js` reads it for **any** Pokémon, and still adds what Bulbapedia's
+snapshot has that it lacks (World Champions Pack). Only facts are published — set names,
+card numbers, card names — never PokéWallet's own ids, which stay in the gitignored
+build-side copy (`data/jp-catalog/`). Japanese checklist ids are `JP_{set}_{number}`
+(`js/api/jp-model.js`), the same in Master Set and TMS; older ids are moved over once at
+boot (`js/ui/jp-migrate.js`), and an id it cannot place with certainty is kept, never
+dropped.
+
+**Weekly refresh.** `refresh-data.yml` rebuilds it with the `POKEWALLET_IO_PROD_KEY`
+repository secret (~490 requests; the free tier allows 1,000 a day). Without the secret
+the step does nothing. Only a **complete** walk replaces the committed files — a run
+stopped by the quota or an outage leaves them as they were — and a set whose Limitless
+coverage is not yet known is checked against the Limitless CDN (a few HEAD requests).
+
+**Withdrawing it.** If PokéWallet asks, revert the commit that added `data/jp-cat/` and
+drop the workflow step. The app needs no change: with the files gone it falls back to
+Bulbapedia on its own (a single 404 for the missing set table).
 
 ```bash
 node tools/build-jp-catalog.mjs              # fetch (needs the key)
@@ -347,10 +355,10 @@ Everything is static; the only "backend" is the weekly Action that refreshes
 ## Credits
 
 Card data and images come from:
-- [TCGdex](https://www.tcgdex.net/) — primary card index, set metadata, and images
-- [Bulbapedia](https://bulbapedia.bulbagarden.net/) — Japanese card listings
-- [Limitless TCG](https://limitlesstcg.com/) — supplementary card images
-- [pokemontcg.io](https://pokemontcg.io/) — legacy fallback data source
+- [TCGdex](https://www.tcgdex.net/) — primary card index, set metadata, print variants, and images
+- [PokéWallet](https://pokewallet.io/) — the Japanese card list (every Japanese set; `data/jp-cat/`)
+- [Bulbapedia](https://bulbapedia.bulbagarden.net/) — Japanese card listings (fallback)
+- [Limitless TCG](https://limitlesstcg.com/) — Japanese card scans
 
 This project is [MIT-licensed](LICENSE) and is not affiliated with, endorsed
 by, or sponsored by Nintendo, The Pokémon Company, or The Pokémon Company

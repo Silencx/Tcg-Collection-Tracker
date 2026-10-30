@@ -4,8 +4,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   canonicalSetName, parseReleaseDate, splitPrint, splitNumberSuffix, cardTuple, cleanTuple,
-  isJapaneseSet, japaneseOnly, pagesFor,
+  isJapaneseSet, japaneseOnly, pagesFor, publishCheck,
 } from '../tools/lib/jp-catalog.mjs';
+import { limitlessCodeVariants } from '../tools/lib/limitless.mjs';
 
 const KNOWN = ['Cyber Judge', 'Bonds to the End of Time', 'Latios ex Half Deck', 'SM-P Promotional cards', 'Fever-Burst Fighter'];
 
@@ -68,6 +69,21 @@ test('Thai and Indonesian promo sets are not Japanese; Chinese/Japanese promos a
   );
   assert.deepEqual(sets.map(s => s.pwName), ['A', 'B']);
   assert.deepEqual(cards, [[0, '1', 'x'], [1, '3', 'z']]);
+});
+
+test('only a complete walk may replace the committed card list', () => {
+  assert.deepEqual(publishCheck({ incomplete: 0, sets: 457, committedSets: 457 }), { ok: true, why: null });
+  assert.equal(publishCheck({ incomplete: 0, sets: 460, committedSets: 0 }).ok, true);   // first publish
+  assert.equal(publishCheck({ incomplete: 3, sets: 454, committedSets: 457 }).ok, false); // stopped at the quota
+  assert.equal(publishCheck({ incomplete: 0, sets: 120, committedSets: 457 }).ok, false); // degraded /sets
+  assert.equal(publishCheck({ incomplete: 0, sets: 0 }).ok, false);
+});
+
+test('Limitless codes are tried as spelled first — the CDN is case-sensitive', () => {
+  assert.deepEqual(limitlessCodeVariants('SV4a'), ['SV4a', 'SV4A']);
+  assert.deepEqual(limitlessCodeVariants('XY11-Bb'), ['XY11-Bb', 'XY11-BB', 'XY11Bb', 'XY11BB']);
+  assert.deepEqual(limitlessCodeVariants('L1: HG'), ['L1HG']);
+  assert.deepEqual(limitlessCodeVariants(null), []);
 });
 
 test('page counts cover the set and never drop to zero', () => {

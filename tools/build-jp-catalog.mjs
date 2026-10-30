@@ -6,14 +6,20 @@
 // answers our builds with 403) and are only shown for the 21 sets in JP_BULBA_SET_MAP,
 // which was written for the Seedot line. PokéWallet lists 462 Japanese sets.
 //
-// WHAT IT WRITES (gitignored until PokéWallet agrees to republishing — see README):
-//   data/jp-catalog/sets.json   [{ id, name, pwName, code, date, cards, limitless }]
-//   data/jp-catalog/cards.json  { cards: [[setIndex, number, name, print, rarity, ref], …] }
+// WHAT IT WRITES:
+//   data/jp-cat/                committed: what the app reads (see writeAppFiles below);
+//                               replaced only by a COMPLETE walk (publishCheck)
+//   data/jp-catalog/sets.json   gitignored build side: [{ id, name, pwName, code, date, cards, limitless }]
+//   data/jp-catalog/cards.json  gitignored build side: [[setIndex, number, name, print, rarity, ref], …]
 //   tools/jp-catalog-report.md  totals + a card-by-card check against Bulbapedia for the
 //                               Pokémon in data/jp.json
 // `name` keeps Bulbapedia's spelling for the 21 sets it shares (so existing JP checklist
 // ids can carry over), and drops PokéWallet's code prefix elsewhere. `limitless` is the
-// CDN code when Limitless has scans (from tools/jp-gap-size.json, else JP_BULBA_SET_MAP).
+// CDN code when Limitless has scans: JP_BULBA_SET_MAP, then tools/jp-gap-size.json if a
+// local sizing run left one, then the committed data/jp-cat/sets.json — and only a set
+// none of those knows (a new release) is checked against the Limitless CDN, a handful of
+// HEAD requests. CI has no gap file, so without the carry-over a weekly rebuild would
+// mark every modern set as unscanned.
 //
 // COST: /sets once, then one request per 200 cards of each set — ≈491 requests in all
 // (sized 2026-10-30). Every set's raw answer is cached in tools/.cache/, so a run that
@@ -30,9 +36,12 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadEnvKey } from './lib/apitcg-key.mjs';
 import { createClient, listOf, matchJpRows } from './lib/pokewallet.mjs';
-import { canonicalSetName, parseReleaseDate, cardTuple, cleanTuple, japaneseOnly, pagesFor } from './lib/jp-catalog.mjs';
+import {
+  canonicalSetName, parseReleaseDate, cardTuple, cleanTuple, isJapaneseSet, japaneseOnly, pagesFor, publishCheck,
+} from './lib/jp-catalog.mjs';
 import { JP_BULBA_SET_MAP } from '../js/api/bulba-jp.js';
 import { assignJpKeys, jpEra, nameShardLetters } from '../js/api/jp-model.js';
+import { findLimitlessCode } from './lib/limitless.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT_DIR = resolve(ROOT, 'data/jp-catalog');
@@ -73,6 +82,10 @@ async function main() {
   const knownNames = Object.keys(JP_BULBA_SET_MAP);
   const limitlessById = new Map();
   if (existsSync(GAP_FILE)) for (const r of readJSON(GAP_FILE).sets || []) limitlessById.set(String(r.set_id), r.limitless || null);
+  // What the committed catalogue already knows (null included: "checked, no scans").
+  const committedLimitless = new Map();
+  const committedFile0 = resolve(APP_DIR, 'sets.json');
+  if (existsSync(committedFile0)) for (const s of readJSON(committedFile0).sets || []) committedLimitless.set(`${s.name}\u0000${s.code}`, s.limitless ?? null);
 
   let fetchedSets = 0, cachedSets = 0, stoppedWhy = null;
   const incomplete = [];
@@ -112,6 +125,7 @@ async function main() {
   const sets = [];
   const cards = [];
   const unavailableSets = [];
+  let newChecks = 0;
   for (const s of jpSets) {
     const file = cacheFile(s.set_id);
     if (!existsSync(file)) { incomplete.push(s.name); continue; }
@@ -119,20 +133,33 @@ async function main() {
     if (unavailable) { unavailableSets.push(`${s.name} [${s.set_id}]`); continue; }
     const name = canonicalSetName(s.name, knownNames);
     const known = JP_BULBA_SET_MAP[name];
+    const code = s.set_code || null;
+    const carried = `${name}\u0000${code}`;
+    let limitless = known?.code || limitlessById.get(String(s.set_id)) || null;
+    // (Thai/Indonesian promo sets never reach the app, so they are not worth a check.)
+    if (!known?.code && !limitlessById.has(String(s.set_id)) && isJapaneseSet(s.name)) {
+      limitless = committedLimitless.has(carried) ? committedLimitless.get(carried)
+        : (newChecks++, await findLimitlessCode(code, Number(s.number_count) || rows.length));
+    }
     const idx = sets.length;
     sets.push({
-      id: String(s.set_id), name, pwName: s.name, code: s.set_code || null,
-      date: parseReleaseDate(s.release_date), cards: Number(s.number_count) || rows.length,
-      limitless: known?.code || limitlessById.get(String(s.set_id)) || null,
+      id: String(s.set_id), name, pwName: s.name, code,
+      date: parseReleaseDate(s.release_date), cards: Number(s.number_count) || rows.length, limitless,
     });
     for (const c of rows) cards.push(cardTuple(idx, c));
   }
+  if (newChecks) say(`checked ${newChecks} set(s) no source knew against the Limitless CDN.`);
 
   const builtAt = new Date().toISOString();
   writeFileSync(resolve(OUT_DIR, 'sets.json'), JSON.stringify({ schemaVersion: 1, builtAt, source: 'pokewallet', sets }, null, 1) + '\n');
   writeFileSync(resolve(OUT_DIR, 'cards.json'), JSON.stringify({ schemaVersion: 1, builtAt, source: 'pokewallet',
     fields: ['set', 'number', 'name', 'print', 'rarity', 'ref'], cards }) + '\n');
-  writeAppFiles(sets, cards, builtAt);
+  // data/jp-cat/ is committed and served: only a complete walk may replace it.
+  const committedFile = resolve(APP_DIR, 'sets.json');
+  const committedSets = existsSync(committedFile) ? (readJSON(committedFile).sets || []).length : 0;
+  const verdict = publishCheck({ incomplete: incomplete.length, sets: japaneseOnly(sets, []).sets.length, committedSets });
+  if (verdict.ok) writeAppFiles(sets, cards, builtAt);
+  else say(`! data/jp-cat/ left as it was (${verdict.why}) — run again to finish the walk.`);
 
   writeReport({ sets, cards, client, fetchedSets, cachedSets, incomplete, stoppedWhy, unavailableSets, failed });
   if (failed.length) say(`${failed.length} set(s) failed this run: ${failed.join('; ')}`);

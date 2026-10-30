@@ -102,6 +102,23 @@ export function japaneseOnly(sets, cards) {
   return { sets: keptSets, cards: keptCards };
 }
 
+/**
+ * May this run replace the committed app files (data/jp-cat/)? Only a COMPLETE walk may:
+ * the weekly CI run has no cache, so a walk cut short by the quota or an outage would
+ * otherwise commit a catalogue missing whole sets — and every visitor would lose those
+ * cards until the next good week. Also refuses a set list that shrank by more than 10%
+ * against the committed one, which is what a degraded /sets answer looks like.
+ * @returns {{ok:boolean, why:string|null}}
+ */
+export function publishCheck({ incomplete = 0, sets = 0, committedSets = 0 } = {}) {
+  if (incomplete > 0) return { ok: false, why: `${incomplete} set(s) not fetched` };
+  if (!sets) return { ok: false, why: 'no sets' };
+  if (committedSets && sets < committedSets * 0.9) {
+    return { ok: false, why: `only ${sets} sets against ${committedSets} committed` };
+  }
+  return { ok: true, why: null };
+}
+
 /** Pages needed for a set at `limit` rows per page; at least one. */
 export function pagesFor(cardCount, limit = 200) {
   return Math.max(1, Math.ceil((Number(cardCount) || 0) / limit));
