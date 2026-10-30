@@ -31,13 +31,14 @@
 // written. Run: node tools/build-jp-catalog.mjs [--max N] [--refresh | --emit-only]
 // =============================================================================
 
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadEnvKey } from './lib/env-key.mjs';
 import { createClient, listOf, matchJpRows } from './lib/pokewallet.mjs';
 import {
   canonicalSetName, parseReleaseDate, cardTuple, cleanTuple, isJapaneseSet, japaneseOnly, pagesFor, publishCheck,
+  stampBuiltAt,
 } from './lib/jp-catalog.mjs';
 import { JP_BULBA_SET_MAP } from '../js/api/bulba-jp.js';
 import { assignJpKeys, jpEra, nameShardLetters } from '../js/api/jp-model.js';
@@ -177,7 +178,8 @@ async function main() {
  * No PokéWallet ids (`ref`): they are 60% of cards.json and only the image build needs
  * them. Keys come from jp-model.assignJpKeys, so ids here, in the app and in the image
  * build are the same strings. Rebuilt from scratch each time, so a letter that empties
- * out cannot leave a stale shard behind.
+ * out cannot leave a stale shard behind — but a file whose content did not change keeps
+ * its committed builtAt (stampBuiltAt), so an unchanged catalogue produces no diff.
  */
 function writeAppFiles(allSets, rawCards, builtAt) {
   const { sets, cards } = japaneseOnly(allSets, rawCards.map(cleanTuple));
@@ -191,10 +193,18 @@ function writeAppFiles(allSets, rawCards, builtAt) {
     const row = [setKeys[c[0]], c[1], c[2], c[3], numKeys[i]];
     for (const l of nameShardLetters(c[2])) (shards.get(l) || shards.set(l, []).get(l)).push(row);
   });
+  const previous = new Map();
+  if (existsSync(APP_DIR)) {
+    for (const f of readdirSync(APP_DIR)) {
+      try { previous.set(f, readJSON(resolve(APP_DIR, f))); } catch { /* unreadable: just rewrite it */ }
+    }
+  }
+  const write = (file, body) =>
+    writeFileSync(resolve(APP_DIR, file), JSON.stringify(stampBuiltAt(body, previous.get(file), builtAt)) + '\n');
   rmSync(APP_DIR, { recursive: true, force: true });
   mkdirSync(APP_DIR, { recursive: true });
-  writeFileSync(resolve(APP_DIR, 'sets.json'), JSON.stringify({ schemaVersion: 1, builtAt, source: 'pokewallet', sets: appSets }) + '\n');
-  for (const [l, rows] of shards) writeFileSync(resolve(APP_DIR, `cards-${l}.json`), JSON.stringify({ schemaVersion: 1, builtAt, rows }) + '\n');
+  write('sets.json', { schemaVersion: 1, builtAt, source: 'pokewallet', sets: appSets });
+  for (const [l, rows] of shards) write(`cards-${l}.json`, { schemaVersion: 1, builtAt, rows });
   say(`app files: ${appSets.length} sets, ${shards.size} name shards (largest ${Math.max(...[...shards.values()].map(r => r.length))} rows).`);
 }
 
