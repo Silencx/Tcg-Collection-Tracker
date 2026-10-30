@@ -2,7 +2,7 @@
 // api/router.js — provider failover.
 //
 //   Master card index    : snapshot shards → TCGdex EN (no further fallback)
-//   Set names/dates/syms : snapshot → TCGdex → legacy (TCGdex /sets, names only)
+//   Set names/dates/syms : snapshot → TCGdex
 //   Set cards (one set)  : TCGdex
 //   JA raw rows          : snapshot shards → live Bulbapedia. The app reads Japanese
 //                          cards through api/jp-source.js, which tries the PokéWallet
@@ -19,7 +19,6 @@
 
 import { tcgdex } from './providers/tcgdex.js';
 import { snapshot } from './providers/snapshot.js';
-import * as legacy from './providers/legacy.js';
 import * as bulbaJp from './bulba-jp.js';
 import { mergeCardSets, mergeSource } from './merge.js';
 
@@ -90,37 +89,29 @@ export async function getCards(names, { forceRefresh = false } = {}) {
 
 /**
  * Set metadata (localized names + EN release dates + EN symbols).
- * Order: snapshot → live TCGdex → legacy (names only).
- * @returns {Promise<{names:Object, dates:Object, symbols:Object, source:'snapshot'|'tcgdex'|'legacy'}>}
+ * Order: snapshot → live TCGdex.
+ *
+ * Nothing sits behind TCGdex: tcgdex.getSetMeta catches every request on its own (and
+ * the abort at the timeout), so when TCGdex is down it answers with empty maps rather
+ * than throwing, and the grid falls back to set ids and the 1999 sort date.
+ * @returns {Promise<{names:Object, dates:Object, symbols:Object, source:'snapshot'|'tcgdex'}>}
  */
 export async function getSetMeta({ forceRefresh = false, setIds = [] } = {}) {
-  if (forceRefresh) primaryHealthy = true;
   if (!forceRefresh) {
     try {
       const meta = await snapshot.getSetMeta(setIds);
       return { ...setMetaShape(meta), source: 'snapshot' };
     } catch (e) { /* snapshot miss/absent → go live */ }
   }
-  if (primaryHealthy) {
-    try {
-      // withSeries:false — the series sweep is ~116 extra requests and only the BUILD
-      // needs it. A browser that has fallen through to live set meta is already paying
-      // for nine /sets sweeps; the picker degrades to one ungrouped list rather than
-      // tripling that.
-      const meta = await withTimeout(signal => tcgdex.getSetMeta({ signal, setIds, withSeries: false }));
-      return { ...setMetaShape(meta), source: 'tcgdex' };
-    } catch (err) {
-      console.warn('[router] TCGdex set meta unavailable → legacy fallback:', err.message);
-      primaryHealthy = false;
-    }
-  }
-  // legacy.fetchAllSetNames is TCGdex /sets per language: names only, no dates/art/counts.
-  const names = await legacy.fetchAllSetNames();
-  return { ...setMetaShape({ names }), source: 'legacy' };
+  // withSeries:false — the series sweep is ~116 extra requests and only the BUILD needs
+  // it. A browser that has fallen through to live set meta is already paying for nine
+  // /sets sweeps; the picker degrades to one ungrouped list rather than tripling that.
+  const meta = await withTimeout(signal => tcgdex.getSetMeta({ signal, setIds, withSeries: false }));
+  return { ...setMetaShape(meta), source: 'tcgdex' };
 }
 
 /**
- * One shape for all three branches, so a consumer never has to ask which one answered.
+ * One shape for both branches, so a consumer never has to ask which one answered.
  * Every optional map defaults to empty rather than undefined — callers index into these
  * directly, and `undefined[id]` throws where `{}[id]` is a clean miss.
  */

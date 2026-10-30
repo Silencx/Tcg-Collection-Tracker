@@ -246,7 +246,7 @@ export async function getCards(names, { signal, withVariants = true } = {}) {
  *   so it is on by default for the build and off for the browser, which reads them from
  *   the committed snapshot.
  * @returns {Promise<{names,dates,symbols,logos,counts,setSeries,series,lang}>}
- *   names:     { langCode: { setId: localizedName } } — same shape as legacy.fetchAllSetNames
+ *   names:     { langCode: { setId: localizedName } }
  *   dates:     { setId: 'YYYY-MM-DD' }                — release dates (drives set/era sort)
  *   symbols:   { setId: symbolUrl }                   — set symbols (.webp), small mono glyph
  *   logos:     { setId: logoUrl }                     — set logos (.webp), the wordmark art

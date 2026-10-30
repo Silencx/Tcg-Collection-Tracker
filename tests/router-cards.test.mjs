@@ -1,5 +1,5 @@
-// router.getCards with TCGdex down, now that the card index has no legacy fallback
-// (pokemontcg.io is shutting down). fetch is stubbed: the snapshot's data/ files come
+// router.getCards with TCGdex down — the card index has no fallback behind TCGdex.
+// fetch is stubbed: the snapshot's data/ files come
 // from an in-memory table, every other request fails like a dead network.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

@@ -16,7 +16,6 @@ import {
   LANGUAGES, PLACEHOLDER_LANGS, NATIVE_NAMES, BADGE_ORDER, ERA_MAP, CACHE_TTL,
 } from '../config.js';
 import { limitlessJpUrl, tcgdexAssetBase, tcgdexSymbolUrl } from '../api/images.js';
-import { detectNew } from '../api/providers/legacy.js';
 import { router } from '../api/router.js';
 import { variantBadges, printsSummary } from '../api/variants.js';
 import { loadImageIndex, localImage } from '../api/local-images.js';
@@ -1370,6 +1369,12 @@ async function buildAll(forceRefresh){
     body.appendChild(retry);
     if(btn){btn.disabled=false;btn.textContent='↺ Refresh';}
   }
+}
+
+/** Cards in `newCards` whose id was not in `oldCards` — the Refresh notice's "N new". */
+function detectNew(oldCards,newCards){
+  const old=new Set((oldCards||[]).map(c=>c.id));
+  return newCards.filter(c=>!old.has(c.id));
 }
 
 function doRefresh(){buildAll(true);}
