@@ -9,37 +9,39 @@
 // downstream via JP_BULBA_SET_MAP + images.limitlessJpUrl.
 //
 // JP_BULBA_SET_MAP is a static table (JP set name → Limitless code + era + date +
-// symbol); it only needs editing when a new JP set with our Pokémon ships.
+// symbol); it only needs editing when a new JP set with our Pokémon ships. `sym` is
+// the TCGdex symbol of the closest EN set (TCGdex has no usable JP symbols), written
+// out exactly as data/sets.json's `symbols` map has it for that set id.
 // =============================================================================
 
 export const JP_BULBA_SET_MAP = {
   // ── EX / PCG era ── Limitless ORB blocked → placeholder
-  'Movie Commemoration VS Pack':      {code:null,  era:'ex',   date:'2003-07-01', sym:'https://images.pokemontcg.io/ex2/symbol.png'},
-  'Miracle of the Desert':            {code:null,  era:'ex',   date:'2004-01-16', sym:'https://images.pokemontcg.io/ex2/symbol.png'},
-  'Latios ex Half Deck':              {code:null,  era:'ex',   date:'2004-01-16', sym:'https://images.pokemontcg.io/ex2/symbol.png'},
-  'Undone Seal':                      {code:null,  era:'ex',   date:'2004-08-20', sym:'https://images.pokemontcg.io/ex5/symbol.png'},
-  'Deoxys Constructed Starter Deck':  {code:null,  era:'ex',   date:'2004-11-01', sym:'https://images.pokemontcg.io/ex8/symbol.png'},
-  'Mirage Forest':                    {code:null,  era:'ex',   date:'2004-10-22', sym:'https://images.pokemontcg.io/ex12/symbol.png'},
-  'Miracle Crystal':                  {code:null,  era:'ex',   date:'2005-11-25', sym:'https://images.pokemontcg.io/ex14/symbol.png'},
-  'World Champions Pack':             {code:null,  era:'ex',   date:'2006-08-20', sym:'https://images.pokemontcg.io/ex16/symbol.png'},
+  'Movie Commemoration VS Pack':      {code:null,  era:'ex',   date:'2003-07-01', sym:'https://assets.tcgdex.net/univ/ex/ex2/symbol.webp'},
+  'Miracle of the Desert':            {code:null,  era:'ex',   date:'2004-01-16', sym:'https://assets.tcgdex.net/univ/ex/ex2/symbol.webp'},
+  'Latios ex Half Deck':              {code:null,  era:'ex',   date:'2004-01-16', sym:'https://assets.tcgdex.net/univ/ex/ex2/symbol.webp'},
+  'Undone Seal':                      {code:null,  era:'ex',   date:'2004-08-20', sym:'https://assets.tcgdex.net/univ/ex/ex5/symbol.webp'},
+  'Deoxys Constructed Starter Deck':  {code:null,  era:'ex',   date:'2004-11-01', sym:'https://assets.tcgdex.net/univ/ex/ex8/symbol.webp'},
+  'Mirage Forest':                    {code:null,  era:'ex',   date:'2004-10-22', sym:'https://assets.tcgdex.net/univ/ex/ex12/symbol.webp'},
+  'Miracle Crystal':                  {code:null,  era:'ex',   date:'2005-11-25', sym:'https://assets.tcgdex.net/univ/ex/ex14/symbol.webp'},
+  'World Champions Pack':             {code:null,  era:'ex',   date:'2006-08-20', sym:'https://assets.tcgdex.net/univ/ex/ex16/symbol.webp'},
   // ── DP era ── Limitless ORB blocked → placeholder
-  'Bonds to the End of Time':         {code:null,  era:'dp',   date:'2008-07-10', sym:'https://images.pokemontcg.io/dp5/symbol.png'},
+  'Bonds to the End of Time':         {code:null,  era:'dp',   date:'2008-07-10', sym:'https://assets.tcgdex.net/univ/dp/dp5/symbol.webp'},
   // ── BW era ── Limitless ORB blocked → placeholder
-  'Psycho Drive':                     {code:null,  era:'bw',   date:'2011-09-16', sym:'https://images.pokemontcg.io/bw3/symbol.png'},
+  'Psycho Drive':                     {code:null,  era:'bw',   date:'2011-09-16', sym:'https://assets.tcgdex.net/univ/bw/bw3/symbol.webp'},
   // ── XY era ── mixed (split sets ORB-blocked)
-  'Wild Blaze':                       {code:'XY2', era:'xy',   date:'2014-02-08', sym:'https://images.pokemontcg.io/xy2/symbol.png'},
-  'Fever-Burst Fighter':              {code:null,  era:'xy',   date:'2014-10-25', sym:'https://images.pokemontcg.io/xy5/symbol.png'},
-  'XY-P Promotional cards':           {code:'XYP', era:'xy',   date:'2013-10-12', sym:'https://images.pokemontcg.io/xyp/symbol.png'},
-  'Rage of the Broken Heavens':       {code:'XY9', era:'xy',   date:'2016-01-09', sym:'https://images.pokemontcg.io/xy9/symbol.png'},
+  'Wild Blaze':                       {code:'XY2', era:'xy',   date:'2014-02-08', sym:'https://assets.tcgdex.net/univ/xy/xy2/symbol.webp'},
+  'Fever-Burst Fighter':              {code:null,  era:'xy',   date:'2014-10-25', sym:'https://assets.tcgdex.net/univ/xy/xy5/symbol.webp'},
+  'XY-P Promotional cards':           {code:'XYP', era:'xy',   date:'2013-10-12', sym:'https://assets.tcgdex.net/univ/xy/xyp/symbol.webp'},
+  'Rage of the Broken Heavens':       {code:'XY9', era:'xy',   date:'2016-01-09', sym:'https://assets.tcgdex.net/univ/xy/xy9/symbol.webp'},
   // ── SM era ── all load ✅
-  'Sky-Splitting Charisma':           {code:'SM7', era:'sm',   date:'2018-05-03', sym:'https://images.pokemontcg.io/sm7/symbol.png'},
+  'Sky-Splitting Charisma':           {code:'SM7', era:'sm',   date:'2018-05-03', sym:'https://assets.tcgdex.net/univ/sm/sm7/symbol.webp'},
   'SM-P Promotional cards':           {code:'SMP', era:'sm',   date:'2017-01-27', sym:'https://assets.tcgdex.net/univ/sm/smp/symbol.webp'},
   // ── S era (Sword & Shield JP) ── all load ✅
-  'Amazing Volt Tackle':              {code:'S4',  era:'swsh', date:'2020-10-16', sym:'https://images.pokemontcg.io/swsh4/symbol.png'},
-  'Jet-Black Spirit':                 {code:'S6K', era:'swsh', date:'2021-09-24', sym:'https://images.pokemontcg.io/swsh6/symbol.png'},
-  'Lost Abyss':                       {code:'S11', era:'swsh', date:'2022-07-15', sym:'https://images.pokemontcg.io/swsh11/symbol.png'},
+  'Amazing Volt Tackle':              {code:'S4',  era:'swsh', date:'2020-10-16', sym:'https://assets.tcgdex.net/univ/swsh/swsh4/symbol.webp'},
+  'Jet-Black Spirit':                 {code:'S6K', era:'swsh', date:'2021-09-24', sym:'https://assets.tcgdex.net/univ/swsh/swsh6/symbol.webp'},
+  'Lost Abyss':                       {code:'S11', era:'swsh', date:'2022-07-15', sym:'https://assets.tcgdex.net/univ/swsh/swsh11/symbol.webp'},
   // ── SV era ── all load ✅
-  'Cyber Judge':                      {code:'SV5M',era:'sv',   date:'2024-01-26', sym:'https://images.pokemontcg.io/sv5/symbol.png'},
+  'Cyber Judge':                      {code:'SV5M',era:'sv',   date:'2024-01-26', sym:'https://assets.tcgdex.net/univ/sv/sv05/symbol.webp'},
   // ── M era (Mega expansions) ── load ✅
   'Mega Brave':                       {code:'M1L', era:'sv',   date:'2025-08-01', sym:null},
 };
@@ -93,8 +95,8 @@ async function fetchWikitext(pokeName, fetchImpl) {
  * "this Pokémon has no JP cards" (see fetchWikitext).
  */
 export async function fetchJpRawByName(names, fetchImpl = fetch) {
-  // Parallel, matching legacy.js's fetchBulbaData, which requests the same pages
-  // the same way — this was a sequential for/await, so a five-Pokémon list paid
+  // Parallel, as the old legacy.js fetchBulbaData requested the same pages — this
+  // was a sequential for/await, so a five-Pokémon list paid
   // five round-trips end to end instead of one.
   //
   // Promise.all rather than the tcgdex pool on purpose: this module imports
