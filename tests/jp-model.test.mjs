@@ -105,3 +105,21 @@ test('Master Set and TMS ticks of the same card land on the same new id', () => 
   const i = replay.findIndex(r => r.jpset === 'Cyber Judge');
   assert.equal(migrateJpId(`JP_jp_Seedot_Cyber Judge_${i}`, { replay }), migrateJpId('JP_SV5M_003'));
 });
+
+// Per-print tracking (js/ui/prints-model.js) stores `${cardId}#${printKey}`. Such an id
+// must never be read as an old JP card id and "migrated" into something else.
+test('a print id is never an old JP id', async () => {
+  const { PRINT_SEP, printId } = await import('../js/ui/prints-model.js');
+  assert.equal(PRINT_SEP, '#', 'jp-model.js hard-codes the separator; keep the two in step');
+  for (const id of [
+    printId('JP_miracle-of-the-desert_1', 'reverse'),
+    printId('JP_SV5M_003', 'reverse'),
+    printId('JP_jp_Seedot_Miracle of the Desert_0', 'holo'),
+    'JP_x_1#reverse',
+  ]) {
+    assert.equal(parseOldTmsId(id), null, id);
+    assert.equal(parseOldMasterId(id), null, id);
+    assert.equal(isOldJpId(id), false, id);
+    assert.equal(migrateJpId(id), null, id);
+  }
+});
