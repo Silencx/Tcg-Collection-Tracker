@@ -1506,3 +1506,10 @@ main{width:min(100%,var(--page-w));margin:0 auto;padding:12px;}
 @media print{.picker-overlay{display:none!important;}}
 
 .tms-toolbar-sep{width:1px;background:var(--c-border,#e0e0e0);height:18px;margin:0 2px;flex-shrink:0;}
+
+/* Data-source credits (index.html). Muted and small: it is a footnote, not chrome.
+   Hidden in print, where the sheet is a checklist and every line costs paper. */
+.site-credits{max-width:900px;margin:28px auto 18px;padding:0 16px;font-size:var(--fs-sm);line-height:1.6;text-align:center;color:var(--c-text-muted,#999);}
+.site-credits a{color:var(--c-text-dim,#555);text-decoration:underline;text-underline-offset:2px;}
+.site-credits a:hover{color:var(--c-accent-ink,#2e7d32);}
+@media print{.site-credits{display:none!important;}}

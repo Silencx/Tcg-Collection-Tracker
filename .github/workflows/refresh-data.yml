@@ -58,6 +58,17 @@ jobs:
           APITCG_KEY: ${{ secrets.APITCG_KEY }}
         run: node tools/build-data.mjs
 
+      # The Japanese card list (data/jp-cat/: every Japanese set, any Pokémon) from
+      # PokéWallet, ~490 requests. POKEWALLET_IO_PROD_KEY is optional: without it the
+      # script exits cleanly and the committed list stays as it is. Only a COMPLETE walk
+      # replaces the committed files, so a run cut short by the quota cannot shrink the
+      # list. continue-on-error: a PokéWallet outage must not cost the week's TCGdex refresh.
+      - name: Build Japanese card list
+        continue-on-error: true
+        env:
+          POKEWALLET_IO_PROD_KEY: ${{ secrets.POKEWALLET_IO_PROD_KEY }}
+        run: node tools/build-jp-catalog.mjs
+
       - name: Commit and push if changed
         run: |
           git config user.name "github-actions[bot]"

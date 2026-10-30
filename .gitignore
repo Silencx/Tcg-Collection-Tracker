@@ -40,10 +40,12 @@ tools/jp-gap-size.json
 # "Hosted card images").
 img/
 data/img-index.json
-# Japanese card catalogue (tools/build-jp-catalog.mjs) — same rule: PokéWallet data,
-# local until they agree. Its raw per-set cache never goes anywhere.
+# Japanese card catalogue (tools/build-jp-catalog.mjs). data/jp-cat/ — set names, card
+# numbers and card names — IS committed: the app serves it. Everything below stays local:
+# the build-side copy carries PokéWallet's own card ids, and the raw per-set cache is
+# their full API answers. To withdraw the published list, revert the commit that added
+# data/jp-cat/; the app falls back to Bulbapedia on its own when the files are gone.
 data/jp-catalog/
-data/jp-cat/
 tools/jp-catalog-report.md
 tools/.cache/
 
