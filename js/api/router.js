@@ -106,10 +106,9 @@ export async function getSetMeta({ forceRefresh = false, setIds = [] } = {}) {
     try {
       // withSeries:false — the series sweep is ~116 extra requests and only the BUILD
       // needs it. A browser that has fallen through to live set meta is already paying
-      // for nine /sets sweeps; the picker degrades to one ungrouped list rather than
-      // tripling that.
+      // for nine /sets sweeps, so the series data comes from the snapshot instead.
       const meta = await withTimeout(signal => tcgdex.getSetMeta({ signal, setIds, withSeries: false }));
-      return { ...setMetaShape(meta), source: 'tcgdex' };
+      return { ...setMetaShape(await withSnapshotSeries(meta)), source: 'tcgdex' };
     } catch (err) {
       console.warn('[router] TCGdex set meta unavailable → legacy fallback:', err.message);
       primaryHealthy = false;
@@ -117,7 +116,25 @@ export async function getSetMeta({ forceRefresh = false, setIds = [] } = {}) {
   }
   // legacy.fetchAllSetNames is TCGdex /sets per language: names only, no dates/art/counts.
   const names = await legacy.fetchAllSetNames();
-  return { ...setMetaShape({ names }), source: 'legacy' };
+  return { ...setMetaShape(await withSnapshotSeries({ names })), source: 'legacy' };
+}
+
+/**
+ * Live set meta with the snapshot's series data filled in. Without it the Master Set
+ * page has no series names for its era headings (ui/era-model.js) and the picker no
+ * grouping — so a Refresh, which always goes live, would lose both for 24h of cache.
+ * Live values win where both have one; a missing or unreadable snapshot changes nothing.
+ */
+async function withSnapshotSeries(meta) {
+  try {
+    const snap = await snapshot.getSeries();
+    const hasSeries = Object.keys(meta.series || {}).length > 0;
+    return {
+      ...meta,
+      setSeries: { ...snap.setSeries, ...(meta.setSeries || {}) },
+      series: hasSeries ? meta.series : snap.series,
+    };
+  } catch { return meta; }
 }
 
 /**

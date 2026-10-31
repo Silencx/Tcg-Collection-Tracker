@@ -20,7 +20,7 @@ import {
   loadCache, saveCache, clearCardCache,
 } from '../state.js';
 import {
-  LANGUAGES, PLACEHOLDER_LANGS, NATIVE_NAMES, BADGE_ORDER, ERA_MAP,
+  LANGUAGES, PLACEHOLDER_LANGS, NATIVE_NAMES, BADGE_ORDER,
   PTCGIO_SERIES_ERA, POKEMON_CATALOG, CACHE_TTL,
 } from '../config.js';
 import {
@@ -47,6 +47,7 @@ import {
   planGridVisibility, blockAllHidden, estimateGridHeight,
   KIND_CARD, KIND_DIVIDER, KIND_OTHER,
 } from './filter-pass.js';
+import { seriesNames, eraKey, eraLabel } from './era-model.js';
 import { setNavReset, setNavRebuild, setNavSync } from './setnav.js';
 import { toggleBlockCollapsed, applyCollapseState, resetCollapse } from './collapse.js';
 import { ttlFor, cacheAge } from './notify-model.js';
@@ -912,10 +913,12 @@ function renderBySet(enCards, setNamesAll, container, setMeta = { dates: {}, sym
 
   const setsMap=buildSetsMap(enCards,setNamesAll,setMeta);
   const gm=gridMetrics(container);
-  // Group by ERA for display — use si.era so that e.g. "me" sets appear under XY Era
+  // Group by ERA for display: the set's TCGdex series from sets.json, not the CDN
+  // segment, which is a guess for cards listed without art (see era-model.js eraKey).
+  const names=seriesNames(setMeta.series);
   const bySeries=new Map();
   setsMap.forEach(si=>{
-    const key=si.era||si.series;
+    const key=eraKey(si.tcgdexSetId,si.era||si.series,setMeta.setSeries,names);
     if(!bySeries.has(key)) bySeries.set(key,[]);
     bySeries.get(key).push(si);
   });
@@ -950,7 +953,7 @@ function renderBySet(enCards, setNamesAll, container, setMeta = { dates: {}, sym
 
     // Build the whole era detached, then attach it in one go (flushed below).
     const frag=document.createDocumentFragment();
-    mkEra(frag,ERA_MAP[series]||series||'Other Sets',series);
+    mkEra(frag,eraLabel(series,names),series);
     sortedSets.forEach(si=>{
       try{
       const block=mkSetBlock(si.combined,si.symSrc,'c-green',frag);
@@ -1436,7 +1439,9 @@ async function buildAll(forceRefresh){
 
   try{
     const cached=loadCache();
-    const fresh=forceRefresh||!cached||(Date.now()-cached.ts)>CACHE_TTL;
+    // A cache saved before setMeta carried setSeries would put its sets back under the
+    // guessed CDN segments (raw "cel", "2024sv" headings), so it is refetched instead.
+    const fresh=forceRefresh||!cached||(Date.now()-cached.ts)>CACHE_TTL||!cached.setMeta?.setSeries;
     let cards, setNamesAll, setMeta, source;
 
     if(!fresh){
@@ -1455,7 +1460,9 @@ async function buildAll(forceRefresh){
       // accurate release dates for exactly the sets in play.
       const setIds=[...new Set(cards.map(c=>(c&&typeof c.id==='string'&&c.id.includes('-'))?c.id.slice(0,c.id.lastIndexOf('-')):null).filter(Boolean))];
       const metaRes=await router.getSetMeta({forceRefresh,setIds});
-      setNamesAll=metaRes.names; setMeta={dates:metaRes.dates||{},symbols:metaRes.symbols||{}};
+      setNamesAll=metaRes.names;
+      setMeta={dates:metaRes.dates||{},symbols:metaRes.symbols||{},
+        setSeries:metaRes.setSeries||{},series:metaRes.series||{}};   // era headings
 
       if(forceRefresh&&cached){
         const nc=detectNew(cached.cards,cards);

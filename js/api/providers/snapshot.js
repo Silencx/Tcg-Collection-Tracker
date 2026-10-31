@@ -22,7 +22,8 @@ const DATA_BASE = new URL('../../../data/', import.meta.url);
 // set names). A sort flip re-fetched jp.json for nothing.
 //
 // Safe for the whole session by construction: router.js skips the snapshot layer
-// entirely when forceRefresh is set, and clearCache() ends in location.reload() —
+// when forceRefresh is set (all but getSeries, whose build-time series structure a
+// refresh does not re-check), and clearCache() ends in location.reload() —
 // so there is no path that expects a *changed* snapshot without a fresh document.
 // Promises (not results) are cached, which also collapses concurrent reads of the
 // same file into one request.
@@ -103,6 +104,18 @@ export async function getSetMeta(setIds = []) {
     symbols: snap.symbols || {}, logos: snap.logos || {}, counts: snap.counts || {},
     setSeries: snap.setSeries || {}, series: snap.series || {}, lang: snap.lang || {},
   };
+}
+
+/**
+ * The series structure alone — which series each set is in, and what each series is
+ * called — with no coverage check. It is build-time data the browser never fetches live
+ * (tcgdex.getSetMeta withSeries:false), so the router lends it to live set meta.
+ * Read even on a forced refresh: a refresh re-checks cards and dates, not which era a
+ * set belongs to.
+ */
+export async function getSeries() {
+  const snap = await loadJSON('sets.json');
+  return { setSeries: snap?.setSeries || {}, series: snap?.series || {} };
 }
 
 /**
@@ -231,4 +244,4 @@ export async function getJpRawPartial(names) {
   return { data, covered, missing: names.filter(n => !covered.includes(n)) };
 }
 
-export const snapshot = { getCards, getSetCards, getSetMeta, getJpRaw, getCardsPartial, getJpRawPartial };
+export const snapshot = { getCards, getSetCards, getSetMeta, getSeries, getJpRaw, getCardsPartial, getJpRawPartial };
