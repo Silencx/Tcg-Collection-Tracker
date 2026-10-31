@@ -1,15 +1,14 @@
 // =============================================================================
-// api/router.js — provider failover per the rebuild brief's ROUTING TABLE.
+// api/router.js — provider failover.
 //
-//   Master card index   : snapshot → TCGdex EN (no further fallback)
-//   Set names/dates/syms : snapshot → TCGdex → fallback legacy (TCGdex /sets, names only)
-//   JA cards             : snapshot data/jp.json → live Bulbapedia
+//   Master card index    : snapshot shards → TCGdex EN (no further fallback)
+//   Set names/dates/syms : snapshot → TCGdex
+//   Set cards (one set)  : TCGdex
+//   JA raw rows          : snapshot shards → live Bulbapedia. The app reads Japanese
+//                          cards through api/jp-source.js, which tries the PokéWallet
+//                          catalogue first and only then comes here.
 //
-// The card index used to fall back to a legacy chain (Bulbapedia EN + pokemontcg.io).
-// pokemontcg.io is shutting down and that chain's last step was TCGdex anyway, so it
-// was removed on 2026-10-30; see providers/legacy.js.
-//
-// Behaviour (per brief):
+// Behaviour:
 //   • try primary with an ~8s timeout (AbortController);
 //   • on timeout / HTTP error / empty result → fall back where a fallback exists,
 //     otherwise throw so the caller shows its failure banner with Retry;
@@ -20,7 +19,6 @@
 
 import { tcgdex } from './providers/tcgdex.js';
 import { snapshot } from './providers/snapshot.js';
-import * as legacy from './providers/legacy.js';
 import * as bulbaJp from './bulba-jp.js';
 import { mergeCardSets, mergeSource } from './merge.js';
 
@@ -43,8 +41,11 @@ function withTimeout(factory) {
  *  so a PARTIAL snapshot hit can run it for just the uncovered names. */
 async function liveCards(names) {
   if (!primaryHealthy) throw new Error('TCGdex unavailable this session');
+  // The snapshot's series map, for the image URL of a card TCGdex lists without one.
+  // sets.json is memoised and read for set meta straight after anyway.
+  const { setSeries } = await snapshot.getSeries();
   try {
-    const cards = await withTimeout(signal => tcgdex.getCards(names, { signal }));
+    const cards = await withTimeout(signal => tcgdex.getCards(names, { signal, setSeries }));
     if (cards && cards.length) return { cards, source: 'tcgdex' };
     throw new Error('empty result');
   } catch (err) {
@@ -91,54 +92,45 @@ export async function getCards(names, { forceRefresh = false } = {}) {
 
 /**
  * Set metadata (localized names + EN release dates + EN symbols).
- * Order: snapshot → live TCGdex → legacy (names only).
- * @returns {Promise<{names:Object, dates:Object, symbols:Object, source:'snapshot'|'tcgdex'|'legacy'}>}
+ * Order: snapshot → live TCGdex.
+ *
+ * Nothing sits behind TCGdex: tcgdex.getSetMeta catches every request on its own (and
+ * the abort at the timeout), so when TCGdex is down it answers with empty maps rather
+ * than throwing, and the grid falls back to set ids and the 1999 sort date.
+ * @returns {Promise<{names:Object, dates:Object, symbols:Object, source:'snapshot'|'tcgdex'}>}
  */
 export async function getSetMeta({ forceRefresh = false, setIds = [] } = {}) {
-  if (forceRefresh) primaryHealthy = true;
   if (!forceRefresh) {
     try {
       const meta = await snapshot.getSetMeta(setIds);
       return { ...setMetaShape(meta), source: 'snapshot' };
     } catch (e) { /* snapshot miss/absent → go live */ }
   }
-  if (primaryHealthy) {
-    try {
-      // withSeries:false — the series sweep is ~116 extra requests and only the BUILD
-      // needs it. A browser that has fallen through to live set meta is already paying
-      // for nine /sets sweeps, so the series data comes from the snapshot instead.
-      const meta = await withTimeout(signal => tcgdex.getSetMeta({ signal, setIds, withSeries: false }));
-      return { ...setMetaShape(await withSnapshotSeries(meta)), source: 'tcgdex' };
-    } catch (err) {
-      console.warn('[router] TCGdex set meta unavailable → legacy fallback:', err.message);
-      primaryHealthy = false;
-    }
-  }
-  // legacy.fetchAllSetNames is TCGdex /sets per language: names only, no dates/art/counts.
-  const names = await legacy.fetchAllSetNames();
-  return { ...setMetaShape(await withSnapshotSeries({ names })), source: 'legacy' };
+  // withSeries:false — the series sweep is ~116 extra requests and only the BUILD needs
+  // it. A browser that has fallen through to live set meta is already paying for nine
+  // /sets sweeps, so the series data comes from the snapshot instead.
+  const meta = await withTimeout(signal => tcgdex.getSetMeta({ signal, setIds, withSeries: false }));
+  return { ...setMetaShape(await withSnapshotSeries(meta)), source: 'tcgdex' };
 }
 
 /**
  * Live set meta with the snapshot's series data filled in. Without it the Master Set
  * page has no series names for its era headings (ui/era-model.js) and the picker no
  * grouping — so a Refresh, which always goes live, would lose both for 24h of cache.
- * Live values win where both have one; a missing or unreadable snapshot changes nothing.
+ * Live values win where both have one; a missing snapshot changes nothing.
  */
 async function withSnapshotSeries(meta) {
-  try {
-    const snap = await snapshot.getSeries();
-    const hasSeries = Object.keys(meta.series || {}).length > 0;
-    return {
-      ...meta,
-      setSeries: { ...snap.setSeries, ...(meta.setSeries || {}) },
-      series: hasSeries ? meta.series : snap.series,
-    };
-  } catch { return meta; }
+  const snap = await snapshot.getSeries();
+  const hasSeries = Object.keys(meta.series || {}).length > 0;
+  return {
+    ...meta,
+    setSeries: { ...snap.setSeries, ...(meta.setSeries || {}) },
+    series: hasSeries ? meta.series : snap.series,
+  };
 }
 
 /**
- * One shape for all three branches, so a consumer never has to ask which one answered.
+ * One shape for both branches, so a consumer never has to ask which one answered.
  * Every optional map defaults to empty rather than undefined — callers index into these
  * directly, and `undefined[id]` throws where `{}[id]` is a clean miss.
  */
@@ -156,44 +148,31 @@ function setMetaShape(meta = {}) {
 }
 
 /**
- * Every card in one set (single-set mode).
- * Order: snapshot shard → live TCGdex. NO legacy fallback: the legacy sources are
- * indexed by Pokémon, so neither of them can answer "what is in this set" at all —
- * a fallback that cannot serve the request is worse than a clean failure.
- * @returns {Promise<{cards:Array, set:Object, source:'snapshot'|'tcgdex'}>}
+ * Every card in one set (single-set mode), live from TCGdex. The snapshot ships no
+ * per-set shards, and the per-Pokémon ones cannot answer "what is in this set".
+ * @returns {Promise<{cards:Array, set:Object, source:'tcgdex'}>}
  */
 export async function getSetCards(setId, { forceRefresh = false, lang = 'en' } = {}) {
   if (forceRefresh) primaryHealthy = true;
-  // Shards are EN-only. Consulting one for a zh-Hant set id cannot hit today (the id
-  // namespaces are disjoint), but it would be an EN answer to a non-EN question the
-  // moment per-language shards ship, which is exactly the bug that is hard to see.
-  if (!forceRefresh && lang === 'en') {
-    try {
-      const hit = await snapshot.getSetCards(setId);
-      return { ...hit, source: 'snapshot' };
-    } catch (e) { /* no shard for this set → go live */ }
-  }
   const live = await withTimeout(signal => tcgdex.getSetCards(setId, { signal, lang }));
   return { ...live, source: 'tcgdex' };
 }
 
 /**
  * Raw Bulbapedia JP entries [{jpset, jpnum, pokemonName}] for the given Pokémon.
- * Order: pre-built snapshot (data/jp.json) → live Bulbapedia. A forced refresh skips
- * the snapshot. JP has no further fallback (TCGdex JA is unusable).
+ * Order: pre-built snapshot shards → live Bulbapedia for whatever they lack. JP has no
+ * further fallback (TCGdex JA is unusable).
  */
-export async function getJpRaw(names, { forceRefresh = false } = {}) {
-  if (!forceRefresh) {
-    try {
-      const hit = await snapshot.getJpRawPartial(names);
-      if (!hit.missing.length) return hit.data;
-      // Easier to split than the card index: JP rows are per-Pokémon with no
-      // cross-set metadata, and fetchJpRaw already fetches per name.
-      const live = await bulbaJp.fetchJpRaw(hit.missing);
-      return [...hit.data, ...live];
-    } catch (e) { /* snapshot miss/absent → live Bulbapedia */ }
-  }
+export async function getJpRaw(names) {
+  try {
+    const hit = await snapshot.getJpRawPartial(names);
+    if (!hit.missing.length) return hit.data;
+    // Easier to split than the card index: JP rows are per-Pokémon with no
+    // cross-set metadata, and fetchJpRaw already fetches per name.
+    const live = await bulbaJp.fetchJpRaw(hit.missing);
+    return [...hit.data, ...live];
+  } catch (e) { /* snapshot miss/absent → live Bulbapedia */ }
   return bulbaJp.fetchJpRaw(names);
 }
 
-export const router = { getCards, getSetCards, getSetMeta, getJpRaw, resetHealth, mergeCardSets, mergeSource };
+export const router = { getCards, getSetCards, getSetMeta, getJpRaw };

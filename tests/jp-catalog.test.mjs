@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   canonicalSetName, parseReleaseDate, splitPrint, splitNumberSuffix, cardTuple, cleanTuple,
-  isJapaneseSet, japaneseOnly, pagesFor, publishCheck,
+  isJapaneseSet, japaneseOnly, pagesFor, publishCheck, stampBuiltAt,
 } from '../tools/lib/jp-catalog.mjs';
 import { limitlessCodeVariants } from '../tools/lib/limitless.mjs';
 
@@ -84,6 +84,17 @@ test('Limitless codes are tried as spelled first — the CDN is case-sensitive',
   assert.deepEqual(limitlessCodeVariants('XY11-Bb'), ['XY11-Bb', 'XY11-BB', 'XY11Bb', 'XY11BB']);
   assert.deepEqual(limitlessCodeVariants('L1: HG'), ['L1HG']);
   assert.deepEqual(limitlessCodeVariants(null), []);
+});
+
+test('an unchanged app file keeps its committed builtAt, a changed one gets the new one', () => {
+  const prev = { schemaVersion: 1, builtAt: 'OLD', rows: [['cyber-judge', '001/101', 'Seedot', null, '1']] };
+  const same = { schemaVersion: 1, builtAt: 'NEW', rows: [['cyber-judge', '001/101', 'Seedot', null, '1']] };
+  const changed = { schemaVersion: 1, builtAt: 'NEW', rows: [['cyber-judge', '002/101', 'Seedot', null, '2']] };
+  // Byte-identical to the committed file, key order included: no diff to commit.
+  assert.equal(JSON.stringify(stampBuiltAt(same, prev, 'NEW')), JSON.stringify(prev));
+  assert.equal(stampBuiltAt(changed, prev, 'NEW').builtAt, 'NEW');
+  assert.equal(stampBuiltAt(same, null, 'NEW').builtAt, 'NEW', 'a new file gets this run\'s stamp');
+  assert.equal(stampBuiltAt(same, { ...prev, builtAt: null }, 'NEW').builtAt, 'NEW');
 });
 
 test('page counts cover the set and never drop to zero', () => {

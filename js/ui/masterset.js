@@ -1,33 +1,21 @@
 // =============================================================================
 // ui/masterset.js — Master-Set mode: render + interactions.
 //
-// Owns: the per-set / per-era card grid (renderBySet), language filter pills,
-// Pokémon chips + suggestions, the image-wrap/placeholder builders, the JP card
-// injection (fetches via legacy, builds the DOM here), the data orchestrator
-// (buildAll), refresh/clear/reset/sort, and the image preview modal.
-//
-// Ported from the old single-file tool. Per the project's state-object rule,
-// bare state names were rewritten to `state.<name>` (checked → state.checked,
-// activeLangs → state.activeLangs, _meta/_bulbaData/setBlockNamesMap/totalCards,
-// sortDesc, pokemonList, dismissedBanners). Persistence + cache helpers and all
-// data fetching are imported (state.js, legacy.js); URL builders from images.js.
-//
-// TMS render and the print modes are NOT here — they are Phase 4.
+// Owns: the per-era / per-set card grid (renderBySet), the language filter summary,
+// the Pokémon chips, the image-wrap/placeholder builders, the JP card injection
+// (rows from api/jp-source.js, DOM built here), the data orchestrator (buildAll),
+// refresh/clear/reset/sort, and the image preview modal. Card data comes through
+// api/router.js; the TMS mode and the print views live in tms.js and print.js.
 // =============================================================================
 
 import {
-  state, saveChk, saveMsPrints, savePoke, saveFilter, saveDismissed, saveSort,
+  state, saveChk, saveMsPrints, savePoke, saveFilter, saveSort,
   loadCache, saveCache, clearCardCache,
 } from '../state.js';
 import {
-  LANGUAGES, PLACEHOLDER_LANGS, NATIVE_NAMES, BADGE_ORDER,
-  PTCGIO_SERIES_ERA, POKEMON_CATALOG, CACHE_TTL,
+  LANGUAGES, PLACEHOLDER_LANGS, NATIVE_NAMES, BADGE_ORDER, CACHE_TTL,
 } from '../config.js';
-import {
-  limitlessIntlUrl, ptcgioToTcgdexSetId, ptcgioToTcgdexLocalId, limitlessJpUrl,
-  tcgdexAssetBase, tcgdexSymbolUrl,
-} from '../api/images.js';
-import { detectNew } from '../api/providers/legacy.js';
+import { limitlessJpUrl, tcgdexAssetBase, tcgdexSymbolUrl } from '../api/images.js';
 import { router } from '../api/router.js';
 import { variantBadges, printsSummary } from '../api/variants.js';
 import { loadImageIndex, localImage } from '../api/local-images.js';
@@ -50,7 +38,7 @@ import {
 import { seriesNames, eraKey, eraLabel } from './era-model.js';
 import { setNavReset, setNavRebuild, setNavSync } from './setnav.js';
 import { toggleBlockCollapsed, applyCollapseState, resetCollapse } from './collapse.js';
-import { ttlFor, cacheAge } from './notify-model.js';
+import { cacheAge } from './notify-model.js';
 import { record as recordNotice } from './notify.js';
 import {
   openPokemonPicker as openPokemonPickerModal, openLanguagePicker, renderLangSummary,
@@ -70,8 +58,8 @@ let statPrints = 0, statPrintsDone = 0;
 // by the pass that was going to compute them anyway, so per-set progress in the
 // sidebar — and set-scoped stat deltas below — cost no extra traversal.
 // A WeakMap, not a Map: every re-render throws its set blocks away, and a strong
-// map would pin all of them — the same unbounded-growth bug the _meta comments
-// in toggleSort record.
+// map would pin all of them — the same unbounded growth the _meta note in
+// rerenderMaster guards against.
 const blockTallies = new WeakMap();
 
 /** Adjust the running totals for one card whose checked state just changed. */
@@ -160,11 +148,7 @@ function rerenderMaster(){
   const cached = loadCache();
   if(cached && cached.cards){
     const container = document.getElementById('dyn');
-    // Save keyed (persistent) banners; let renderBySet re-create them if needed
-    // mkBanner will skip any banner whose key already exists in the DOM
-    const persistBanners = [...container.querySelectorAll('.banner[data-key]')];
     container.innerHTML = '';
-    persistBanners.forEach(b => container.appendChild(b));
     installCardDelegation(container);   // idempotent; guards against a sort before the first buildAll
     // _meta is rebuilt by renderBySet, so it must be cleared alongside
     // setBlockNamesMap — otherwise every sort toggle and Pokémon change leaves
@@ -384,10 +368,8 @@ function selectAll(){
 }
 
 // ── POKÉMON SELECTOR UI ───────────────────────────────────────────────────────
-// Master Set's chips ONLY. The h1 and the document title used to be decided here with
-// an `appMode==='tms'` branch, which made this function the de-facto owner of both for
-// every mode — so a third mode would have got Master's title. main.js's applyModeTitle
-// owns them now, for all modes, from one table; this returns early anywhere but Master.
+// Master Set's chips ONLY. The h1 and the document title belong to main.js's
+// applyModeTitle (one table for every mode); this returns early anywhere but Master.
 function renderPokeChips(){
   if(state.appMode!=='master') return;
   const c=document.getElementById('poke-chips'); if(!c) return; c.innerHTML='';
@@ -404,12 +386,9 @@ function renderPokeChips(){
     chip.appendChild(rm);
     c.appendChild(chip);
   });
-  // (The h1 stays STATIC rather than listing the Pokémon: it used to be
-  // `${names.join(' · ')} — Master Set Checklist`, which grew without bound, while
-  // every one of those names is already a removable chip immediately below it. The
-  // document title is where the long list IS useful — it names the tab and the bookmark,
-  // neither of which competes with the layout for space. Both live in main.js's
-  // MODE_TITLE table now; savePoke fires 'tcg:settings-changed', which re-applies them.)
+  // The h1 stays STATIC rather than listing the Pokémon: every name is already a chip
+  // right below it, and a list there grows without bound. The document title does list
+  // them (main.js MODE_TITLE); savePoke fires 'tcg:settings-changed', which re-applies it.
 }
 
 /**
@@ -435,11 +414,9 @@ function removePoke(name){
   onPokemonListChanged();
 }
 
-// NO normalizePokeName ANY MORE. It existed because the old bar let you TYPE a name, and
-// title-casing it by hand got 'Ho-Oh' → 'Ho-oh' and 'Tapu Koko' → 'Tapu koko' — spellings
-// the API matches nothing for, so the Pokémon silently returned zero cards. The picker
-// only ever hands back a POKEMON_CATALOG entry, which already carries the real casing,
-// irregulars included. The prefix-only autocomplete went with it.
+// No name normalization here: the picker only ever hands back a POKEMON_CATALOG entry,
+// which already carries the real casing ('Ho-Oh', 'Tapu Koko'). Title-casing a typed
+// name got those wrong, and the API then matched nothing.
 
 // ── DOM HELPERS ───────────────────────────────────────────────────────────────
 const JP_DEF = {badge:'JP', color:'#4527a0'};
@@ -528,51 +505,20 @@ function mkEra(parent,text,series){
   parent.appendChild(e); return e;
 }
 
-// mkBanner: optional dismissKey saves dismissal to localStorage
-// Also skips creation if a banner with the same key already exists in the DOM.
+// An in-flow banner at the top of #dyn. Only two exist — buildAll's "Loading…" and its
+// failure banner with a Retry button — because both describe the page you are looking
+// at; everything merely informational goes to the bell (notify.js) instead. Neither
+// expires on a timer: the loading one is removed when the work finishes, and the failure
+// one owns a control.
 //
-// opts.ttl overrides the classification in notify-model.ttlFor; opts.hasAction marks a
-// banner that contains a control the user may want to click, which forces ttl 0.
-// Every banner is also RECORDED to the notification log, including ones suppressed as
-// already-dismissed — routing them all through one call is what stops the log and the
-// page disagreeing about what happened.
-function mkBanner(parent,html,cls,dismissKey,opts={}){
-  recordNotice(html,cls);
-  if(dismissKey && state.dismissedBanners.has(dismissKey)) return null;
-  if(dismissKey && document.querySelector(`.banner[data-key="${dismissKey}"]`)) return null;
+// NOT recorded to the bell: "Loading…" is not news, and logging it put one more unread
+// row in the bell on every Master render. The failure path records its own message.
+function mkBanner(parent,html,cls){
   const e=document.createElement('div'); e.className=`banner ${cls}`;
-  if(dismissKey) e.dataset.key=dismissKey;
   const body=document.createElement('div'); body.className='banner-body'; body.innerHTML=html;
   e.appendChild(body);
-  if(dismissKey){
-    const x=document.createElement('button'); x.className='banner-close'; x.textContent='×'; x.title='Dismiss';
-    x.addEventListener('click',()=>{ state.dismissedBanners.add(dismissKey); saveDismissed(); e.remove(); });
-    e.appendChild(x);
-  }
   parent.appendChild(e);
-  const ttl=opts.ttl!=null?opts.ttl:ttlFor(cls,{dismissKey,hasAction:!!opts.hasAction});
-  if(ttl>0) autoDismiss(e,ttl);
   return e;
-}
-
-// Fade a transient banner out, PAUSING while the pointer or keyboard focus is on it —
-// a 6-second notice on a page someone is mid-read of is otherwise unreadable. Expiry
-// is never a loss: the bell keeps a copy of every message.
-function autoDismiss(e,ms){
-  let timer=0;
-  const go=()=>{
-    e.classList.add('banner-leaving');
-    const done=()=>e.remove();
-    e.addEventListener('transitionend',done,{once:true});
-    setTimeout(done,400);   // backstop: under prefers-reduced-motion there is no transition to end
-  };
-  const start=()=>{ clearTimeout(timer); timer=setTimeout(go,ms); };
-  const hold=()=>clearTimeout(timer);
-  e.addEventListener('pointerenter',hold);
-  e.addEventListener('pointerleave',start);
-  e.addEventListener('focusin',hold);
-  e.addEventListener('focusout',start);
-  start();
 }
 
 // `nameText` is plain TEXT despite the old parameter name — buildSetsMap joins the
@@ -601,18 +547,15 @@ function mkSetBlock(nameText,symSrc,headClass,parent){
 function updCount(block,n){ const e=block.querySelector('.set-count'); if(e) e.textContent=`${n} ${n===1?'entry':'entries'}`; }
 
 // ── IMAGE WRAP ────────────────────────────────────────────────────────────────
-// Priority chain per language:
-//   EN:     pokemontcg.io PNG  → TCGdex CDN (fallbackSrc) → placeholder
-//   Non-EN: TCGdex CDN (loSrc) → placeholder
-//   JP:     handled separately in fetchAndInjectJPCards
-//
-// fallbackSrc: optional secondary URL tried when loSrc fails (used for EN TCGdex fallback)
+// Image per language:
+//   EN + the other TCGdex languages: TCGdex asset CDN (loSrc) → placeholder
+//   JP: handled separately in fetchAndInjectJPCards
 //
 // PLACEHOLDER-FIRST: the placeholder is painted immediately, and the candidate image
 // loads *underneath* it — the placeholder is what gets absolutely positioned (.ph-over),
 // not the image. The old order was image-then-placeholder-on-error, so a card sat as an
-// empty box for the whole of its image load, and through up to two sequential 404s when
-// it had no artwork at all.
+// empty box for the whole of its image load, and through a 404 when it had no artwork
+// at all.
 //
 // The image deliberately keeps its original normal-flow layout: `width:100%` +
 // `aspect-ratio` means it reserves its full box even before it decodes (so the wrap
@@ -625,11 +568,11 @@ function updCount(block,n){ const e=block.querySelector('.set-count'); if(e) e.t
 // A URL that has already 404'd/403'd is skipped WITHOUT a request (img-cache.js), so
 // a language TCGdex holds no artwork for costs one failed request per URL ever
 // instead of one per render. `recheck` (the retry button) ignores that memory.
-function mkImgWrap(loSrc,cardName,localId,enSetName,symSrc,badge,bColor,cardId,fallbackSrc=null,speciesName=cardName){
+function mkImgWrap(loSrc,cardName,localId,enSetName,symSrc,badge,bColor,cardId,speciesName=cardName){
   const wrap=document.createElement('div');
   wrap.className='img-wrap';
   const nat=(NATIVE_NAMES[badge]||{})[speciesName]||null;
-  const allSources=[loSrc,fallbackSrc].filter(Boolean);
+  const allSources=[loSrc].filter(Boolean);
 
   // Retry is only offered once every candidate has failed — otherwise the button would
   // flash over every card that is merely still loading.
@@ -688,25 +631,23 @@ function mkImgWrap(loSrc,cardName,localId,enSetName,symSrc,badge,bColor,cardId,f
 // markup into their generated documents. Every interpolated value is remote or
 // user-supplied, so each is escaped here — this one function is the choke point
 // for the grid tiles AND for print.
-function buildPlaceholderHTML(symSrc,badge,bColor,cardName,nativeName,setName,localId,showRetry){
+// No retry button in here: mkImgWrap adds one only once every image source has failed.
+function buildPlaceholderHTML(symSrc,badge,bColor,cardName,nativeName,setName,localId){
   const symUrl=escapeUrl(symSrc);
   const sym=symUrl?`<img class="cp-symbol" src="${symUrl}" alt="" onerror="this.style.display='none'">`:'' ;
   const nat=nativeName?`<span class="cp-native">${escapeHtml(nativeName)}</span>`:'';
-  const retry=showRetry?`<button class="img-retry-btn">↺ retry</button>`:'';
-  return `<div class="custom-placeholder">${sym}<span class="cp-lang" style="background:${escapeHtml(bColor)}">${escapeHtml(badge)}</span><span class="cp-name">${escapeHtml(cardName)}</span>${nat}<span class="cp-set">${escapeHtml(setName)}</span><span class="cp-num">#${escapeHtml(localId)}</span>${retry}</div>`;
+  return `<div class="custom-placeholder">${sym}<span class="cp-lang" style="background:${escapeHtml(bColor)}">${escapeHtml(badge)}</span><span class="cp-name">${escapeHtml(cardName)}</span>${nat}<span class="cp-set">${escapeHtml(setName)}</span><span class="cp-num">#${escapeHtml(localId)}</span></div>`;
 }
 
 /**
  * Same placeholder as buildPlaceholderHTML, but returned as a detached ELEMENT so the
  * caller can hold a reference to it (to toggle .ph-over, or remove it once the real
- * image decodes) without re-querying the wrap. Retry is never baked in here — callers
- * add it only after every image source has failed.
+ * image decodes) without re-querying the wrap.
  */
 //
-// The markup is parsed ONCE, at first use, and cloned per card thereafter. It used
-// to be parsed per card, through a throwaway wrapper div — together with the two
-// card footers that is ~1550 HTML parses for the default Pokémon list, and ten
-// times that for a popular one.
+// The markup is parsed ONCE, at first use, and cloned per card thereafter. Parsing it
+// per card, together with the two card footers, is ~1550 HTML parses for the default
+// Pokémon list, and ten times that for a popular one.
 //
 // The template is derived FROM buildPlaceholderHTML rather than hand-written as DOM
 // calls, so the structure cannot drift from the escaping choke point documented
@@ -726,7 +667,7 @@ let phTemplate=null;
 function placeholderTemplate(){
   if(!phTemplate){
     const holder=document.createElement('div');
-    holder.innerHTML=buildPlaceholderHTML(PH_TEMPLATE_SYM,'X','#000','n','n','s','0',false);
+    holder.innerHTML=buildPlaceholderHTML(PH_TEMPLATE_SYM,'X','#000','n','n','s','0');
     phTemplate=holder.firstElementChild;
   }
   return phTemplate;
@@ -776,10 +717,10 @@ function footerTemplate(){
  * @param {string} langClass e.g. 'lang-EN' — the stylesheet carries the colour.
  * @param {string} color inline background, for badges with no stylesheet class
  *   (the placeholder languages, whose colours live in config.js).
- * @param {object} variants normalized print variants (api/variants.js); null on the
- *   legacy path and for languages TCGdex has no print data for.
+ * @param {object} variants normalized print variants (api/variants.js); null for
+ *   languages TCGdex has no print data for.
  */
-function mkCardFooter(localId,badge,{langClass=null,color=null,variants=null,isDone=false}={}){
+function mkCardFooter(localId,badge,{langClass=null,color=null,variants=null}={}){
   const f=footerTemplate().cloneNode(true);
   f.querySelector('.card-num').textContent=`#${localId}`;
   const lang=f.querySelector('.lang');
@@ -791,7 +732,7 @@ function mkCardFooter(localId,badge,{langClass=null,color=null,variants=null,isD
     const holder=document.createElement('div'); holder.innerHTML=vb;
     f.insertBefore(holder.firstElementChild,lang);
   }
-  // isDone is handled by the TILE (.done → full colour + aria-checked), not here.
+  // Owned/not owned is the TILE's business (.done → full colour + aria-checked), not here.
   return f;
 }
 
@@ -826,88 +767,50 @@ function mkPrintTile(cardId,pr,first,badge){
 }
 
 // ── BUILD SETS MAP ────────────────────────────────────────────────────────────
-// Handles both pokemontcg.io cards and TCGdex cards. Nothing fetches pokemontcg.io
-// cards any more (the legacy provider's card index was removed); the branch only
-// reads a cache the old fallback wrote, until its 24h TTL runs out.
-// pokemontcg.io card structure: { id, name, number, set:{id,name,series,releaseDate,images}, images:{small,large} }
-// TCGdex card structure:        { id, name, image:"https://assets.tcgdex.net/en/..." }
-function isPtcgioCard(card){ return !!card.set?.id; }
-
+// Cards are TCGdex-shaped (providers/tcgdex.js getCards): { id, name, species, image,
+// localId, variants }, where `image` is the EN asset base
+// "https://assets.tcgdex.net/en/{series}/{setId}/{localId}". Series and set id are read
+// from that URL rather than sliced from the id: it is the path TCGdex actually serves,
+// and the id-slicing guess is wrong for a large minority of sets (tcgdexSerieSegment).
 function buildSetsMap(enCards, setNamesAll, setMeta = { dates: {}, symbols: {} }){
   const map = new Map();
   for(const card of enCards){
-    let ptcgioSetId, series, tcgdexSetId, localId, tcgdexLocalId,
-        enName, releaseDate, symSrc, enImgSrc, enHiImgSrc;
+    if(!card.image) continue;
+    const parts = card.image.replace(/^https?:\/\/assets\.tcgdex\.net\/[^/]+\//, '').split('/').filter(Boolean);
+    if(parts.length < 2) continue;
+    const [series, setId, localId = ''] = parts;
 
-    let era; // used for ERA_MAP display grouping (separate from TCGdex CDN series)
-    if(isPtcgioCard(card)){
-      // ── pokemontcg.io path ──
-      ptcgioSetId  = card.set.id;                         // "swsh11", "sv5", "me1"
-      // series = TCGdex CDN prefix, always derived from set ID (e.g. "me" not "xy" for me1)
-      series       = ptcgioSetId.replace(/\d.*$/,'');     // "swsh","sv","me","bw","xy"...
-      // era = display grouping, uses pokemontcg.io series name for consistent era labels
-      era          = PTCGIO_SERIES_ERA[card.set.series] || series;
-      tcgdexSetId  = ptcgioToTcgdexSetId(ptcgioSetId);   // "swsh11","sv05","me01"...
-      localId      = card.number || '';                   // "13", "003", "XY23"
-      tcgdexLocalId= ptcgioToTcgdexLocalId(localId, series);
-      enName       = card.set.name;
-      releaseDate  = card.set.releaseDate || '1999/01/01';
-      // TCGdex, not card.set.images.symbol: that is a pokemontcg.io URL, and the host
-      // is going away.
-      symSrc       = setMeta.symbols[tcgdexSetId] || tcgdexSymbolUrl(series, tcgdexSetId);
-      enImgSrc     = card.images?.small  || null;
-      enHiImgSrc   = card.images?.large  || null;
-    } else {
-      // ── TCGdex fallback path ──
-      if(!card.image) continue;
-      const stripped = card.image.replace(/^https?:\/\/assets\.tcgdex\.net\/[^/]+\//, '');
-      const parts = stripped.split('/').filter(Boolean);
-      if(parts.length < 2) continue;
-      series       = parts[0];
-      era          = PTCGIO_SERIES_ERA[series] || series;
-      tcgdexSetId  = ptcgioSetId = parts[1];
-      localId      = tcgdexLocalId = parts[2] || '';
-      releaseDate  = setMeta.dates[tcgdexSetId] || '1999/01/01';
-      enName       = (setNamesAll['en']||{})[tcgdexSetId] || tcgdexSetId;
-      symSrc       = setMeta.symbols[tcgdexSetId] || tcgdexSymbolUrl(series, tcgdexSetId);
-      enImgSrc     = `${card.image}/low.webp`;
-      enHiImgSrc   = `${card.image}/high.webp`;
-    }
-
-    if(!map.has(ptcgioSetId)){
+    if(!map.has(setId)){
+      const enName = (setNamesAll['en']||{})[setId] || setId;
       const namesByBadge = {};
       for(const lang of LANGUAGES){
-        namesByBadge[lang.badge] = (setNamesAll[lang.code]||{})[tcgdexSetId] || enName;
+        namesByBadge[lang.badge] = (setNamesAll[lang.code]||{})[setId] || enName;
       }
       for(const pl of PLACEHOLDER_LANGS) namesByBadge[pl.badge] = enName;
       namesByBadge['JP'] = enName;
       const allUnique = [...new Set(Object.values(namesByBadge))];
-      map.set(ptcgioSetId,{
-        setId:ptcgioSetId, tcgdexSetId, series, era, enName, releaseDate,
-        combined: allUnique.join(' | '), namesByBadge, symSrc, cards:[]
+      map.set(setId,{
+        setId, series, enName,
+        releaseDate: setMeta.dates[setId] || '1999/01/01',
+        combined: allUnique.join(' | '), namesByBadge,
+        symSrc: setMeta.symbols[setId] || tcgdexSymbolUrl(series, setId),
+        cards:[]
       });
     }
-    map.get(ptcgioSetId).cards.push({
-      localId, tcgdexLocalId, series,
-      setId:ptcgioSetId, tcgdexSetId,
-      // Unified checklist id = TCGdex format ("sv05-163") for BOTH providers, so a
-      // checkmark survives a TCGdex↔legacy switch. For TCGdex cards this equals
-      // card.id; for legacy cards it normalizes the pokemontcg.io id to TCGdex.
+    map.get(setId).cards.push({
+      localId, series, setId,
       // name = the card's real printed name (shown, and grouped on);
       // species = the Pokémon it was matched for (keys NATIVE_NAMES). Providers
       // that don't distinguish the two fall back to name.
       name:card.name, species:card.species||card.name,
-      id:`${tcgdexSetId}-${tcgdexLocalId}`,
-      enImgSrc, enHiImgSrc,
-      ptcgoCode: card.ptcgoCode||null,
-      variants: card.variants||null,   // api/variants.js shape: five flags (+ prints, inferred); null on the legacy path
+      // Checklist id, TCGdex format ("sv05-163").
+      id:`${setId}-${localId}`,
+      variants: card.variants||null,   // api/variants.js shape: five flags (+ prints, inferred)
     });
   }
   return map;
 }
 
-// Extract a sortable numeric key from a set ID so sets within an era sort correctly.
-// e.g. "swsh11" → 11, "sv05" → 5, "sv5M" → 5.13, "xyp" → 0
 function renderBySet(enCards, setNamesAll, container, setMeta = { dates: {}, symbols: {} }){
   if(!enCards.length) return;
 
@@ -918,7 +821,7 @@ function renderBySet(enCards, setNamesAll, container, setMeta = { dates: {}, sym
   const names=seriesNames(setMeta.series);
   const bySeries=new Map();
   setsMap.forEach(si=>{
-    const key=eraKey(si.tcgdexSetId,si.era||si.series,setMeta.setSeries,names);
+    const key=eraKey(si.tcgdexSetId,si.series,setMeta.setSeries,names);
     if(!bySeries.has(key)) bySeries.set(key,[]);
     bySeries.get(key).push(si);
   });
@@ -927,16 +830,15 @@ function renderBySet(enCards, setNamesAll, container, setMeta = { dates: {}, sym
   //
   // "Korean cards exist but no public image database yet" is a standing fact about the
   // data, not an event: it was true before you opened the page and will be true after.
-  // As an in-flow banner it was two permanent amber strips pinned above the sets on every
-  // single render, saying the same thing every time — and mkBanner's dismissKey only hid
-  // them until the next Clear cache. The notification log is exactly the right home for a
+  // As an in-flow banner it would be a permanent strip above the sets on every render,
+  // saying the same thing every time. The notification log is the right home for a
   // message you read once and go back to when you wonder why KR tiles are blank.
   for(const pl of PLACEHOLDER_LANGS){
     const links=pl.sources.map(s=>`<a href="${s.url}" target="_blank" style="color:inherit;font-weight:bold">${s.name}</a>`).join(' · ');
     recordNotice(`<strong>${pl.label} (${pl.badge})</strong>: ${pl.note} — ${links}`,'banner-amber',{once:`plang-${pl.badge}`});
   }
 
-  // Sort eras and sets by actual release date from pokemontcg.io
+  // Sort eras and sets by release date (data/sets.json, or TCGdex live)
   function relDate(si){ return new Date(si.releaseDate||'1999/01/01').getTime(); }
 
   const eraEntries = [...bySeries.entries()].sort((a,b)=>{
@@ -1009,26 +911,13 @@ function renderBySet(enCards, setNamesAll, container, setMeta = { dates: {}, sym
           // TCGdex languages
           for(const langDef of LANGUAGES){
             const id=`${langDef.badge}_${card.id}`, isDone=state.checked.has(id);
-            // All languages: Limitless TPCI CDN primary → fallback → placeholder
-            // EN fallback: pokemontcg.io PNG; non-EN fallback: TCGdex CDN
-            let loSrc, hiSrc, fallbackSrc;
-            const limitlessSrc = limitlessIntlUrl(card.ptcgoCode, card.localId, langDef.badge);
-            if(langDef.badge==='EN'){
-              loSrc = limitlessSrc || card.enImgSrc;
-              hiSrc = limitlessSrc || card.enHiImgSrc || card.enImgSrc;
-              fallbackSrc = limitlessSrc ? (card.enImgSrc||null) : `${tcgdexAssetBase('en', card.series, card.tcgdexSetId, card.tcgdexLocalId)}/low.webp`;
-            } else {
-              const tcgdexBase=tcgdexAssetBase(langDef.code, card.series, card.tcgdexSetId, card.tcgdexLocalId);
-              loSrc = limitlessSrc || `${tcgdexBase}/low.webp`;
-              hiSrc = limitlessSrc || `${tcgdexBase}/high.webp`;
-              fallbackSrc = limitlessSrc ? `${tcgdexBase}/low.webp` : null;
-            }
-            state._meta.set(id,{name:{en:card.name,native:(NATIVE_NAMES[langDef.badge]||{})[spec]||null},setName:si.enName,num:`#${card.localId}`,lang:langDef.badge,langColor:langDef.color,...imgMeta([loSrc,fallbackSrc],[hiSrc]),symSrc:si.symSrc,...pmeta});
-            // EN: TCGdex fallback; non-EN: TCGdex fallback when Limitless fails
-            // (hiSrc is not passed — mkImgWrap only renders the low-res tile; the
-            // high-res candidates reach the preview/print via _meta.hiSources above.)
-            const enFallback = fallbackSrc;
-            const mkWrap=()=>mkImgWrap(loSrc,card.name,card.localId,si.enName,si.symSrc,langDef.badge,langDef.color,id,enFallback,spec);
+            // TCGdex asset CDN for every language; a missing scan falls to the placeholder.
+            const base=tcgdexAssetBase(langDef.code, card.series, card.setId, card.localId);
+            const loSrc=`${base}/low.webp`, hiSrc=`${base}/high.webp`;
+            state._meta.set(id,{name:{en:card.name,native:(NATIVE_NAMES[langDef.badge]||{})[spec]||null},setName:si.enName,num:`#${card.localId}`,lang:langDef.badge,langColor:langDef.color,...imgMeta([loSrc],[hiSrc]),symSrc:si.symSrc,...pmeta});
+            // hiSrc is not passed — mkImgWrap only renders the low-res tile; the high-res
+            // candidate reaches the preview/print via _meta.hiSources above.
+            const mkWrap=()=>mkImgWrap(loSrc,card.name,card.localId,si.enName,si.symSrc,langDef.badge,langDef.color,id,spec);
             // Tiles view: one tile per print, in place of the card's single tile.
             if(tracked&&state.printView==='tiles'){
               plist.forEach((pr,pi)=>{
@@ -1045,7 +934,7 @@ function renderBySet(enCards, setNamesAll, container, setMeta = { dates: {}, sym
             markCardToggle(el,isDone);
             const footer=mkCardFooter(card.localId,langDef.badge,
               // Chips view: the chips say everything the badges did, and are clickable.
-              {langClass:`lang-${langDef.badge}`,variants:tracked?null:card.variants,isDone});
+              {langClass:`lang-${langDef.badge}`,variants:tracked?null:card.variants});
             el.appendChild(mkWrap());
             if(tracked){
               el.appendChild(mkPrintChips(plist));
@@ -1064,7 +953,7 @@ function renderBySet(enCards, setNamesAll, container, setMeta = { dates: {}, sym
             markCardToggle(el,isDone);
             const phWrap=document.createElement('div'); phWrap.className='img-wrap';
             phWrap.appendChild(mkPlaceholderEl(si.symSrc,pl.badge,pl.color,card.name,nat,si.enName,card.localId));
-            const footer=mkCardFooter(card.localId,pl.badge,{color:pl.color,isDone});
+            const footer=mkCardFooter(card.localId,pl.badge,{color:pl.color});
             el.appendChild(phWrap); el.appendChild(footer);
             grid.appendChild(el); count++;
           }
@@ -1114,7 +1003,6 @@ function buildPills(){
       available:[...present],
       active:state.activeLangs,
       // Recount: the filter changes which cards count toward "N / M collected".
-      // (The badge used to go stale here — nothing recomputed it on a pill click.)
       // buildPills ends in applyFilter, which owns the stats recount — hence no
       // separate applyFilter()/updateStats() call here.
       onChange:()=>{ saveFilter(); buildPills(); },
@@ -1123,20 +1011,11 @@ function buildPills(){
   applyFilter();
 }
 
-// NO toggleAllFilter HERE ANY MORE. "All / None" was a single button that flipped
-// between the two extremes depending on where you already were, which meant its effect
-// could not be predicted from its label. The language modal has an explicit "Select all"
-// and "Select none" instead — two buttons, each of which does exactly one thing.
-//
-// HISTORY WORTH KEEPING: it used to repaint the pills with a document-rooted, UNSCOPED
-// query for the bare .filter-pill class. (Spelling that query out here is not possible —
-// tests/pill-scope.test.mjs is a raw source scan and would flag the comment.)
-// `.filter-pill` is a shared STYLE class owned by pill sets that are all in the document
-// at the same time — TMS's #tms-filter-pills (state.tmsActiveLangs) and the TMS popup's
-// #tms-popup-toolbar (state._tmsPopupActive). applyModeUI only toggles their `display`,
-// it never removes them, so the unscoped query repainted TMS's pills from Master's state
-// and they then lied about the filter actually applied. tests/pill-scope.test.mjs still
-// fails the build if an unscoped query comes back.
+// INVARIANT: never query the bare .filter-pill class document-wide. It is a shared STYLE
+// class owned by pill sets that are all in the document at once — TMS's
+// #tms-filter-pills (state.tmsActiveLangs) and the TMS popup's #tms-popup-toolbar
+// (state._tmsPopupActive) — so an unscoped repaint from Master's state makes TMS's pills
+// lie about the filter applied. tests/pill-scope.test.mjs fails the build on one.
 
 // Update one set head to show only the names of the languages still active.
 function syncSetHeadName(block){
@@ -1229,13 +1108,10 @@ function syncEmptyNotice(container){
 }
 
 // ── CACHE ─────────────────────────────────────────────────────────────────────
-// cacheAge now lives in notify-model.js (imported above): the notification log needs
-// the same relative-time formatting, and moving it there made it testable.
-// The label used to read `↺ Refresh (5m ago)`. Two problems with that: the button sits
-// in .sticky-top, so a time-sensitive string was pinned on screen all session with no way
-// to dismiss it; and cacheAge() was evaluated once at render, so it still said "5m ago"
-// hours later. The age already reaches the user through the blue cache banner and the
-// notification log, both of which expire. Here the exact timestamp goes in the tooltip.
+// The cache age is NOT in the button label: the button sits in .sticky-top, so a
+// relative time there would be pinned on screen all session and go stale ("5m ago"
+// hours later). The bell's "Loaded from cache" entry carries the age; the tooltip
+// carries the exact timestamp.
 function updRefreshBtn(ts){
   const btn=document.getElementById('btn-refresh'); if(!btn) return;
   btn.disabled=false;
@@ -1246,22 +1122,16 @@ function updRefreshBtn(ts){
 
 // ── FETCH ─────────────────────────────────────────────────────────────────────
 //
-// Architecture:
-//   Source of truth for card lists → Bulbapedia (CORS OK, has EN + JP)
-//   EN images   → pokemontcg.io PNG  (primary) → TCGdex CDN (fallback) → placeholder
-//   JP images   → Limitless CDN      (primary) → hosted copy (img/) → placeholder
-//   Other langs → TCGdex CDN         (primary) → placeholder
-//
-// Language mapping:
-//   JP cards come from api/jp-source.js: the PokéWallet catalogue (every set) when it is
-//   deployed, otherwise Bulbapedia + the hand-made JP_BULBA_SET_MAP (21 sets). Ids are
-//   api/jp-model.js's stable `JP_{set}_{number}`, the same in TMS.
+// Sources:
+//   EN card list → router (data/ snapshot → live TCGdex)
+//   JP card list → api/jp-source.js (PokéWallet catalogue → Bulbapedia); ids are
+//                  api/jp-model.js's stable `JP_{set}_{number}`, the same in TMS
+//   Images: TCGdex CDN for EN and the other TCGdex languages; JP from the Limitless
+//   CDN → hosted copy (img/) → placeholder.
 
-// Parse EN card entries from Bulbapedia wikitext.
-// Each {{card list/release}} block yields {pokemonName, enSet, num}.
 async function fetchAndInjectJPCards(container){
-  // 1. JP cards from api/jp-source.js: the PokéWallet catalogue when it is deployed (every
-  //    set, every Pokémon), else Bulbapedia (snapshot → live). Rows carry the stable ids
+  // 1. JP cards from api/jp-source.js: the PokéWallet catalogue (every set, every
+  //    Pokémon), else Bulbapedia (snapshot → live). Rows carry the stable ids
   //    of api/jp-model.js. The hosted-image manifest loads alongside: it never rejects
   //    (a missing file is an empty index), and it must be in hand before the first JP
   //    tile picks its image.
@@ -1278,7 +1148,7 @@ async function fetchAndInjectJPCards(container){
   if(!jpSets.size) return;
 
   // 3. Sort sets by release date, respecting state.sortDesc. A set with no known date
-  //    (115 of the catalogue's, mostly WotC-era) goes last either way, by name.
+  //    (the catalogue has many, mostly WotC-era) goes last either way, by name.
   const when=d=>d?new Date(d).getTime():NaN;
   const sortedSets=[...jpSets.values()].sort((a,b)=>{
     const x=when(a.date), y=when(b.date);
@@ -1374,8 +1244,8 @@ async function fetchAndInjectJPCards(container){
         const wrap=document.createElement('div'); wrap.className='img-wrap';
         const ph=mkPlaceholderEl(si.sym,'JP','#4527a0',cardName||enName,jpNatName,si.bulbaName,localId);
         wrap.appendChild(ph);
-        // Skip candidates already known missing — Limitless 403s a lot of older JP art
-        // (SM7_105 vs SM7_6), all of it ORB-blocked noise — and fall through to the next.
+        // Skip candidates already known missing — Limitless answers 403 for every scan it
+        // does not have (SM7_105 vs SM7_6) — and fall through to the next.
         const srcs=viableSources(loList.filter(Boolean));
         if(srcs.length){
           ph.classList.add('ph-over');
@@ -1390,7 +1260,7 @@ async function fetchAndInjectJPCards(container){
           wrap.appendChild(img);
         }
 
-        const footer=mkCardFooter(localId,'JP',{langClass:'lang-JP',isDone});
+        const footer=mkCardFooter(localId,'JP',{langClass:'lang-JP'});
         el.appendChild(wrap); el.appendChild(footer);
         grid.appendChild(el); count++;
       });
@@ -1403,9 +1273,8 @@ async function fetchAndInjectJPCards(container){
     else container.appendChild(block);
   });
 
-  // NO `state.activeLangs.add('JP')` here. This ran unconditionally on every JP
-  // injection, so JP could never stay deselected: turn it off, and the next render
-  // silently turned it back on. buildPills below renders a `+ JP` pill instead.
+  // Never `state.activeLangs.add('JP')` here: JP must be able to stay deselected across
+  // renders. buildPills below offers it in the language picker instead.
   //
   // This fetch is kicked off without `await`, so "Collapse all" can land while it is
   // still in flight. Stamp the current state onto the blocks it just appended, or they
@@ -1420,20 +1289,17 @@ async function buildAll(forceRefresh){
   const container=document.getElementById('dyn');
   container.innerHTML=''; state.totalCards=0;
   // _meta is repopulated by renderBySet below; clear it with setBlockNamesMap so
-  // ids from a previous Pokémon selection don't accumulate (see toggleSort).
+  // ids from a previous Pokémon selection don't accumulate (see rerenderMaster).
   state.setBlockNamesMap.clear(); state._meta.clear();
   setNavReset();
-  resetCollapse();   // see toggleSort: the flag must not outlive the blocks it described
+  resetCollapse();   // see rerenderMaster: the flag must not outlive the blocks it described
   installCardDelegation(container);
 
-  // The ONLY two things still rendered as in-flow banners are this one and the failure
-  // banner in the catch below, and for the same reason: both describe the state of the
-  // page you are looking at, and the failure one owns a Retry button. Everything else
-  // buildAll used to say — loaded-from-cache, N new cards, no new cards, backup source,
-  // the placeholder-language notes — goes to the bell instead. They were status, not
-  // instructions, and each one shoved the grid down by its own height and then let it
-  // spring back when its TTL ran out.
-  const loadBanner=mkBanner(container,'Loading…','banner-load',null);
+  // The ONLY two in-flow banners are this one and the failure banner in the catch below
+  // (see mkBanner). Everything else buildAll reports — loaded from cache, N new cards,
+  // partial results, the placeholder-language notes — is status, so it goes to the bell
+  // rather than pushing the grid down.
+  const loadBanner=mkBanner(container,'Loading…','banner-load');
   const btn=document.getElementById('btn-refresh');
   if(btn){btn.disabled=true;btn.textContent='Loading…';}
 
@@ -1448,9 +1314,7 @@ async function buildAll(forceRefresh){
       cards=cached.cards; setNamesAll=cached.setNamesAll||{};
       setMeta=cached.setMeta||{dates:{},symbols:{}}; source=cached.source||'tcgdex';
       loadBanner.remove();
-      // BELL, not a banner — see the note above buildAll's loadBanner. Nothing is asked
-      // of the reader here, and as an in-flow strip it pushed the whole grid down 27px
-      // for eight seconds and then let it snap back up when the TTL expired.
+      // BELL, not a banner — see the note above buildAll's loadBanner.
       recordNotice(`Loaded from cache (${cacheAge(cached.ts)}). Click Refresh to check for new cards.`,'banner-blue');
     } else {
       loadBanner.querySelector('.banner-body').textContent='Fetching cards, set names and translations…';
@@ -1496,20 +1360,16 @@ async function buildAll(forceRefresh){
 
   }catch(err){
     console.error('[masterset] buildAll failed:',err);
-    // Do NOT reuse loadBanner here. It has already been .remove()'d by the time
-    // most failures happen — the cache path drops it at the top, and everything
-    // after renderBySet runs with it detached — so rewriting it wrote the error
-    // into a node that was no longer in the document. The failure, and its Retry
-    // button, were invisible: the page just sat empty with the button re-enabled.
+    // Do NOT reuse loadBanner here. It has already been .remove()'d by the time most
+    // failures happen — the cache path drops it at the top, and everything after
+    // renderBySet runs with it detached — so writing the error into it would leave the
+    // failure, and its Retry button, invisible.
     loadBanner?.remove();
-    // hasAction: this banner owns a Retry button, so it must never auto-hide — pulling
-    // a control out from under the pointer on a timer is worse than leaving clutter.
-    const errBanner=mkBanner(container,'','banner-error',null,{hasAction:true});
+    const errBanner=mkBanner(container,'','banner-error');
     const body=errBanner.querySelector('.banner-body');
     const msg=`Failed: ${err.message} `;
     body.textContent=msg;   // textContent: err.message is not ours to trust as HTML
-    // mkBanner recorded an empty string above (the body is filled here, after the
-    // fact), so log the real message explicitly or the failure is missing from the bell.
+    // mkBanner records nothing, so log the failure here or it is missing from the bell.
     recordNotice(msg,'banner-error');
     const retry=document.createElement('button');
     retry.id='retry-btn'; retry.className='banner-retry-btn'; retry.textContent='↺ Retry';
@@ -1517,6 +1377,12 @@ async function buildAll(forceRefresh){
     body.appendChild(retry);
     if(btn){btn.disabled=false;btn.textContent='↺ Refresh';}
   }
+}
+
+/** Cards in `newCards` whose id was not in `oldCards` — the Refresh notice's "N new". */
+function detectNew(oldCards,newCards){
+  const old=new Set((oldCards||[]).map(c=>c.id));
+  return newCards.filter(c=>!old.has(c.id));
 }
 
 function doRefresh(){buildAll(true);}
@@ -1528,7 +1394,7 @@ function clearCache(){
 }
 
 function showPlaceholderInPreview(content, m, en, nat){
-  const ph = buildPlaceholderHTML(m.symSrc, m.lang, m.langColor, en, nat, m.setName, m.num.replace('#',''), false);
+  const ph = buildPlaceholderHTML(m.symSrc, m.lang, m.langColor, en, nat, m.setName, m.num.replace('#',''));
   content.innerHTML = `<div class="preview-placeholder">${ph}</div>`;
   return content.firstElementChild;
 }
@@ -1539,12 +1405,8 @@ function showPlaceholderInPreview(content, m, en, nat){
 let previewToken = 0;
 
 // PLACEHOLDER-FIRST, matching the grid (see mkImgWrap): paint the stand-in
-// synchronously, resolve the image underneath, swap on success.
-//
-// The old order was image-first with the placeholder built only from onerror, so the
-// overlay opened EMPTY while the meta line (name/set/number) was already on screen —
-// that is the "shows just the name, then the card appears a moment later" report. On a
-// card with no artwork it also meant waiting out two sequential 404s to see anything.
+// synchronously, resolve the image underneath, swap on success — so the overlay never
+// opens empty beside an already-painted meta line while the image loads or 404s.
 async function openPreview(id){
   const m=state._meta.get(id); if(!m) return;
   return openPreviewMeta(m);
@@ -1601,15 +1463,10 @@ function closePreview(e){
 
 document.addEventListener('keydown',e=>{ if(e.key==='Escape') document.getElementById('preview-overlay')?.classList.remove('open'); });
 
-// ── PRINT SELECTED ────────────────────────────────────────────────────────────
-// Uses buildPlaceholderHTML (same as main page) so print placeholders match exactly.
-// Placeholder CSS is inlined into the print window.
-
 // ── PUBLIC API ────────────────────────────────────────────────────────────────
-// main.js calls buildAll/renderPokeChips/updateSortBtn/updateStats directly and
-// publishes the inline-onclick handlers on window (see main.js GLOBAL HANDLERS).
-// Public API. main.js calls the renders directly + publishes the inline-onclick
-// handlers on window; langColor + buildPlaceholderHTML are shared with print.js/tms.js.
+// main.js calls the renders directly and publishes the inline-onclick handlers on
+// window (see main.js GLOBAL HANDLERS). The placeholder builders, langColor and
+// markCardToggle are shared with print.js, tms.js and setmode.js.
 export {
   buildAll, renderPokeChips, updateSortBtn, updateStats, rerenderMaster,
   clearCache, closePreview, doRefresh,

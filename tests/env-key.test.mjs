@@ -1,9 +1,8 @@
-// The key file itself is deliberately unreadable (see .claude/hooks/block-secrets*.mjs)
-// and may or may not exist on any given machine, so it can never be the thing under
-// test. The PARSING is pure and exported, which is what these cover.
+// The key file itself may or may not exist on any given machine, so it can never be
+// the thing under test. The PARSING is pure and exported, which is what these cover.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseEnvValue, loadApiTcgKey, KEY_HELP } from '../tools/lib/apitcg-key.mjs';
+import { parseEnvValue, loadApiTcgKey, KEY_HELP } from '../tools/lib/env-key.mjs';
 
 test('reads a plain KEY=VALUE line', () => {
   assert.equal(parseEnvValue('APITCG_KEY=abc123', 'APITCG_KEY'), 'abc123');

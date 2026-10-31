@@ -15,44 +15,15 @@ export function cacheAge(ts, now = Date.now()) {
   return dd > 0 ? `${dd}d ago` : h > 0 ? `${h}h ago` : m > 0 ? `${m}m ago` : 'just now';
 }
 
-/**
- * How long a banner should stay on screen, in ms. 0 means "never auto-hide".
- *
- * The rule: a banner auto-dismisses only if it is purely informational — no
- * interactive control inside it, and no dismissKey.
- *
- *  • hasAction — the fetch-failure banner carries its own "↺ Retry" button. Yanking a
- *    control out from under the pointer on a timer is worse than leaving clutter.
- *  • dismissKey — that already means "the user decides, and the decision persists to
- *    state.dismissedBanners". A timer would quietly override a deliberate design.
- *  • banner-load — an in-progress notice. It is removed programmatically when the work
- *    finishes; a timeout would make it vanish while the work is still running.
- *
- * @param {string} cls        the banner variant class (banner-blue, banner-green, …)
- * @param {object} [opts]
- * @param {string|null} [opts.dismissKey]
- * @param {boolean} [opts.hasAction] banner contains a button the user may want to click
- */
-export function ttlFor(cls, { dismissKey = null, hasAction = false } = {}) {
-  if (dismissKey || hasAction) return 0;
-  switch (cls) {
-    case 'banner-blue':  return 8000;   // "Loaded from cache (5m ago)"
-    case 'banner-green': return 6000;   // "No new cards since last check"
-    case 'banner-new':   return 20000;  // "N new cards found" — worth reading properly
-    default:             return 0;      // banner-load (in progress), banner-error, unknown
-  }
-}
-
 /** Append to a capped log, newest last. Returns a NEW array; never mutates. */
 export function pushNotice(list, notice, cap = 30) {
   const next = [...list, notice];
   return next.length > cap ? next.slice(next.length - cap) : next;
 }
 
-// LOAD-BEARING: entries are identified by this counter, NOT by their ts.
-// The fetch-failure path records twice within the same tick — once from mkBanner and
-// once from the explicit recordNotice(msg,'banner-error') in masterset.js's catch — so
-// Date.now() collides and a ts-keyed dismiss would remove both rows at once.
+// LOAD-BEARING: entries are identified by this counter, NOT by their ts. Two notices
+// recorded within the same tick (buildAll can raise several back to back) share a
+// Date.now(), and a ts-keyed dismiss would remove all of them at once.
 let noticeSeq = 0;
 
 /** Next id for a log entry. Monotonic within the session; unique even within one tick. */

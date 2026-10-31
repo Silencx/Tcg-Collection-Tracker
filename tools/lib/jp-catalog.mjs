@@ -119,6 +119,21 @@ export function publishCheck({ incomplete = 0, sets = 0, committedSets = 0 } = {
   return { ok: true, why: null };
 }
 
+/**
+ * An app file's body, stamped with this run's `builtAt` — unless the committed copy `prev`
+ * says exactly the same thing, in which case it keeps prev's stamp. The weekly job
+ * commits any diff, so without this every run that found nothing new re-committed all of
+ * data/jp-cat/ (~2.4 MB) for a timestamp the app never reads.
+ * @param {object} body  the file's object, with a `builtAt` key in its place
+ * @param {object|null} prev  the committed file's parsed contents, if any
+ * @param {string} builtAt
+ */
+export function stampBuiltAt(body, prev, builtAt) {
+  const same = !!prev?.builtAt
+    && JSON.stringify({ ...prev, builtAt: null }) === JSON.stringify({ ...body, builtAt: null });
+  return { ...body, builtAt: same ? prev.builtAt : builtAt };
+}
+
 /** Pages needed for a set at `limit` rows per page; at least one. */
 export function pagesFor(cardCount, limit = 200) {
   return Math.max(1, Math.ceil((Number(cardCount) || 0) / limit));

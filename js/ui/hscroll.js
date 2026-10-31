@@ -33,11 +33,6 @@ function sync(el) {
   el.classList.toggle('hs-fade-end', end);
 }
 
-/** Recompute every row's fades. Exported for callers that change content wholesale. */
-export function syncHScroll() {
-  for (const el of tracked) sync(el);
-}
-
 function track(el) {
   if (tracked.has(el)) return;
   tracked.add(el);

@@ -1,9 +1,9 @@
 {
-  "name": "pokemon-master-set-tool",
+  "name": "tcg-collection-tracker",
   "version": "2.0.0",
   "private": true,
   "type": "module",
-  "description": "Pokémon TCG Master Set tracker (Seedot/Nuzleaf/Shiftry line) — client-side static site.",
+  "description": "Pokémon TCG collection tracker: master set, true master set and single-set checklists in every language — client-side static site.",
   "scripts": {
     "dev": "python3 -m http.server 8000",
     "build-data": "node tools/build-data.mjs",

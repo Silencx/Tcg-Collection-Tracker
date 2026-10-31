@@ -1,9 +1,7 @@
 /* =============================================================================
-   style.css — all styles for the Pokémon Master Set tool.
-   Ported verbatim from the old single-file tool's <style> block (Phase 1).
-   Section comments below are the originals. Print-specific CSS for the popup
-   print windows lives in js/ui/print.js (those windows are generated as
-   standalone HTML documents).
+   style.css — all styles for the Pokémon TCG collection tracker.
+   Print-specific CSS for the popup print windows lives in js/ui/print.js (those
+   windows are generated as standalone HTML documents).
    ============================================================================= */
 
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
@@ -24,7 +22,6 @@ body{font-family:Arial,Helvetica,sans-serif;background:var(--c-body-bg,#ecf5ec);
      dashboard's big stat numbers came out at contrast 1.01 against their own panel —
      literally invisible. These two are the accent's ink form; every palette but Dark
      inherits the same colours, and Dark overrides them alone.
-     Same trick, and same reason, as body.palette-dark .chk further down.
 
      DECLARED ON body, NOT HERE — see the rule immediately after this block. */
   --c-body-bg:#ecf5ec;
@@ -57,13 +54,11 @@ body{font-family:Arial,Helvetica,sans-serif;background:var(--c-body-bg,#ecf5ec);
   --c-border-tint:#d7e8d7;
   --c-shadow:rgba(0,0,0,.12);
 
-  /* Banner triples. Pale pastels are unreadable on a dark surface, so each variant
-     needs a real per-theme value rather than a shared neutral. Only the dark palette
-     overrides them; the four light palettes inherit these and are unaffected. */
-  --c-bn-blue-bg:#e8f4fd;--c-bn-blue-bd:#90caf9;--c-bn-blue-fg:#0d47a1;
-  --c-bn-amber-bg:#fff8e1;--c-bn-amber-bd:#ffe082;--c-bn-amber-fg:#e65100;
+  /* Banner triples (the loading and the failure banner). Pale pastels are unreadable
+     on a dark surface, so each variant needs a real per-theme value rather than a
+     shared neutral. Only the dark palette overrides them; the four light palettes
+     inherit these and are unaffected. */
   --c-bn-load-bg:#f3e5f5;--c-bn-load-bd:#ce93d8;--c-bn-load-fg:#4a148c;
-  --c-bn-green-bg:#e8f5e9;--c-bn-green-bd:#a5d6a7;--c-bn-green-fg:#1b5e20;
   --c-bn-error-bg:#fce4ec;--c-bn-error-bd:#f48fb1;--c-bn-error-fg:#880e4f;
 
   color-scheme:light;
@@ -134,7 +129,7 @@ body.palette-mono{
    is why the eleven neutral tokens in :root had to exist first.
 
    CONSTRAINT: --c-accent1/2/3 must stay DARK. The header, sidebar, both
-   modal heads and the ⋯ More panel all paint white or white-alpha text straight onto
+   modal heads and the bell/gear panels all paint white or white-alpha text straight onto
    them, so a "dark theme" that lightened the accents would break every one of those
    at once. Dark here means the neutrals invert and the accents stay near-black. */
 body.palette-dark{
@@ -158,10 +153,7 @@ body.palette-dark{
   --c-border:#2c343e;--c-border-soft:#232a33;--c-border-strong:#3a4552;
   --c-border-tint:#2c343e;
   --c-shadow:rgba(0,0,0,.55);
-  --c-bn-blue-bg:#12242f;--c-bn-blue-bd:#1d4a63;--c-bn-blue-fg:#9ed3f0;
-  --c-bn-amber-bg:#2b2312;--c-bn-amber-bd:#5c4a1d;--c-bn-amber-fg:#f0cf8a;
   --c-bn-load-bg:#241a2e;--c-bn-load-bd:#4a3560;--c-bn-load-fg:#d7b3ea;
-  --c-bn-green-bg:#13291b;--c-bn-green-bd:#2c5c3a;--c-bn-green-fg:#a3dbb2;
   --c-bn-error-bg:#2e1620;--c-bn-error-bd:#632a3d;--c-bn-error-fg:#f2a5bd;
   /* The neutral surfaces are dark here, so the default dark-on-light thumb would be
      invisible on them. The sidebar keeps its own lighter pair regardless. */
@@ -178,7 +170,6 @@ body.palette-dark{
 body{background:var(--c-body-bg);}
 .header{background:linear-gradient(135deg,var(--c-accent1) 0%,var(--c-accent2) 60%,var(--c-accent3) 100%);}
 .era-label{color:var(--c-era);}
-.set-head.c-green{background:var(--c-set-head);}
 .card:hover{background:var(--c-card-hover);border-color:var(--c-card-hover-border);}
 .card.done{background:var(--c-card-done-bg);border-color:var(--c-card-done-border);}
 .poke-divider{color:var(--c-divider-text);border-top-color:var(--c-divider);}
@@ -210,8 +201,8 @@ body{background:var(--c-body-bg);}
 .btn:disabled{opacity:.4;cursor:not-allowed;}
 .btn-secondary{border-color:rgba(255,255,255,.4);color:rgba(255,255,255,.85);font-weight:normal;}
 .btn-print-sel{background:rgba(255,255,255,.15);}
-/* ── "⋯ More" MENU — <details>, so it needs no JS at all and every button keeps
-   its original inline onclick attribute. ── */
+/* ── POPOVER MENUS (bell, gear) — <details>, so open/close needs no JS of its own
+   (main.js only adds outside-click and Escape closing). ── */
 .more-menu{position:relative;display:inline-block;}
 .more-menu>summary{list-style:none;display:inline-block;}
 .more-menu>summary::-webkit-details-marker{display:none;}
@@ -226,9 +217,8 @@ body{background:var(--c-body-bg);}
 .more-panel .btn{text-align:left;}
 
 /* ── SETTINGS PANEL ──
-   One panel at header level replaces the two ⋯ More menus. The theme picker used to be
-   duplicated once per mode row (because applyModeUI hides the inactive row) and its six
-   swatches wrapped inside a 150px panel; a named grid in a wider panel fixes both. */
+   One panel at header level, so a single copy serves every mode (applyModeUI hides
+   the inactive mode rows), with the six swatches as a named grid. */
 .settings-panel{min-width:min(290px,86vw);gap:10px;}
 .settings-section{display:flex;flex-direction:column;gap:5px;}
 .settings-section + .settings-section{padding-top:9px;border-top:1px solid rgba(255,255,255,.18);}
@@ -341,7 +331,7 @@ body{background:var(--c-body-bg);}
      display get the same bar while phones keep their slightly larger touch sizes.
 
      Redefining the TOKENS here rather than editing rules is the whole trick: every
-     descendant — header, mode toggle, poke bar, both filter bars, the ⋯ More panel —
+     descendant — header, mode toggle, poke bar, both filter bars, the bell/gear panels —
      inherits the tighter scale without a single selector changing. The card grid and
      the modals live outside .sticky-top and keep the full scale. */
   --fs-3xs :clamp(.344rem, .325rem + .09vw, .40rem);   /*  5.5 → 6.4px */
@@ -360,16 +350,12 @@ body{background:var(--c-body-bg);}
 .poke-chips::-webkit-scrollbar-track{background:transparent;}
 .poke-chips::-webkit-scrollbar-thumb{background:var(--scroll-thumb);border-radius:3px;}
 .poke-chips>*{flex-shrink:0;}
-/* These four used to be white-on-translucent-white, because this bar was the app's one
-   dark strip. It is a .filter-bar like every other bar now, so they take the same
-   surface treatment as .filter-pill / .filter-clear beside them. */
+/* The same surface treatment as every other .filter-bar control. */
 .poke-chip{display:inline-flex;align-items:center;gap:4px;background:var(--c-era-bg,#f0f8f0);border:1px solid var(--c-border-strong,#ccc);color:var(--c-text,#1a1a1a);border-radius:20px;padding:2px 4px 2px 9px;font-size:var(--fs-base);font-weight:bold;}
 .poke-chip-remove{background:none;border:none;color:var(--c-text-muted,#999);cursor:pointer;font-size:var(--fs-lg);line-height:1;padding:0 3px;}
 .poke-chip-remove:hover{color:#e53935;}
 .poke-add-btn{padding:0 10px;height:22px;border-radius:20px;border:1px solid var(--c-border-strong,#ccc);background:var(--c-surface,#fff);color:var(--c-text-dim,#555);font-size:var(--fs-base);cursor:pointer;white-space:nowrap;}
 .poke-add-btn:hover{background:var(--c-surface-3,#f5f5f5);border-color:var(--c-accent-ink);}
-/* .poke-input / .poke-suggestions are GONE — adding a Pokémon is a modal now
-   (js/ui/pickers.js). Their scrollbar rules went with them. */
 @media print{#poke-bar{display:none!important;}}
 
 /* ── FILTER BAR ── */
@@ -386,8 +372,6 @@ body{background:var(--c-body-bg);}
 .filter-pill{font-size:var(--fs-base);font-weight:bold;padding:2px 8px;border-radius:20px;border:1.5px solid transparent;cursor:pointer;color:white;opacity:.38;transition:opacity .12s,transform .08s;user-select:none;}
 .filter-pill:hover{opacity:.7;transform:scale(1.05);}
 .filter-pill.active{opacity:1;border-color:rgba(0,0,0,.2);transform:scale(1.05);}
-.filter-clear{font-size:var(--fs-base);padding:2px 9px;border:1px solid var(--c-border-strong,#ccc);border-radius:20px;background:var(--c-surface,#fff);color:var(--c-text-dim,#555);cursor:pointer;white-space:nowrap;}
-.filter-clear:hover{background:var(--c-surface-3,#f5f5f5);}
 
 /* ── LANGUAGE SUMMARY (the sticky bar's stand-in for the pill row) ── */
 .lang-summary{
@@ -426,7 +410,7 @@ body{background:var(--c-body-bg);}
      size now reads these, INCLUDING .set-nav's parked position below, which needs half
      the column width to park the sidebar beside it.
 
-     These reproduce dex.tcg's card ladder, measured off their pages:
+     These reproduce DexTCG's card ladder (app.dextcg.com), measured off their pages:
        502px → 3 columns   788px → 4   1928px → 6   2560px → 6 (their column caps too)
      --tile-min is the readability knob; it scales on vw rather than stepping at
      breakpoints, which is what let the old 380px and 600px grid overrides be deleted.
@@ -816,16 +800,12 @@ main{width:min(100%,var(--page-w));margin:0 auto;padding:12px;}
 .dash-card:hover{border-color:var(--c-accent-ink);box-shadow:0 4px 14px rgba(0,0,0,.10);transform:translateY(-1px);}
 .dash-card:focus-visible{outline:2px solid var(--c-accent-ink);outline-offset:2px;}
 .dash-card.accent{border-color:var(--c-accent-ink);box-shadow:0 2px 10px rgba(0,0,0,.08);}
-/* Single-set mode does not exist yet. Shown rather than hidden so the row does not
-   reflow when it lands — and inert, so it cannot be clicked or tabbed to. */
-.dash-card.disabled{opacity:.55;cursor:default;pointer-events:none;}
 .dash-card-head{display:flex;align-items:center;gap:7px;}
 .dash-card-icon{font-size:var(--fs-lg);}
 .dash-card-title{font-size:var(--fs-md);font-weight:bold;}
 .dash-card-count{font-size:var(--fs-xl);font-weight:bold;color:var(--c-accent-ink);font-variant-numeric:tabular-nums;}
 .dash-card-blurb{font-size:var(--fs-base);color:var(--c-text-dim,#555);line-height:1.45;}
 .dash-card-chevron{position:absolute;top:50%;right:12px;transform:translateY(-50%);font-size:var(--fs-xl);color:var(--c-text-muted,#999);}
-.dash-card.disabled .dash-card-chevron{display:none;}
 
 .dash-empty{
   background:var(--c-surface,#fff);border:1px solid var(--c-border-tint,#d7e8d7);
@@ -957,25 +937,13 @@ main{width:min(100%,var(--page-w));margin:0 auto;padding:12px;}
    Applied to #set-app only — the other three modes have no bottom bar. */
 #set-app{padding-bottom:52px;}
 @media print{.set-status-bar{display:none!important;}}
-@media print{#set-app,#set-controls,#set-filter-bar{display:none!important;}}
+@media print{#set-app,#set-controls{display:none!important;}}
 
 /* ── BANNERS ── */
 .banner{border-radius:6px;padding:7px 12px;margin-bottom:8px;font-size:var(--fs-base);line-height:1.5;display:flex;align-items:flex-start;gap:8px;}
 .banner-body{flex:1;}
-.banner-close{background:none;border:none;cursor:pointer;font-size:var(--fs-lg);line-height:1;opacity:.6;flex-shrink:0;padding:0;}
-.banner-close:hover{opacity:1;}
-.banner-blue{background:var(--c-bn-blue-bg);border:1px solid var(--c-bn-blue-bd);color:var(--c-bn-blue-fg);}
-.banner-amber{background:var(--c-bn-amber-bg);border:1px solid var(--c-bn-amber-bd);color:var(--c-bn-amber-fg);}
 .banner-load{background:var(--c-bn-load-bg);border:1px solid var(--c-bn-load-bd);color:var(--c-bn-load-fg);animation:pulse 1.5s infinite;}
-.banner-green{background:var(--c-bn-green-bg);border:1px solid var(--c-bn-green-bd);color:var(--c-bn-green-fg);}
 .banner-error{background:var(--c-bn-error-bg);border:1px solid var(--c-bn-error-bd);color:var(--c-bn-error-fg);}
-/* Same palette as banner-load, WITHOUT the infinite pulse. "N new cards found" reused
-   banner-load purely for its purple and inherited the animation with it, so a notice
-   that was not in progress pulsed until the next full re-render. */
-.banner-new{background:var(--c-bn-load-bg);border:1px solid var(--c-bn-load-bd);color:var(--c-bn-load-fg);}
-/* Transient banners fade rather than vanish. The bell keeps a copy either way. */
-.banner{transition:opacity .3s linear;}
-.banner-leaving{opacity:0;}
 .banner-retry-btn{
   margin-left:8px;padding:2px 8px;cursor:pointer;border-radius:3px;font-size:var(--fs-base);
   border:1px solid currentColor;background:transparent;color:inherit;
@@ -983,10 +951,7 @@ main{width:min(100%,var(--page-w));margin:0 auto;padding:12px;}
 .banner-retry-btn:hover{background:rgba(0,0,0,.08);}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.6}}
 /* The other two animations (sb-flash, ph-spin) already opt out; this one never did. */
-@media (prefers-reduced-motion:reduce){
-  .banner-load{animation:none;}
-  .banner{transition:none;}
-}
+@media (prefers-reduced-motion:reduce){ .banner-load{animation:none;} }
 @media print{.banner{display:none!important;}}
 
 /* ── NOTIFICATION BELL ── */
@@ -1071,7 +1036,7 @@ main{width:min(100%,var(--page-w));margin:0 auto;padding:12px;}
 .set-chevron:hover{background:rgba(255,255,255,.28);}
 .set-chevron:focus-visible{outline:2px solid #fff;outline-offset:1px;}
 @media print{.set-chevron{display:none!important;}}
-.set-head.c-green{background:var(--c-set-head,#2e7d32);}.set-head.c-blue{background:#1565c0;}.set-head.c-brown{background:#4e342e;}.set-head.c-orange{background:var(--c-set-head-jp,#bf360c);}
+.set-head.c-green{background:var(--c-set-head,#2e7d32);}.set-head.c-orange{background:var(--c-set-head-jp,#bf360c);}
 .set-head-left{display:flex;align-items:center;gap:8px;min-width:0;}
 .set-symbol{width:24px;height:24px;object-fit:contain;flex-shrink:0;filter:brightness(0) invert(1);opacity:.9;}
 .set-name-block{display:flex;flex-direction:column;min-width:0;}
@@ -1149,8 +1114,6 @@ main{width:min(100%,var(--page-w));margin:0 auto;padding:12px;}
   .card:hover{background:var(--c-card-hover,#f0f8f0);border-color:var(--c-card-hover-border,#81c784);transform:translateY(-1px);}
 }
 .card.done{background:var(--c-card-done-bg,#e8f5e9);border-color:var(--c-card-done-border,#43a047);}
-.card.cameo{border:2px solid #c8a400;}
-.card.cameo.done{background:var(--c-card-done-bg,#e8f5e9);border-color:var(--c-card-done-border,#43a047);}
 /* ── OWNED IS COLOUR ──
    The per-card checkbox is gone. What you own reads off the ARTWORK: unowned cards are
    desaturated and slightly dimmed, owned ones are full colour. Across a 776-tile grid
@@ -1204,7 +1167,6 @@ main{width:min(100%,var(--page-w));margin:0 auto;padding:12px;}
 .cp-native{font-size:clamp(7.5px,5.2cqw,13px);font-weight:bold;color:#ffe082;line-height:1.2;word-break:break-word;}
 .cp-set{font-size:clamp(6.5px,4.4cqw,11px);color:#a5d6a7;line-height:1.2;word-break:break-word;}
 .cp-num{font-size:clamp(6px,4cqw,10px);color:#81c784;font-style:italic;}
-.cp-note{font-size:clamp(5.5px,3.8cqw,9px);color:rgba(255,255,255,.4);margin-top:1px;line-height:1.2;}
 .img-retry-btn{margin-top:3px;padding:2px clamp(4px,3cqw,8px);font-size:clamp(6px,4cqw,10px);border:1px solid var(--ph-inner,rgba(200,164,0,.35));border-radius:3px;background:rgba(0,0,0,.2);color:var(--ph-set,#a5d6a7);cursor:pointer;}
 .img-retry-btn:hover{background:rgba(0,0,0,.35);}
 @media print{.img-retry-btn{display:none!important;}}

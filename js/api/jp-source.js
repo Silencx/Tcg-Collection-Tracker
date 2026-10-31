@@ -2,11 +2,11 @@
 // jp-source.js — the Japanese cards for a Pokémon list, from the best source present.
 //
 //   1. The CATALOGUE (data/jp-cat/, built by tools/build-jp-catalog.mjs from PokéWallet):
-//      every Japanese set, any Pokémon. Gitignored until PokéWallet agrees to us
-//      republishing it, so on the live site it is simply absent and step 2 answers.
-//   2. BULBAPEDIA (data/jp*.json snapshot → live wikitext, via the router): the old
-//      source — only the Pokémon pre-built in the snapshot (or reachable live), and only
-//      the 21 sets JP_BULBA_SET_MAP knows.
+//      every Japanese set, any Pokémon. Committed and served; step 2 answers only if
+//      the files are missing (for example after the catalogue is withdrawn).
+//   2. BULBAPEDIA (data/jp/ snapshot → live wikitext, via the router): only the Pokémon
+//      pre-built in the snapshot (or reachable live), and only the 21 sets
+//      JP_BULBA_SET_MAP knows.
 // With the catalogue present, Bulbapedia's snapshot still fills in cards the catalogue
 // lacks (World Champions Pack). Either way every row gets the stable id from
 // jp-model.js, so a tick survives the source changing underneath it.
@@ -64,10 +64,10 @@ function addBulbaRows(raw, rows, sets, seen) {
 
 /**
  * @param {string[]} names  the Pokémon list
- * @param {{forceRefresh?:boolean, live?:boolean}} [opts]  `live:false` never reaches
- *   Bulbapedia over the network (used by the boot migration, which must stay quick)
+ * @param {{live?:boolean}} [opts]  `live:false` never reaches Bulbapedia over the
+ *   network (used by the boot migration, which must stay quick)
  */
-export async function getJpCards(names, { forceRefresh = false, live = true } = {}) {
+export async function getJpCards(names, { live = true } = {}) {
   const rows = [], seen = new Set(), sets = new Map();
   const catSets = await catalogueSets();
 
@@ -93,7 +93,7 @@ export async function getJpCards(names, { forceRefresh = false, live = true } = 
   }
 
   const raw = live
-    ? await router.getJpRaw(names, { forceRefresh })
+    ? await router.getJpRaw(names)
     : (await snapshot.getJpRawPartial(names).catch(() => null))?.data || [];
   addBulbaRows(raw, rows, sets, seen);
   return { rows, sets, source: 'bulbapedia' };

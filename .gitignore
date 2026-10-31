@@ -19,16 +19,17 @@ reference/
 npm-debug.log*
 
 # Env/secrets
-# .env.local is where APITCG_KEY lives for local builds — see README "Refresh the
-# card data". CI supplies it as a repo secret instead, so it is never committed
-# either way. The wildcard covers .env.production and friends too.
+# .env.local holds the local build keys (POKEWALLET_IO_PROD_KEY, APITCG_KEY) — see
+# README "Build keys". CI supplies keys as repo secrets instead, so they are never
+# committed either way. The wildcard covers .env.production and friends too.
 .env
 .env.*
 *.key
 *.pem
 
-# PokéWallet probe output holds their card data, and their terms grant no right to
-# republish it — keep it local (tools/pokewallet-probe.mjs).
+# Probe output holds the probed service's card data (PokéWallet's terms grant no right
+# to republish it) — keep it local (tools/*-probe.mjs, tools/jp-gap-size.mjs).
+tools/apitcg-probe-report.md
 tools/pokewallet-probe-report.md
 tools/pokewallet-probe-images/
 tools/jp-gap-size-report.md

@@ -25,6 +25,16 @@ test('a promo set id with its own hyphen is matched, not truncated', () => {
   assert.deepEqual(setProgress(['EN_swshp-SWSH001'], 'swshp'), { printings: 1, cards: 1 });
 });
 
+test('belongsToSet: the whole set id, never a prefix of another (Clear this set uses it)', () => {
+  assert.equal(belongsToSet('EN_sv05-163', 'sv05'), true);
+  assert.equal(belongsToSet('DE_sv05-1', 'sv05'), true);
+  assert.equal(belongsToSet('EN_sv05a-1', 'sv05'), false);
+  assert.equal(belongsToSet('EN_tk-ex-latia-3', 'tk-ex-latia'), true);   // ids with hyphens
+  assert.equal(belongsToSet('EN_sv05-163', ''), false);
+  assert.equal(belongsToSet('EN_sv05-163', null), false);
+  assert.equal(belongsToSet('JP_cyber-judge_1', 'cyber-judge'), false); // JP ids never parse
+});
+
 test('progress with no set chosen is zero, not a crash', () => {
   assert.deepEqual(setProgress(['EN_sv05-003'], null), { printings: 0, cards: 0 });
   assert.deepEqual(setProgress([], 'sv05'), { printings: 0, cards: 0 });

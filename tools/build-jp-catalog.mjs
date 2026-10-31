@@ -12,7 +12,7 @@
 //   data/jp-catalog/sets.json   gitignored build side: [{ id, name, pwName, code, date, cards, limitless }]
 //   data/jp-catalog/cards.json  gitignored build side: [[setIndex, number, name, print, rarity, ref], …]
 //   tools/jp-catalog-report.md  totals + a card-by-card check against Bulbapedia for the
-//                               Pokémon in data/jp.json
+//                               Pokémon in the committed data/jp/ shards
 // `name` keeps Bulbapedia's spelling for the 21 sets it shares (so existing JP checklist
 // ids can carry over), and drops PokéWallet's code prefix elsewhere. `limitless` is the
 // CDN code when Limitless has scans: JP_BULBA_SET_MAP, then tools/jp-gap-size.json if a
@@ -31,13 +31,14 @@
 // written. Run: node tools/build-jp-catalog.mjs [--max N] [--refresh | --emit-only]
 // =============================================================================
 
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { loadEnvKey } from './lib/apitcg-key.mjs';
+import { loadEnvKey } from './lib/env-key.mjs';
 import { createClient, listOf, matchJpRows } from './lib/pokewallet.mjs';
 import {
   canonicalSetName, parseReleaseDate, cardTuple, cleanTuple, isJapaneseSet, japaneseOnly, pagesFor, publishCheck,
+  stampBuiltAt,
 } from './lib/jp-catalog.mjs';
 import { JP_BULBA_SET_MAP } from '../js/api/bulba-jp.js';
 import { assignJpKeys, jpEra, nameShardLetters } from '../js/api/jp-model.js';
@@ -177,7 +178,8 @@ async function main() {
  * No PokéWallet ids (`ref`): they are 60% of cards.json and only the image build needs
  * them. Keys come from jp-model.assignJpKeys, so ids here, in the app and in the image
  * build are the same strings. Rebuilt from scratch each time, so a letter that empties
- * out cannot leave a stale shard behind.
+ * out cannot leave a stale shard behind — but a file whose content did not change keeps
+ * its committed builtAt (stampBuiltAt), so an unchanged catalogue produces no diff.
  */
 function writeAppFiles(allSets, rawCards, builtAt) {
   const { sets, cards } = japaneseOnly(allSets, rawCards.map(cleanTuple));
@@ -191,17 +193,34 @@ function writeAppFiles(allSets, rawCards, builtAt) {
     const row = [setKeys[c[0]], c[1], c[2], c[3], numKeys[i]];
     for (const l of nameShardLetters(c[2])) (shards.get(l) || shards.set(l, []).get(l)).push(row);
   });
+  const previous = new Map();
+  if (existsSync(APP_DIR)) {
+    for (const f of readdirSync(APP_DIR)) {
+      try { previous.set(f, readJSON(resolve(APP_DIR, f))); } catch { /* unreadable: just rewrite it */ }
+    }
+  }
+  const write = (file, body) =>
+    writeFileSync(resolve(APP_DIR, file), JSON.stringify(stampBuiltAt(body, previous.get(file), builtAt)) + '\n');
   rmSync(APP_DIR, { recursive: true, force: true });
   mkdirSync(APP_DIR, { recursive: true });
-  writeFileSync(resolve(APP_DIR, 'sets.json'), JSON.stringify({ schemaVersion: 1, builtAt, source: 'pokewallet', sets: appSets }) + '\n');
-  for (const [l, rows] of shards) writeFileSync(resolve(APP_DIR, `cards-${l}.json`), JSON.stringify({ schemaVersion: 1, builtAt, rows }) + '\n');
+  write('sets.json', { schemaVersion: 1, builtAt, source: 'pokewallet', sets: appSets });
+  for (const [l, rows] of shards) write(`cards-${l}.json`, { schemaVersion: 1, builtAt, rows });
   say(`app files: ${appSets.length} sets, ${shards.size} name shards (largest ${Math.max(...[...shards.values()].map(r => r.length))} rows).`);
 }
 
-/** Totals, plus the Pokémon already in data/jp.json checked card by card. */
+/** The committed Bulbapedia rows, from every data/jp/ shard data/index.json names. */
+function committedBulbaRows() {
+  const indexFile = resolve(ROOT, 'data/index.json');
+  if (!existsSync(indexFile)) return [];
+  return Object.values(readJSON(indexFile).pokemon || {}).flatMap(slug => {
+    const file = resolve(ROOT, `data/jp/${slug}.json`);
+    return existsSync(file) ? readJSON(file).jpCardsData || [] : [];
+  });
+}
+
+/** Totals, plus the Pokémon in the committed JP shards checked card by card. */
 function writeReport({ sets, cards, client, fetchedSets, cachedSets, incomplete, stoppedWhy, unavailableSets, failed }) {
-  const jp = existsSync(resolve(ROOT, 'data/jp.json')) ? readJSON(resolve(ROOT, 'data/jp.json')) : { jpCardsData: [] };
-  const bulba = jp.jpCardsData || [];
+  const bulba = committedBulbaRows();
   const names = [...new Set(bulba.map(r => r.pokemonName))];
   // Rebuild PokéWallet-shaped rows (with PokéWallet's own set name) so the very same
   // matcher as build-images applies, aliases included.

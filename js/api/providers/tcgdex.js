@@ -1,7 +1,7 @@
 // =============================================================================
 // providers/tcgdex.js — PRIMARY provider (master card index + set metadata).
 //
-// Live facts (verified 2026-06-11, see rebuild brief — do not re-verify here):
+// Live facts (verified 2026-06-11):
 //   Base https://api.tcgdex.net/v2/{lang}/… — keyless, CORS-open, fast.
 //   /{lang}/cards?name=X  → [{ id, localId, name, image }]  (contains-match on the
 //                           LOCALIZED name; image may be absent on list items).
@@ -28,7 +28,6 @@ const API = 'https://api.tcgdex.net/v2';
 // Every serie lookup in this file goes through tcgdexSerieSegment — the id-slicing rule
 // it falls back to is wrong for 48 of the sets that carry art, and getting it wrong
 // yields 404 image URLs and silently skipped variant data. See that function.
-const serieOf = setId => tcgdexSerieSegment(setId);
 
 // Split a card id "sv05-163" → { setId:"sv05", localId:"163" }.
 function splitId(id) {
@@ -37,10 +36,13 @@ function splitId(id) {
 }
 
 // Construct an EN asset base from a card id, for when the list omits `image`.
-// Format matches what buildSetsMap's TCGdex branch parses: /en/{serie}/{setId}/{localId}.
-function imageBaseFromId(id) {
+// Format matches what buildSetsMap parses: /en/{serie}/{setId}/{localId}. The serie
+// comes from `setSeries` (data/sets.json's map); the id-slicing guess is only the last
+// resort for a set the map does not know yet. buildSetsMap also groups the card's era
+// by this segment, so a wrong guess filed the card under a stray era of its own.
+function imageBaseFromId(id, setSeries) {
   const { setId, localId } = splitId(id);
-  return tcgdexAssetBase('en', serieOf(setId), setId, localId);
+  return tcgdexAssetBase('en', tcgdexSerieSegment(setId, setSeries), setId, localId);
 }
 
 async function getJSON(url, signal) {
@@ -90,7 +92,7 @@ const GQL_QUERY = 'query($f:CardsFilters,$p:Int!,$k:Int){ cards(filters:$f, pagi
 
 // Variants are a footer badge; the card list is the page. Give the variant step its own
 // budget inside the caller's, so a slow GraphQL answer costs the badges, never the cards
-// (the router aborts the WHOLE call at 8 s and falls back to legacy).
+// (the router aborts the WHOLE call at 8 s, and the card index has no fallback).
 const VARIANT_BUDGET_MS = 4000;
 function budgetSignal(signal) {
   if (typeof AbortSignal === 'undefined' || !AbortSignal.timeout || !AbortSignal.any) return signal;
@@ -192,8 +194,11 @@ export function namesSpecies(cardName, species) {
  *   the snapshot's coverage filter). `image` is ALWAYS a valid asset base url
  *   (filled from the id if the list omits it), so no card is ever dropped for a
  *   missing image.
+ * @param {object} [opts]
+ * @param {Object<string,string>|null} [opts.setSeries] set id → CDN series (data/sets.json),
+ *   used for the image base of a card the list returns without one
  */
-export async function getCards(names, { signal, withVariants = true } = {}) {
+export async function getCards(names, { signal, withVariants = true, setSeries = null } = {}) {
   const out = [];
   const seen = new Set();
   // One request per name, in parallel — they are independent, and awaiting them
@@ -217,7 +222,7 @@ export async function getCards(names, { signal, withVariants = true } = {}) {
         // Mewtwo card claim to be "Mew", and erased the real names of cameo cards.
         name: c.name,
         species: name,
-        image: c.image || imageBaseFromId(c.id),
+        image: c.image || imageBaseFromId(c.id, setSeries),
         localId: c.localId != null ? String(c.localId) : splitId(c.id).localId,
       });
     }
@@ -246,7 +251,7 @@ export async function getCards(names, { signal, withVariants = true } = {}) {
  *   so it is on by default for the build and off for the browser, which reads them from
  *   the committed snapshot.
  * @returns {Promise<{names,dates,symbols,logos,counts,setSeries,series,lang}>}
- *   names:     { langCode: { setId: localizedName } } — same shape as legacy.fetchAllSetNames
+ *   names:     { langCode: { setId: localizedName } }
  *   dates:     { setId: 'YYYY-MM-DD' }                — release dates (drives set/era sort)
  *   symbols:   { setId: symbolUrl }                   — set symbols (.webp), small mono glyph
  *   logos:     { setId: logoUrl }                     — set logos (.webp), the wordmark art

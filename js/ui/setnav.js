@@ -22,6 +22,7 @@ import { SETNAVSTORE } from '../config.js';
 import { buildSetNavIndex, matchesNavQuery } from './setnav-index.js';
 import { toggleCollapseAll } from './collapse.js';
 import { collapseButtonLabel } from './collapse-model.js';
+import { el } from './dom.js';
 
 // Docked at this width and above; a drawer over the content below it.
 const DOCK_MIN_PX = 1000;
@@ -44,12 +45,6 @@ let stickyRaf = 0;
 
 // ── SHELL ─────────────────────────────────────────────────────────────────────
 
-function el(tag, cls, text) {
-  const e = document.createElement(tag);
-  if (cls) e.className = cls;
-  if (text != null) e.textContent = text;
-  return e;
-}
 
 function panel()   { return document.getElementById('set-nav'); }
 function listEl()  { return document.getElementById('set-nav-list'); }
@@ -449,8 +444,8 @@ export function initSetNav() {
   collapseBtn.id = 'set-nav-collapse';
   collapseBtn.title = 'Hide every set’s cards. Collapsed sets are not reachable with Ctrl+F.';
   collapseBtn.addEventListener('click', toggleCollapseAll);
-  // Relabel from the event rather than from a local flag, so this button, the ⋯ More
-  // menu's twin and the per-set chevrons can never disagree — including when the state
+  // Relabel from the event rather than from a local flag, so this button, its twin in
+  // the Master control row and the per-set chevrons can never disagree — including when the state
   // changes from somewhere this module knows nothing about.
   document.addEventListener('tcg:collapse-changed', e => {
     collapseBtn.textContent = collapseButtonLabel(!!e.detail?.allCollapsed);

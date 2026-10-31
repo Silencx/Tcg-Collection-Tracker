@@ -1,6 +1,12 @@
-// Walks js/**/*.js, parses import/export statements with regexes (no parser
-// dependency — Node built-ins only), and asserts every relative import resolves
-// to an existing file and every named import is actually exported by its target.
+// Walks js/**/*.js, tools/*.mjs and tools/lib/*.mjs, parses import/export statements
+// with regexes (no parser dependency — Node built-ins only), and asserts every relative
+// import resolves to an existing file and every named import is actually exported by
+// its target.
+//
+// The tools matter as much as the app: the weekly build imports the browser's own
+// modules (the tcgdex provider, bulba-jp, jp-model, local-images, config, slug), so a
+// removal in js/ can break tools/build-*.mjs without touching a single app import.
+// Only STATIC imports are checked — the probes' dynamic import() is not.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
@@ -9,6 +15,7 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const JS_DIR = resolve(ROOT, 'js');
+const TOOLS_DIR = resolve(ROOT, 'tools');
 
 function walk(dir) {
   const out = [];
@@ -20,7 +27,11 @@ function walk(dir) {
   return out;
 }
 
+/** The .mjs files directly in `dir` (tools/ holds caches and reports deeper down). */
+const mjsIn = dir => readdirSync(dir).filter(f => f.endsWith('.mjs')).map(f => resolve(dir, f));
+
 const files = walk(JS_DIR).sort();
+const toolFiles = [...mjsIn(TOOLS_DIR), ...mjsIn(resolve(TOOLS_DIR, 'lib'))].sort();
 
 const sourceCache = new Map();
 function source(file) {
@@ -59,9 +70,16 @@ test('every js/**/*.js file was discovered', () => {
   assert.ok(files.length > 0, 'expected to find at least one .js file under js/');
 });
 
-test('every relative import resolves to an existing file, and every named import is exported by its target', () => {
+test('the build tools were discovered', () => {
+  const rel = toolFiles.map(f => relative(ROOT, f).split(/[\\/]/).join('/'));
+  for (const must of ['tools/build-data.mjs', 'tools/build-jp-catalog.mjs', 'tools/build-images.mjs', 'tools/lib/jp-keep.mjs']) {
+    assert.ok(rel.includes(must), `${must} not found`);
+  }
+});
+
+function importOffenders(list) {
   const offenders = [];
-  for (const file of files) {
+  for (const file of list) {
     const rel = relative(ROOT, file);
     for (const m of source(file).matchAll(IMPORT_RE)) {
       const [, namedRaw, specifier] = m;
@@ -81,5 +99,15 @@ test('every relative import resolves to an existing file, and every named import
       }
     }
   }
+  return offenders;
+}
+
+test('every relative import resolves to an existing file, and every named import is exported by its target', () => {
+  const offenders = importOffenders(files);
+  assert.equal(offenders.length, 0, `import graph errors:\n${offenders.join('\n')}`);
+});
+
+test('the same holds for the build tools, including what they import from js/', () => {
+  const offenders = importOffenders(toolFiles);
   assert.equal(offenders.length, 0, `import graph errors:\n${offenders.join('\n')}`);
 });

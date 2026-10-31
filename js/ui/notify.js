@@ -1,12 +1,11 @@
 // =============================================================================
 // ui/notify.js — the notification log behind the header bell.
 //
-// Banners are in-flow notices above the sets. They never disappeared, so the page
-// accumulated "Loaded from cache (3m ago)" and friends until the next full render,
-// and anything that scrolled past was simply missed. Transient banners now expire on
-// a timer (see notify-model.ttlFor) — which would make them unrecoverable, hence this
-// log: every banner is recorded here as it is created, and the bell keeps an unread
-// count until the panel is opened.
+// Status messages ("Loaded from cache", "N new cards", partial results, the
+// placeholder-language notes) live here rather than as in-flow banners, which pushed
+// the grid around and scrolled out of sight. The bell keeps an unread count until the
+// panel is opened. Of the two remaining in-flow banners (masterset mkBanner), only the
+// failure is logged here; "Loading…" is not.
 //
 // NOT persisted, deliberately. Every entry describes THIS session's fetch, so a
 // stored "Loaded from cache (5m ago)" would resurface days later, stale and wrong.
@@ -78,7 +77,7 @@ function renderList() {
     row.className = `notif-item notif-${n.level}`;
     const text = document.createElement('span');
     text.className = 'notif-text';
-    text.textContent = n.text;              // textContent, not innerHTML — see mkBanner
+    text.textContent = n.text;              // textContent, not innerHTML: stored as plain text
     const when = document.createElement('time');
     when.className = 'notif-when';
     when.dateTime = new Date(n.ts).toISOString();
@@ -127,9 +126,7 @@ function levelFor(cls) {
 }
 
 /**
- * Record a notice. Called from mkBanner for EVERY banner, including sticky ones and
- * ones suppressed as already-dismissed — they are still things that happened, and
- * routing them all through one call is what stops the log and the page diverging.
+ * Record a notice.
  *
  * @param {string} html  the banner's HTML; stored as plain text
  * @param {string} cls   the banner variant class

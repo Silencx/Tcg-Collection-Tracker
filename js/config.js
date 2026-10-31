@@ -1,11 +1,8 @@
 // =============================================================================
 // config.js — all static configuration: storage keys, language tables,
-// era tables, and the Pokémon catalogue. Pure data only (no DOM, no fetch).
-//
-// Data blocks below are ported VERBATIM from the old single-file tool so the
-// new site behaves identically. URL-builder helpers that used to sit next to
-// these tables (limitlessIntlUrl, ptcgioToTcgdexSetId/LocalId, LIMITLESS_LANG_CODE)
-// live in js/api/images.js instead, since they belong to the image layer.
+// era tables, and the Pokémon catalogue, plus the two validators over them
+// (isValidMode, isValidPrintView). No DOM, no fetch. URL builders live in
+// js/api/images.js.
 // =============================================================================
 
 // Bump on any breaking change to a persisted blob's shape. Stamped into state
@@ -53,8 +50,9 @@ export const OTHER_SERIES_NAME = 'Other sets';
 export const CHKSTORE   = 'tcgChk_v1';
 export const POKESTORE  = 'tcgPokemon_v1';
 export const FILTERSTORE= 'tcgFilter_v1';
-export const BANNERSTORE= 'tcgBannerDismissed_v1';
-export const CACHESTORE = 'tcgData_v22';   // v22: variants for every era (+ prints, BW/XY/SM reverse inference)
+// v23: the renderer reads TCGdex-shaped cards only, so a cache the removed pokemontcg.io
+// fallback wrote under v22 must not be read back.
+export const CACHESTORE = 'tcgData_v23';
 export const SORTSTORE  = 'tcgSort_v1';
 export const MODESTORE  = 'tcgMode_v1';
 export const TMSSTORE   = 'tcgTMS_v1';
@@ -69,7 +67,7 @@ export const SETCHKSTORE    = 'tcgSetChk_v1';     // its checklist, SEPARATE fro
 // simply unread, and storage.keys('tcg') will carry it through an export harmlessly.)
 export const SETPICKERSTORE = 'tcgSetPicker_v1';  // picker chrome: {lang, asc}
 export const PALETTE_KEY = 'tcgPalette_v1';
-export const SESSIONSTORE = 'tcgSession_v1'; // base64url settings hash (Phase 5)
+export const SESSIONSTORE = 'tcgSession_v1'; // base64url settings hash (io.js)
 export const IMGFAILSTORE = 'tcgImgFail_v1'; // negative cache of image URLs that 404/403
 // Set-navigation sidebar open/closed. Device-local CHROME, deliberately NOT part
 // of the shareable session hash (io.js encodeSession) — a link shared from a
@@ -116,8 +114,8 @@ export const LANGUAGES = [
   { code:'es',      apiCode:'es',    badge:'ES', color:'#b71c1c', label:'Spanish',                     hasSetsApi:true  },
   { code:'it',      apiCode:'it',    badge:'IT', color:'#1b5e20', label:'Italian',                     hasSetsApi:true  },
   { code:'pt',      apiCode:'pt',    badge:'PT', color:'#880e4f', label:'Portuguese',                  hasSetsApi:true  },
-  // JP handled as dedicated column via Limitless TPC CDN (see renderBySet JP block)
-  // NOT in LANGUAGES — EN set IDs don't map to JP CDN paths
+  // JP is NOT in LANGUAGES: Japanese cards have their own sets and ids, and come from
+  // api/jp-source.js (PokéWallet catalogue → Bulbapedia), not from TCGdex.
   { code:'zh-Hant', apiCode:'zh-tw', badge:'TW', color:'#c62828', label:'Traditional Chinese (TW/HK)', hasSetsApi:true  },
   { code:'th',      apiCode:'th',    badge:'TH', color:'#283593', label:'Thai',                        hasSetsApi:true  },
   { code:'id',      apiCode:'id',    badge:'ID', color:'#e65100', label:'Indonesian',                  hasSetsApi:true  },
@@ -134,22 +132,20 @@ export const PLACEHOLDER_LANGS = [
 ];
 
 // ── NATIVE POKéMON NAMES (for missing-image placeholder cards) ────────────────
-// Native Pokémon names for known languages (used on missing-image placeholder cards)
-// TH: TCGdex returns 0 results for TH card names — left empty
-//     never errors if the fetch hasn't completed yet.
-// ID: Indonesian TCG uses the same Pokémon names as English — no separate entry needed.
+// Hand-maintained, and covers only the demo Pokémon. Readers fall back to the English
+// name for anything missing. No TH table: TCGdex has no Thai card names. No ID table:
+// Indonesian cards use the English Pokémon names.
 export const NATIVE_NAMES = {
   TW:{ Seedot:'橡實果', Nuzleaf:'長鼻葉', Shiftry:'狡猾天狗' },
   KR:{ Seedot:'도토링', Nuzleaf:'잎새코',  Shiftry:'다탱구'   },
   SC:{ Seedot:'橡实果', Nuzleaf:'长鼻叶',  Shiftry:'狡猾天狗' },
   JP:{ Seedot:'タネボー', Nuzleaf:'コノハナ', Shiftry:'ダーテング' },
-  TH:{}, // populated at runtime from TCGdex th/cards/{id} endpoint
 };
 
 // ── BADGE DISPLAY ORDER ───────────────────────────────────────────────────────
 export const BADGE_ORDER = ['EN','DE','FR','ES','IT','PT','JP','TW','TH','ID','KR','SC'];
 
-// ── ERA DISPLAY NAMES + ORDER ─────────────────────────────────────────────────
+// ── ERA DISPLAY NAMES ─────────────────────────────────────────────────────────
 // The main eras only. Every other series (promos, McDonald's, trainer kits, TCG
 // Pocket…) is named from data/sets.json's `series` lists — see ui/era-model.js.
 export const ERA_MAP = {
@@ -160,20 +156,9 @@ export const ERA_MAP = {
   dp:'Diamond & Pearl Era', ex:'EX Series Era', base:'Original Era',
 };
 
-// pokemontcg.io series name → TCGdex era code (for ERA_MAP display names)
-export const PTCGIO_SERIES_ERA = {
-  'Base':'base','Gym Heroes':'base','Neo':'base','e-Card':'base','EX':'ex',
-  'Diamond & Pearl':'dp','Platinum':'pl','HeartGold & SoulSilver':'hgss',
-  'Black & White':'bw','XY':'xy','Sun & Moon':'sm',
-  'Sword & Shield':'swsh','Scarlet & Violet':'sv',
-};
-
-// Canonical era release order, newest first.
-// Used to sort era sections; eras not listed appear at the end.
-export const ERA_ORDER_DESC = ['sv','swsh','sm','xy','bw','hgss','pl','dp','ex','base'];
-
 // ── POKéMON CATALOGUE (Gen 1–9, dex# + gen) ───────────────────────────────────
-// Popular suggestions for the Pokémon input
+// THE catalogue: the add-Pokémon picker, the first-run modal, the TMS browser and the
+// dashboard's "N of 357" all draw on it. A popular subset, not the full National Dex.
 export const POKEMON_CATALOG = [
   // Gen 1
   {name:'Bulbasaur',dex:1,gen:1},{name:'Ivysaur',dex:2,gen:1},{name:'Venusaur',dex:3,gen:1},

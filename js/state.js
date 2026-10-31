@@ -3,19 +3,16 @@
 //
 // DESIGN: state lives on a single exported `state` OBJECT (not as separate
 // `export let` bindings). ES modules export read-only live bindings, so a
-// consumer module cannot do `activeLangs = new Set(...)` on an imported binding.
-// The old tool reassigned these freely (checked, activeLangs, appMode, sortDesc,
-// _bulbaData, …). Putting them on an object means every module can mutate via
-// `state.activeLangs = …` and all modules see it. When porting old code, prefix
-// the bare names with `state.` (checked → state.checked, etc.).
+// consumer module cannot do `activeLangs = new Set(...)` on an imported binding;
+// on an object every module can write `state.activeLangs = …` and all of them see
+// it. tools/state-prefix-scan.mjs fails the build on a bare state name.
 //
-// All reads/writes to localStorage go through storage.js (quota-safe). Defaults
-// and parse-failure fallbacks match the old tool exactly.
+// All reads/writes to localStorage go through storage.js (quota-safe).
 // =============================================================================
 
 import * as storage from './storage.js';
 import {
-  CHKSTORE, POKESTORE, FILTERSTORE, BANNERSTORE, CACHESTORE, SORTSTORE,
+  CHKSTORE, POKESTORE, FILTERSTORE, CACHESTORE, SORTSTORE,
   MODESTORE, TMSSTORE, TMSFILTERSTORE, TMSCACHESTORE,
   SETTARGETSTORE, SETCHKSTORE, SETPICKERSTORE,
   CHKPRINTSTORE, SETCHKPRINTSTORE, TMSPRINTSTORE, PRINTVIEWSTORE,
@@ -33,7 +30,6 @@ function persistedArray(key, fallback) {
   return Array.isArray(v) ? v : fallback;
 }
 
-// Read once — this was parsed twice, on consecutive lines, to test then use it.
 const tmsFilter = persistedArray(TMSFILTERSTORE, BADGE_ORDER);
 // {lang, asc}. Same defensive read as persistedArray: a corrupt value here would throw
 // at import time, before any UI exists to report it.
@@ -49,10 +45,8 @@ export const state = {
   pokemonList:      persistedArray(POKESTORE, null) || [...DEFAULT_POKEMON],
   // English only on a fresh profile. The grid renders one tile PER LANGUAGE per card
   // (12 badges), so an all-on default buried the cards most people actually want under
-  // eleven other printings. Extra languages are added from the pills. The seed used to
-  // be [] and buildPills quietly rewrote it to "everything present" on first render.
+  // eleven other printings. Extra languages are added from the language picker.
   activeLangs:      new Set(persistedArray(FILTERSTORE, ['EN'])),                 // MS language filter
-  dismissedBanners: new Set(persistedArray(BANNERSTORE, [])),
   sortDesc:         storage.get(SORTSTORE) !== 'asc',   // true = newest sets first (default)
   // Boot ALWAYS lands on the dashboard — a product decision, not a fallback. MODESTORE
   // is still written on every switch, because the mode is part of the shareable session
@@ -194,16 +188,14 @@ if (typeof window !== 'undefined') {
 }
 export function savePoke()       { storage.setJSON(POKESTORE,      state.pokemonList);            settingsChanged(); }
 export function saveFilter()     { storage.setJSON(FILTERSTORE,    [...state.activeLangs]);       settingsChanged(); }
-export function saveDismissed()  { storage.setJSON(BANNERSTORE,    [...state.dismissedBanners]); }
 export function saveSort()       { storage.set(SORTSTORE,          state.sortDesc ? 'desc' : 'asc'); settingsChanged(); }
 export function saveMode()       { storage.set(MODESTORE,          state.appMode);                settingsChanged(); }
 export function saveTmsFilter()  { storage.setJSON(TMSFILTERSTORE, [...state.tmsActiveLangs]);     settingsChanged(); }
 export function savePrintView()  { storage.set(PRINTVIEWSTORE,     state.printView);              settingsChanged(); }
-// Single set. The chosen set and its language filter are shareable SETTINGS (they ride
-// the #s= hash); the checklist is data, so it is debounced like the other two and fires
-// its own event instead.
+// Single set. The chosen set is a shareable SETTING (it rides the #s= hash); the
+// checklist is data, so it is debounced like the other two.
 export function saveSetTarget()  { storage.set(SETTARGETSTORE, state.ssTarget || '');              settingsChanged(); }
-export function saveSetChk()     { saveSetChkInner(); document.dispatchEvent(new CustomEvent('tcg:set-changed')); }
+export function saveSetChk()     { saveSetChkInner(); }
 // Picker chrome only — deliberately NOT settingsChanged(), so it stays out of the
 // shareable session hash. Same call as SETNAVSTORE's open/closed state.
 export function saveSetPicker()  { storage.setJSON(SETPICKERSTORE, { lang: state.ssPickerLang, asc: state.ssPickerAsc }); }
@@ -216,19 +208,17 @@ export function removeTmsCache() {
 }
 
 /**
- * Save TMS includes. The old tool also refreshed the "Print Selected (n)" button
- * here; that UI coupling is replaced by a 'tcg:tms-changed' event so state.js
- * stays free of rendering. tms.js (Phase 4) listens and updates the button.
+ * Save TMS includes. Fires 'tcg:tms-changed' rather than touching the UI, so state.js
+ * stays free of rendering; tms.js listens and updates the "Print Selected (n)" button.
  */
 export function saveTms() {
-  // The WRITE is debounced; the EVENT is not. tms.js's tile counts and the
-  // "Print Selected (n)" badge listen for this, so deferring it would leave the
-  // UI a quarter-second behind the click that caused it.
+  // The WRITE is debounced; the EVENT is not: deferring it would leave the button a
+  // quarter-second behind the click that caused it.
   saveTmsInner();
   document.dispatchEvent(new CustomEvent('tcg:tms-changed'));
 }
 
-// ── EN CARD-DATA CACHE (24h TTL enforced by the legacy provider, Phase 2) ─────
+// ── EN CARD-DATA CACHE (24h TTL, enforced by masterset.buildAll) ──────────────
 /** @returns the cache blob {ts, cards, ...} or null if absent/malformed. */
 export function loadCache() {
   const d = storage.getJSON(CACHESTORE, null);

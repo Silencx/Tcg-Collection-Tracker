@@ -1,15 +1,15 @@
 // =============================================================================
 // ui/io.js — backup/transfer + shareable view sessions.
 //   • exportData()  : download every tcg* key as one JSON envelope.
-//   • importData()  : restore an envelope, with a one-time pokemontcg.io→TCGdex
-//                     id migration for the Master-Set checklist, then reload.
+//   • importData()  : restore an envelope, then reload. Old pokemontcg.io ids
+//                     ("sv5-163") are moved to TCGdex ids ("sv05-163") on the way
+//                     in: the Master-Set checklist checked against the rendered
+//                     cards when there are any, TMS / single-set ids and the TMS
+//                     cache always.
+//   • migrateCheckedOnBoot : the same id move for old localStorage, once.
 //   • sessions      : settings-only base64url hash (mode, filters, pokémon list,
-//                     sort, palette) — auto-saved, auto-restored, URL-shareable.
-//
-// Why migrate only the MS checklist: the Master-Set render now uses TCGdex ids
-// ("sv05-163"), but the TMS popup still uses the legacy pipeline (pokemontcg.io
-// ids "sv5-163"). So TMS includes (tcgTMS_v1) are left as-is; only tcgChk_v1 is
-// remapped, and only when the remapped id matches a card in the live index.
+//                     sort, palette, chosen set, print view) — auto-saved,
+//                     auto-restored, URL-shareable.
 // =============================================================================
 
 import {
@@ -65,7 +65,7 @@ export function exportData() {
 }
 
 // ──────────────────── ID MIGRATION (MS checklist) ────────────────────
-// looksPtcgio / migrateCardId / migrateIdToken now live in ../api/id-migration.js
+// looksPtcgio / migrateCardId / migrateIdToken live in ../api/id-migration.js
 // (pure logic — importable without pulling in state.js/localStorage).
 
 // Returns { migrated:[unique ids], unmatched:[original ids that don't resolve] }.
@@ -228,8 +228,8 @@ export function importData(input) {
 }
 
 // ──────────────────── SESSIONS (settings-only hash) ────────────────────
-// b64urlEncode/b64urlDecode/encodeSessionPayload/decodeSession now live in
-// ./session-codec.js (pure logic — importable without pulling in state.js/DOM).
+// The codec (encodeSessionPayload/decodeSession) lives in ./session-codec.js: pure
+// logic, importable without pulling in state.js or the DOM.
 function currentPalette() {
   const m = document.body.className.match(/palette-[\w-]+/);
   return m ? m[0] : '';

@@ -34,8 +34,7 @@ test('output follows the requested name order, not the order lists arrived in', 
 });
 
 test('cards for unrequested species are kept, not silently dropped', () => {
-  // A provider may answer with more than it was asked for (the removed legacy
-  // fetchEnCards served the whole configured list).
+  // A provider may answer with more than it was asked for.
   const out = mergeCardSets(['Seedot'], [[card('a-1', 'Seedot'), card('z-9', 'Lotad')]]);
   assert.deepEqual(out.map(c => c.id), ['a-1', 'z-9']);
 });
@@ -52,13 +51,12 @@ test('falls back to `name` when `species` is absent (pre-species snapshots)', ()
 
 // ── mergeSource ───────────────────────────────────────────────────────────────
 test('the reported source is the WEAKEST provider that contributed', () => {
-  // Callers compare the source with plain equality (buildAll once raised a backup-source
-  // banner on `source === 'legacy'`); a compound value would break that silently.
-  assert.equal(mergeSource(['snapshot', 'legacy']), 'legacy');
+  // Callers may compare the source with plain equality; a compound value would break
+  // that silently.
   assert.equal(mergeSource(['snapshot', 'tcgdex']), 'tcgdex');
+  assert.equal(mergeSource(['tcgdex', 'snapshot']), 'tcgdex');
   assert.equal(mergeSource(['snapshot']), 'snapshot');
-  assert.equal(mergeSource(['tcgdex', 'legacy']), 'legacy');
-  assert.equal(mergeSource(['legacy', 'snapshot']), 'legacy');
+  assert.equal(mergeSource(['snapshot', null]), 'snapshot');
 });
 
 // ── slug ──────────────────────────────────────────────────────────────────────

@@ -49,8 +49,3 @@ export function flagSvg(badge) {
   // so the flag is decoration and must not be announced or tabbed to.
   return `<svg class="lang-flag" viewBox="0 0 30 20" aria-hidden="true" focusable="false">${body}</svg>`;
 }
-
-/** Every badge this module can draw. Used by tests and by the language picker. */
-export function flagBadges() {
-  return Object.keys(FLAGS);
-}

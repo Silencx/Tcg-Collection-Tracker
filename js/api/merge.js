@@ -2,11 +2,8 @@
 // api/merge.js — combining a partial snapshot hit with a live fetch, as pure
 // functions.
 //
-// Split out of router.js for the usual reason (see filter-pass.js, setnav-index.js,
-// collapse-model.js): importing router.js pulls in legacy.js → state.js → storage.js,
-// which touches localStorage at import time, so `node --test` cannot reach it without
-// a jsdom or a shim. These two rules are the ones most worth testing in the whole
-// partial-hit path, so they live where they can be.
+// Kept apart from router.js so the two rules most worth testing in the partial-hit
+// path can be tested on their own, with no providers or network behind them.
 // =============================================================================
 
 /**
@@ -39,8 +36,8 @@ export function mergeCardSets(names, lists) {
     }
   }
   // Anything whose species is not in `names` still belongs in the result: a provider
-  // that answers with more than it was asked for (the removed legacy fetchEnCards
-  // served the whole configured list) must not have the extra dropped silently.
+  // that answers with more than it was asked for must not have the extra dropped
+  // silently.
   for (const list of lists) {
     for (const c of list || []) {
       if (!c?.id || seen.has(c.id)) continue;
@@ -52,16 +49,13 @@ export function mergeCardSets(names, lists) {
 }
 
 // Provider strength, weakest last.
-const SOURCE_RANK = { snapshot: 0, tcgdex: 1, legacy: 2 };
+const SOURCE_RANK = { snapshot: 0, tcgdex: 1 };
 
 /**
  * The weakest provider that actually contributed.
  *
- * masterset's buildAll stores this string in the cache, and callers compare it with
- * plain equality. It used to drive a "backup source" banner on `source === 'legacy'`,
- * which a compound value like 'snapshot+legacy' would have silently suppressed; the
- * card index has had no legacy branch since 2026-10-30, but returning the weakest
- * single name keeps every such equality check working.
+ * masterset's buildAll stores this string in the cache. A single provider name, never
+ * a compound like 'snapshot+tcgdex', so any caller can compare it with plain equality.
  */
 export function mergeSource(sources) {
   return sources.filter(Boolean).reduce((a, b) => (SOURCE_RANK[b] > SOURCE_RANK[a] ? b : a));

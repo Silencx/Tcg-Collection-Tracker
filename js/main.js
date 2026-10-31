@@ -1,18 +1,14 @@
 // =============================================================================
 // main.js — application boot + event wiring.
 //
-// PHASE 1 SCOPE: this is a SHELL. It loads the foundational modules (config,
-// state, storage), restores the saved colour palette, and shows the correct
-// control rows for the saved mode. It renders NO cards yet — the providers
-// (Phase 2/3), Master-Set render (Phase 2), TMS render + print (Phase 4),
-// banners (Phase 5) and sessions (Phase 5) are added in later phases, and their
-// handlers get appended to the GLOBAL HANDLERS block at the bottom.
+// Boots the app (storage-quota handler, notifications, session restore, id
+// migrations, palette), owns mode switching (applyModeUI / MODE_ENTER), and publishes
+// the inline-handler manifest.
 //
-// INLINE-HANDLER BRIDGE: index.html keeps the old tool's inline `onclick="fn()"`
-// attributes verbatim (faithful port, lowest risk). Module scope is not global,
-// so each such handler must be published on `window` in the GLOBAL HANDLERS
-// block below. That block is the single, explicit list of every function the
-// markup expects to exist — treat it as the wiring manifest.
+// INLINE-HANDLER BRIDGE: index.html uses inline `onclick="fn()"` attributes, and
+// module scope is not global, so each such handler must be published on `window` in
+// the GLOBAL HANDLERS block below. That block is the single, explicit list of every
+// function the markup expects to exist — treat it as the wiring manifest.
 // =============================================================================
 
 import { state, saveMode } from './state.js';
@@ -117,10 +113,10 @@ function restorePalette() {
   });
 }
 
-// ── "⋯ MORE" MENUS ────────────────────────────────────────────────────────────
+// ── POPOVER MENUS (bell, gear) ────────────────────────────────────────────────
 // <details> stays open until its summary is clicked again, which for a dropdown
 // means it lingers after you have used it. Close on any click outside, and on
-// Escape — the same pattern masterset.js uses for the Pokémon suggestions.
+// Escape.
 document.addEventListener('click', e => {
   document.querySelectorAll('.more-menu[open]').forEach(d => {
     if (!d.contains(e.target)) d.open = false;
@@ -244,9 +240,9 @@ function applyModeTitle(mode) {
   document.title = t.doc();
 }
 
-// Which heavy renders have run this session. applyModeUI only toggles `display`, so a
-// rendered mode stays in the DOM and does not need rebuilding on every visit.
-const rendered = { master: false, tms: false, set: false };
+// Whether Master Set's heavy render has run this session. applyModeUI only toggles
+// `display`, so the rendered grid stays in the DOM and is not rebuilt on every visit.
+let masterRendered = false;
 
 /**
  * The render half, one entry per mode. This was an unguarded `else` meaning Master,
@@ -269,11 +265,11 @@ const MODE_ENTER = {
     }
     enterMaster();
   },
-  tms: () => { rendered.tms = true; renderTMS(); updateTmsPrintSelBtn(); },
+  tms: () => { renderTMS(); updateTmsPrintSelBtn(); },
   // Async and NOT awaited: it fetches, and setMode is called from an inline onclick.
   // It paints its own loading state and its own failure state, so there is nothing
   // useful for a caller to wait on. Idempotent, so a re-entry is safe.
-  set: () => { rendered.set = true; renderSetMode(); },
+  set: () => renderSetMode(),
 };
 
 /**
@@ -284,7 +280,7 @@ const MODE_ENTER = {
 function enterMaster() {
   renderPokeChips();
   applyModeTitle('master');
-  if (!rendered.master) { rendered.master = true; buildAll(false); }
+  if (!masterRendered) { masterRendered = true; buildAll(false); }
   else updateStats();   // totals are whatever the last filter pass left them
 }
 
@@ -356,7 +352,7 @@ function finishBoot() {
   document.addEventListener('tcg:settings-changed', () => applyModeTitle(state.appMode));
   // Single set's h1 is the set's NAME, which only exists once its fetch resolves.
   document.addEventListener('tcg:set-loaded', () => applyModeTitle(state.appMode));
-  // Keep the ⋯ More twin of "Collapse all" labelled in step with the sidebar's copy.
+  // Keep the control-row twin of "Collapse all" labelled in step with the sidebar's copy.
   // Both read the same event, so neither owns the state.
   document.addEventListener('tcg:collapse-changed', (e) => {
     const btn = document.getElementById('more-collapse-all');
@@ -372,24 +368,24 @@ function finishBoot() {
 migrateJpIdsOnBoot().catch(err => console.warn('[boot] JP id migration skipped:', err.message)).finally(finishBoot);
 
 // ── GLOBAL HANDLERS (wiring manifest for inline onclick= in index.html) ───────
-// Add to this list as each module lands. Anything the markup calls inline MUST
-// appear here or the click will throw a ReferenceError.
+// Anything the markup calls inline MUST appear here or the click will throw a
+// ReferenceError.
 Object.assign(window, {
   setMode, setPalette,
-  // Master Set (Phase 2)
+  // Master Set
   clearCache, closePreview, doRefresh, openPokemonPicker,
   resetAll, selectAll, toggleSort,
-  // TMS + print (Phase 4)
+  // TMS + print
   resetTms, clearTmsCache, closeTmsPopup,
   printSelected, printChecklist, printTmsSelected, printTmsChecklist,
   printSetSelected, printSetChecklist,
-  // import/export + sessions (Phase 5)
+  // import/export + sessions
   exportData, importData, shareSession, restoreSession,
-  // single-set mode (Phase 3)
+  // single-set mode
   changeSet, selectAllSet, resetSet,
   // set-navigation sidebar
   toggleSetNav,
-  // collapse (sidebar button + ⋯ More twin)
+  // collapse (sidebar button + its control-row twin)
   toggleCollapseAll,
   // per-print tracking (gear panel + the chips/tiles switch)
   setPrintView, swapPrintView,

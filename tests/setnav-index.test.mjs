@@ -1,7 +1,6 @@
 // The sidebar's index is built from a walk of #dyn's children, so its grouping has
 // to cope with whatever order the DOM is in — including a set that precedes any era
-// label, which happens on the sort-toggle path where a keyed banner is re-appended
-// before renderBySet writes the first label. Ids come from remote set names, so the
+// label. Ids come from remote set names, so the
 // slug/collision rules are the other thing worth pinning down.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
