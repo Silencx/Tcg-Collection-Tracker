@@ -43,7 +43,7 @@ async function liveCards(names) {
   if (!primaryHealthy) throw new Error('TCGdex unavailable this session');
   // The snapshot's series map, for the image URL of a card TCGdex lists without one.
   // sets.json is memoised and read for set meta straight after anyway.
-  const setSeries = await snapshot.getSetSeries();
+  const { setSeries } = await snapshot.getSeries();
   try {
     const cards = await withTimeout(signal => tcgdex.getCards(names, { signal, setSeries }));
     if (cards && cards.length) return { cards, source: 'tcgdex' };
@@ -108,9 +108,25 @@ export async function getSetMeta({ forceRefresh = false, setIds = [] } = {}) {
   }
   // withSeries:false — the series sweep is ~116 extra requests and only the BUILD needs
   // it. A browser that has fallen through to live set meta is already paying for nine
-  // /sets sweeps; the picker degrades to one ungrouped list rather than tripling that.
+  // /sets sweeps, so the series data comes from the snapshot instead.
   const meta = await withTimeout(signal => tcgdex.getSetMeta({ signal, setIds, withSeries: false }));
-  return { ...setMetaShape(meta), source: 'tcgdex' };
+  return { ...setMetaShape(await withSnapshotSeries(meta)), source: 'tcgdex' };
+}
+
+/**
+ * Live set meta with the snapshot's series data filled in. Without it the Master Set
+ * page has no series names for its era headings (ui/era-model.js) and the picker no
+ * grouping — so a Refresh, which always goes live, would lose both for 24h of cache.
+ * Live values win where both have one; a missing snapshot changes nothing.
+ */
+async function withSnapshotSeries(meta) {
+  const snap = await snapshot.getSeries();
+  const hasSeries = Object.keys(meta.series || {}).length > 0;
+  return {
+    ...meta,
+    setSeries: { ...snap.setSeries, ...(meta.setSeries || {}) },
+    series: hasSeries ? meta.series : snap.series,
+  };
 }
 
 /**

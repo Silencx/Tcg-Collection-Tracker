@@ -19,7 +19,8 @@ const DATA_BASE = new URL('../../../data/', import.meta.url);
 // fetch and one parse of each file (sets.json alone is ~94 KB).
 //
 // Safe for the whole session by construction: router.js skips the snapshot layer
-// entirely when forceRefresh is set, and clearCache() ends in location.reload() —
+// when forceRefresh is set (all but getSeries, whose build-time series structure a
+// refresh does not re-check), and clearCache() ends in location.reload() —
 // so there is no path that expects a *changed* snapshot without a fresh document.
 // Promises (not results) are cached, which also collapses concurrent reads of the
 // same file into one request.
@@ -80,13 +81,19 @@ export async function getSetMeta(setIds = []) {
 }
 
 /**
- * data/sets.json's set id → CDN series map, or {} when there is no snapshot. Never
- * throws: the live card index uses it only to build image URLs for cards TCGdex lists
- * without one, and must not fail for want of it.
+ * The series structure alone — which series each set is in, and what each series is
+ * called — with no coverage check, or empty maps when there is no snapshot. Never
+ * throws. It is build-time data the browser never fetches live (tcgdex.getSetMeta
+ * withSeries:false), so the router lends it to live set meta (era headings, picker
+ * groups) and to the live card index (the image URL of a card TCGdex lists without
+ * one). Read even on a forced refresh: a refresh re-checks cards and dates, not which
+ * era a set belongs to.
  */
-export async function getSetSeries() {
-  try { return (await loadJSON('sets.json'))?.setSeries || {}; }
-  catch { return {}; }
+export async function getSeries() {
+  try {
+    const snap = await loadJSON('sets.json');
+    return { setSeries: snap?.setSeries || {}, series: snap?.series || {} };
+  } catch { return { setSeries: {}, series: {} }; }
 }
 
 // ── PER-POKÉMON SHARDS ────────────────────────────────────────────────────────
@@ -158,4 +165,4 @@ export async function getJpRawPartial(names) {
   return { data, covered, missing: names.filter(n => !covered.includes(n)) };
 }
 
-export const snapshot = { getSetMeta, getSetSeries, getCardsPartial, getJpRawPartial };
+export const snapshot = { getSetMeta, getSeries, getCardsPartial, getJpRawPartial };

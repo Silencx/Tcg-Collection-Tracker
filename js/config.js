@@ -146,7 +146,10 @@ export const NATIVE_NAMES = {
 export const BADGE_ORDER = ['EN','DE','FR','ES','IT','PT','JP','TW','TH','ID','KR','SC'];
 
 // ── ERA DISPLAY NAMES ─────────────────────────────────────────────────────────
+// The main eras only. Every other series (promos, McDonald's, trainer kits, TCG
+// Pocket…) is named from data/sets.json's `series` lists — see ui/era-model.js.
 export const ERA_MAP = {
+  me:'Mega Evolution Era',
   sv:'Scarlet & Violet Era', swsh:'Sword & Shield Era',
   sm:'Sun & Moon Era', xy:'XY Era', bw:'Black & White Era',
   hgss:'HeartGold & SoulSilver Era', pl:'Platinum Era',
