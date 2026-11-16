@@ -153,6 +153,9 @@ and commits `data/`. Run it by hand from the **Actions** tab to widen coverage: 
 them. A visitor tracking pre-built Pokémon makes zero API calls; coverage is
 per-Pokémon, so for three Pokémon where two are pre-built only the third is fetched live.
 
+- A data file whose contents did not change is written back byte for byte, `builtAt`
+  included (`tools/lib/built-at.mjs`), and card lists are sorted by id, so a week with
+  nothing new commits nothing.
 - `data/sets.json` carries a date for every set, because a snapshot with any gap is a
   miss. Its maps are flat unions across languages, with per-language overrides under
   `lang`; read them through `dateFor` / `countFor` in `js/ui/setmode-model.js`.
