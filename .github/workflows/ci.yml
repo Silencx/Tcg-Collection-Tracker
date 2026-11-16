@@ -1,7 +1,10 @@
 name: CI
 
+# Push on main only: a branch with an open PR is already checked by pull_request, and
+# running both doubled every PR's checks.
 on:
   push:
+    branches: [main]
   pull_request:
 
 jobs:
@@ -9,10 +12,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: 24
 
