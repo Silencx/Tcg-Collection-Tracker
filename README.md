@@ -142,8 +142,8 @@ can't be reassigned across files). The markup uses inline `onclick="fn()"` handl
 | Script | Reads | Writes | Key |
 |---|---|---|---|
 | `tools/build-data.mjs` (`npm run build-data`) | TCGdex, Bulbapedia, `data/prebuilt.json` | `data/sets.json`, `data/index.json`, `data/cards/`, `data/jp/` | none |
-| `tools/build-jp-catalog.mjs` | PokéWallet | `data/jp-cat/` (committed), `data/jp-catalog/` + report (local) | `POKEWALLET_IO_PROD_KEY` |
-| `tools/build-images.mjs` | `data/jp-catalog/`, PokéWallet | `img/`, `data/img-index.json` (local only) | `POKEWALLET_IO_PROD_KEY` |
+| `tools/build-jp-catalog.mjs` (`npm run build-jp-catalog`) | PokéWallet | `data/jp-cat/` (committed), `data/jp-catalog/` + report (local) | `POKEWALLET_IO_PROD_KEY` |
+| `tools/build-images.mjs` (`npm run build-images`) | `data/jp-catalog/`, PokéWallet | `img/`, `data/img-index.json` (local only) | `POKEWALLET_IO_PROD_KEY` |
 | `tools/check.mjs` | `js/`, `tools/` | — | none |
 | `tools/apitcg-probe.mjs`, `tools/pokewallet-probe.mjs`, `tools/jp-gap-size.mjs` | research probes; reports stay local | — | their own |
 
@@ -196,8 +196,8 @@ drop the workflow step. The app needs no change: with the files gone it falls ba
 Bulbapedia on its own.
 
 ```bash
-node tools/build-jp-catalog.mjs              # fetch (needs the key)
-node tools/build-jp-catalog.mjs --emit-only  # rebuild data/jp-cat/ from the local copy, no requests
+npm run build-jp-catalog                 # fetch (needs the key)
+npm run build-jp-catalog -- --emit-only  # rebuild data/jp-cat/ from the local copy, no requests
 ```
 
 ### Hosted card images (build-time only, not live yet)
