@@ -38,8 +38,8 @@ import { loadEnvKey } from './lib/env-key.mjs';
 import { createClient, listOf, matchJpRows } from './lib/pokewallet.mjs';
 import {
   canonicalSetName, parseReleaseDate, cardTuple, cleanTuple, isJapaneseSet, japaneseOnly, pagesFor, publishCheck,
-  stampBuiltAt,
 } from './lib/jp-catalog.mjs';
+import { stampBuiltAt } from './lib/built-at.mjs';
 import { JP_BULBA_SET_MAP } from '../js/api/bulba-jp.js';
 import { assignJpKeys, jpEra, nameShardLetters } from '../js/api/jp-model.js';
 import { findLimitlessCode } from './lib/limitless.mjs';

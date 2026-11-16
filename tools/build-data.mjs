@@ -27,6 +27,7 @@ import { getCards, getSetMeta } from '../js/api/providers/tcgdex.js';
 import { fetchJpRawByName } from '../js/api/bulba-jp.js';
 import { uniqueSlug } from '../js/slug.js';
 import { planJpSnapshot } from './lib/jp-keep.mjs';
+import { stampBuiltAt } from './lib/built-at.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const DATA_DIR = resolve(ROOT, 'data');
@@ -55,6 +56,12 @@ const writeJSON = (file, obj) => writeFileSync(resolve(DATA_DIR, file), JSON.str
 const readJSON = (file) => {
   try { return JSON.parse(readFileSync(resolve(DATA_DIR, file), 'utf8')); } catch { return null; }
 };
+// An unchanged body is written back byte for byte, stamp included (tools/lib/built-at.mjs),
+// so a week that found nothing new gives the refresh job nothing to commit.
+const writeData = (file, body) => writeJSON(file, stampBuiltAt(body, readJSON(file), body.builtAt));
+// TCGdex answers in no fixed order: three weekly builds in a row committed the same cards
+// reshuffled. Shard order means nothing to the app, so pin it.
+const byId = (a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
 
 async function main() {
   console.log(`[build-data] Pokémon (${POKEMON.length}): ${POKEMON.join(', ')}`);
@@ -129,7 +136,7 @@ async function main() {
   const shards = [];
   for (const [i, name] of POKEMON.entries()) {
     try {
-      shards.push({ cards: await getCards([name], { setSeries }) });
+      shards.push({ cards: (await getCards([name], { setSeries })).sort(byId) });
     } catch (e) {
       const prev = readJSON(`cards/${slugs[i]}.json`);
       const kept = prev?.builtAt && prev.pokemon === name && Array.isArray(prev.cards) ? prev.cards : null;
@@ -187,7 +194,9 @@ async function main() {
   // dates/symbols/logos/counts stay FLAT `{setId: value}` maps and are the UNION across
   // languages — see the shape note on tcgdex.getSetMeta. `lang` carries only the values
   // that differ from them, which is why this file is ~94 KB and not ~275 KB.
-  writeJSON('sets.json', {
+  // noCards is filled as parallel requests come back, so its order changes run to run.
+  for (const l of Object.values(meta.lang || {})) l.noCards?.sort();
+  writeData('sets.json', {
     schemaVersion: SCHEMA_VERSION, builtAt,
     names: meta.names, dates: meta.dates, symbols: meta.symbols,
     logos: meta.logos, counts: meta.counts,
@@ -203,12 +212,12 @@ async function main() {
     index.pokemon[name] = slug;
     // A kept card shard is left byte-identical, like a kept JP shard below.
     const { cards: own, kept } = shards[i];
-    if (own) writeJSON(`cards/${slug}.json`, { schemaVersion: SCHEMA_VERSION, builtAt, pokemon: name, cards: own });
+    if (own) writeData(`cards/${slug}.json`, { schemaVersion: SCHEMA_VERSION, builtAt, pokemon: name, cards: own });
     // A kept JP shard is left byte-identical (not rewritten with a new builtAt), so a
     // blocked run produces no data/jp* diff for the weekly job to commit.
     const jpShard = jp.shards[name];
     if (jpShard.write) {
-      writeJSON(`jp/${slug}.json`, {
+      writeData(`jp/${slug}.json`, {
         schemaVersion: SCHEMA_VERSION, builtAt, pokemon: name, jpCardsData: jpShard.entries,
       });
     }
@@ -217,7 +226,7 @@ async function main() {
       (jpShard.write ? `${jpShard.entries.length} JP`
         : jpShard.entries ? `${jpShard.entries.length} JP (KEPT, not refreshed)` : 'no JP shard (fetch failed)'));
   }
-  writeJSON('index.json', index);
+  writeData('index.json', index);
 
   const jpKept = POKEMON.filter(n => !jp.shards[n].write);
   const cardsWritten = shards.filter(s => s.cards).length;

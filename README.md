@@ -142,8 +142,8 @@ can't be reassigned across files). The markup uses inline `onclick="fn()"` handl
 | Script | Reads | Writes | Key |
 |---|---|---|---|
 | `tools/build-data.mjs` (`npm run build-data`) | TCGdex, Bulbapedia, `data/prebuilt.json` | `data/sets.json`, `data/index.json`, `data/cards/`, `data/jp/` | none |
-| `tools/build-jp-catalog.mjs` | PokéWallet | `data/jp-cat/` (committed), `data/jp-catalog/` + report (local) | `POKEWALLET_IO_PROD_KEY` |
-| `tools/build-images.mjs` | `data/jp-catalog/`, PokéWallet | `img/`, `data/img-index.json` (local only) | `POKEWALLET_IO_PROD_KEY` |
+| `tools/build-jp-catalog.mjs` (`npm run build-jp-catalog`) | PokéWallet | `data/jp-cat/` (committed), `data/jp-catalog/` + report (local) | `POKEWALLET_IO_PROD_KEY` |
+| `tools/build-images.mjs` (`npm run build-images`) | `data/jp-catalog/`, PokéWallet | `img/`, `data/img-index.json` (local only) | `POKEWALLET_IO_PROD_KEY` |
 | `tools/check.mjs` | `js/`, `tools/` | — | none |
 | `tools/apitcg-probe.mjs`, `tools/pokewallet-probe.mjs`, `tools/jp-gap-size.mjs` | research probes; reports stay local | — | their own |
 
@@ -153,6 +153,9 @@ and commits `data/`. Run it by hand from the **Actions** tab to widen coverage: 
 them. A visitor tracking pre-built Pokémon makes zero API calls; coverage is
 per-Pokémon, so for three Pokémon where two are pre-built only the third is fetched live.
 
+- A data file whose contents did not change is written back byte for byte, `builtAt`
+  included (`tools/lib/built-at.mjs`), and card lists are sorted by id, so a week with
+  nothing new commits nothing.
 - `data/sets.json` carries a date for every set, because a snapshot with any gap is a
   miss. Its maps are flat unions across languages, with per-language overrides under
   `lang`; read them through `dateFor` / `countFor` in `js/ui/setmode-model.js`.
@@ -193,8 +196,8 @@ drop the workflow step. The app needs no change: with the files gone it falls ba
 Bulbapedia on its own.
 
 ```bash
-node tools/build-jp-catalog.mjs              # fetch (needs the key)
-node tools/build-jp-catalog.mjs --emit-only  # rebuild data/jp-cat/ from the local copy, no requests
+npm run build-jp-catalog                 # fetch (needs the key)
+npm run build-jp-catalog -- --emit-only  # rebuild data/jp-cat/ from the local copy, no requests
 ```
 
 ### Hosted card images (build-time only, not live yet)
