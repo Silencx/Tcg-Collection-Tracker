@@ -150,7 +150,7 @@ async function main() {
       }
     }
   } catch (e) {
-    if (e.code !== 'BUDGET' && !e.status) throw e;
+    if (e.code !== 'BUDGET' && e.code !== 'NETWORK' && !e.status) throw e;
     stoppedWhy = e.message;
   } finally {
     if (!dryRun && changed) writeIndex(idx);

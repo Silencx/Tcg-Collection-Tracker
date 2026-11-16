@@ -79,10 +79,16 @@ export function matchJpRows(rows, pwCards) {
  * A small client: one place that calls PokéWallet, a hard request cap, and a stop when
  * the live hourly quota (read from the response headers) falls to `reserve`. Never
  * records or prints headers — they carry the key.
+ *
+ * A request that gets no response at all (fetch throws: a dropped connection, a DNS
+ * hiccup) is retried after each of `retryDelays` ms; one blip cut a 1,200-image run off at
+ * 70 (2026-11-16). If every retry fails too, it throws code 'NETWORK' so callers can stop
+ * cleanly and resume later. Any HTTP answer, 5xx included, is not retried: it counts
+ * against the quota.
  * @param {string} key
- * @param {{maxRequests?:number, reserve?:number, fetchImpl?:Function, log?:Function}} [opts]
+ * @param {{maxRequests?:number, reserve?:number, retryDelays?:number[], fetchImpl?:Function, log?:Function}} [opts]
  */
-export function createClient(key, { maxRequests = 300, reserve = 10, fetchImpl = fetch, log = () => {} } = {}) {
+export function createClient(key, { maxRequests = 300, reserve = 10, retryDelays = [2000, 10000, 30000], fetchImpl = fetch, log = () => {} } = {}) {
   let spent = 0;
   const quota = { hour: null, day: null, limitHour: null, limitDay: null, resets: {} };
   const stopped = () => spent >= maxRequests
@@ -104,7 +110,19 @@ export function createClient(key, { maxRequests = 300, reserve = 10, fetchImpl =
       throw Object.assign(new Error(`stopped: ${why}`), { code: 'BUDGET' });
     }
     spent++;
-    const res = await fetchImpl(`${POKEWALLET_BASE}${path}`, { headers: { 'X-API-Key': key } });
+    let res;
+    for (let attempt = 0; !res; attempt++) {
+      try {
+        res = await fetchImpl(`${POKEWALLET_BASE}${path}`, { headers: { 'X-API-Key': key } });
+      } catch (err) {
+        const why = err?.cause?.code || err?.message || String(err);
+        if (attempt >= retryDelays.length) {
+          throw Object.assign(new Error(`network error after ${attempt + 1} tries (${why})`), { code: 'NETWORK' });
+        }
+        log(`network error (${why}); retrying in ${Math.round(retryDelays[attempt] / 1000)}s`);
+        await new Promise(r => setTimeout(r, retryDelays[attempt]));
+      }
+    }
     const num = n => { const v = res.headers.get(n); return v == null ? null : Number(v); };
     if (num('x-ratelimit-remaining-hour') != null) {
       quota.hour = num('x-ratelimit-remaining-hour'); quota.day = num('x-ratelimit-remaining-day');

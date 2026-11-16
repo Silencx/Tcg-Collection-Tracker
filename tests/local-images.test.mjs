@@ -150,6 +150,28 @@ test('a server-sent reset time is reported instead of the 03:00 default', async 
   await assert.rejects(c.call('/sets'), e => /retry-after: 3600/.test(e.message));
 });
 
+test('a dropped connection is retried, and the retry is one request against the cap', async () => {
+  const { impl: ok } = fakeFetch(50);
+  let fails = 2;
+  const impl = async (url, opts) => {
+    if (fails-- > 0) throw Object.assign(new TypeError('fetch failed'), { cause: { code: 'ECONNRESET' } });
+    return ok(url, opts);
+  };
+  const logs = [];
+  const c = createClient('k', { retryDelays: [0, 0, 0], fetchImpl: impl, log: m => logs.push(m) });
+  assert.deepEqual(await c.call('/sets'), { results: [] });
+  assert.equal(c.spent, 1);
+  assert.equal(logs.filter(m => /ECONNRESET/.test(m)).length, 2);
+});
+
+test('a connection that stays down stops the run as NETWORK, not a crash', async () => {
+  let tries = 0;
+  const impl = async () => { tries++; throw new TypeError('fetch failed'); };
+  const c = createClient('k', { retryDelays: [0, 0], fetchImpl: impl });
+  await assert.rejects(c.call('/sets'), e => e.code === 'NETWORK' && /3 tries/.test(e.message));
+  assert.equal(tries, 3);
+});
+
 test('image extensions follow the content type, then the bytes', () => {
   assert.equal(extFor('image/jpeg'), 'jpg');
   assert.equal(extFor('image/png'), 'png');
