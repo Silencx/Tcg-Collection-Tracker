@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  setSlug, cardNumber, imagePath, lookupImage, emptyIndex, serializeIndex,
+  setSlug, cardNumber, imagePath, lookupImage, emptyIndex, serializeIndex, sizesToFetch,
 } from '../js/api/local-images.js';
 import { jpImageKeyFor, jpNumKey } from '../js/api/jp-model.js';
 const jpImageKey = (jpset, jpnum) => jpImageKeyFor(setSlug(jpset), jpNumKey(jpnum));
@@ -55,6 +55,24 @@ test('the published manifest is sorted, one entry per line, and never carries th
   assert.equal(text.split('\n').filter(l => l.startsWith('"jp/')).length, 2);
   assert.equal(lookupImage(idx, 'jp/a/1', 'high'), 'img/jp/a/1-low.png');
   assert.deepEqual(JSON.parse(serializeIndex(emptyIndex(), null)).images, {});
+});
+
+test('a size the source has no scan for is published as unavailable, shows nothing, and is not fetched again', () => {
+  const text = serializeIndex({ images: {
+    'jp/a/1': { sizes: {}, source: 'pokewallet', fetched: '2026-11-16', unavailable: ['low'] },
+    'jp/a/2': { sizes: { low: 'jpg' }, source: 'pokewallet', fetched: '2026-11-16', unavailable: [] },
+  } }, null);
+  const idx = JSON.parse(text);
+  assert.deepEqual(idx.images['jp/a/1'].unavailable, ['low']);
+  assert.ok(!('unavailable' in idx.images['jp/a/2']));
+  assert.equal(lookupImage(idx, 'jp/a/1', 'low'), null);
+
+  const onDisk = () => true;
+  assert.deepEqual(sizesToFetch(idx.images['jp/a/1'], ['low'], onDisk), []);
+  assert.deepEqual(sizesToFetch(idx.images['jp/a/1'], ['low', 'high'], onDisk), ['high']);
+  assert.deepEqual(sizesToFetch(idx.images['jp/a/2'], ['low'], onDisk), []);
+  assert.deepEqual(sizesToFetch(idx.images['jp/a/2'], ['low'], () => false), ['low']);   // file gone
+  assert.deepEqual(sizesToFetch(undefined, ['low'], onDisk), ['low']);
 });
 
 // ── matching ──────────────────────────────────────────────────────────────────

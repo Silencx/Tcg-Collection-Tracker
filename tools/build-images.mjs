@@ -22,7 +22,8 @@
 // HOW (see js/api/local-images.js for the layout and the manifest):
 //   1. Work out which gap cards are missing a file, from the manifest. None → 0 requests.
 //   2. Download the missing sizes. A file that exists is never re-fetched or overwritten:
-//      images are immutable, so history only grows when cards are new.
+//      images are immutable, so history only grows when cards are new. A 404 (PokéWallet
+//      lists the card but has no scan) is recorded as `unavailable` and not asked again.
 //   3. Write the manifest (local-images.serializeIndex: sorted, one entry per line, and
 //      without PokéWallet's card ids, which stay in the gitignored catalogue).
 // Stops cleanly at the request cap or when the live quota (read from PokéWallet's
@@ -44,7 +45,7 @@ import { fileURLToPath } from 'node:url';
 import { loadEnvKey } from './lib/env-key.mjs';
 import { createClient, extFor } from './lib/pokewallet.mjs';
 import { cleanTuple, japaneseOnly } from './lib/jp-catalog.mjs';
-import { imagePath, emptyIndex, serializeIndex, IMAGE_SIZES } from '../js/api/local-images.js';
+import { imagePath, emptyIndex, serializeIndex, sizesToFetch, IMAGE_SIZES } from '../js/api/local-images.js';
 import { assignJpKeys, jpImageKeyFor } from '../js/api/jp-model.js';
 import { namesSpecies } from '../js/api/providers/tcgdex.js';
 
@@ -77,10 +78,9 @@ function writeIndex(idx) {
   writeFileSync(INDEX_FILE, serializeIndex(idx, new Date().toISOString()));
 }
 
-/** Sizes still missing for `key`: absent from the manifest, or listed but gone from disk. */
+/** Sizes still to download for `key` (local-images.sizesToFetch, against the disk). */
 function missingSizes(idx, key) {
-  const e = idx.images[key];
-  return SIZES.filter(s => !e?.sizes?.[s] || !existsSync(resolve(ROOT, imagePath(key, s, e.sizes[s]))));
+  return sizesToFetch(idx.images[key], SIZES, (s, ext) => existsSync(resolve(ROOT, imagePath(key, s, ext))));
 }
 
 function pokemonList() {
@@ -132,20 +132,29 @@ async function main() {
   if (!key) { say(`no ${KEY_NAME} configured — skipping (set it in .env.local).`); return; }
 
   const client = createClient(key, { maxRequests, log: m => say(`  ${m}`) });
-  let files = 0, bytes = 0, stoppedWhy = null, changed = false;
+  let files = 0, bytes = 0, noScan = 0, stoppedWhy = null, changed = false;
   try {
     for (const g of todo) {
       if (!g.ref) continue;
       const entry = idx.images[g.key] || { sizes: {} };
       for (const size of missingSizes(idx, g.key)) {
-        const { buf, contentType } = await client.call(`/images/${encodeURIComponent(g.ref)}?size=${size}`, { binary: true });
-        const ext = extFor(contentType, buf);
-        const file = resolve(ROOT, imagePath(g.key, size, ext));
-        mkdirSync(dirname(file), { recursive: true });
-        if (!existsSync(file)) { writeFileSync(file, buf); files++; bytes += buf.length; }
-        entry.sizes = { ...entry.sizes, [size]: ext };
+        let unavailable = (idx.images[g.key]?.unavailable || []).filter(s => s !== size);
+        try {
+          const { buf, contentType } = await client.call(`/images/${encodeURIComponent(g.ref)}?size=${size}`, { binary: true });
+          const ext = extFor(contentType, buf);
+          const file = resolve(ROOT, imagePath(g.key, size, ext));
+          mkdirSync(dirname(file), { recursive: true });
+          if (!existsSync(file)) { writeFileSync(file, buf); files++; bytes += buf.length; }
+          entry.sizes = { ...entry.sizes, [size]: ext };
+        } catch (e) {
+          // 404 "Image not available": PokéWallet lists the card but has no scan of it
+          // (2026-11-16). Skip it, and remember that, so no later run pays for it again.
+          if (e.status !== 404) throw e;
+          unavailable = [...unavailable, size];
+          noScan++;
+        }
         // Recorded per size, so a run stopped between low and high keeps what it fetched.
-        idx.images[g.key] = { sizes: entry.sizes, source: 'pokewallet', fetched: new Date().toISOString().slice(0, 10) };
+        idx.images[g.key] = { sizes: entry.sizes, source: 'pokewallet', fetched: new Date().toISOString().slice(0, 10), unavailable };
         changed = true;
       }
     }
@@ -155,7 +164,8 @@ async function main() {
   } finally {
     if (!dryRun && changed) writeIndex(idx);
     const q = client.quota;
-    say(`${files} file(s), ${Math.round(bytes / 1024)} KB, ${client.spent} request(s).`
+    say(`${files} file(s), ${Math.round(bytes / 1024)} KB, ${client.spent} request(s)`
+      + (noScan ? `, ${noScan} with no scan at PokéWallet (skipped from now on)` : '') + '.'
       + (q.hour != null ? ` Quota left: ${q.hour}/${q.limitHour} this hour, ${q.day}/${q.limitDay} today.` : ''));
     if (stoppedWhy) say(`stopped early (${stoppedWhy}) — run again later to continue.`);
   }
