@@ -12,25 +12,30 @@
 // nothing to search. Keys come from jp-model.assignJpKeys over the same cleaned rows the
 // app's files were written from, so file names match tile ids.
 // WHICH POKÉMON: the pre-built list (data/index.json) by default; --pokemon "A,B" for
-// others; --all for every gap card in the catalogue (≈10,700 — about 21,000 requests for
-// both sizes, so pass a --max to match the day's quota).
+// others; --all for every gap card in the catalogue (≈10,700, one request each at the
+// default size, so pass a --max to match the hour's quota).
+//
+// WHICH SIZES: `low` (200×280, ~13 KB) only, by default — what is published. The preview
+// falls back to it (local-images.lookupImage). --sizes low,high adds the 500×699 scan,
+// which would take the whole set past a gigabyte.
 //
 // HOW (see js/api/local-images.js for the layout and the manifest):
 //   1. Work out which gap cards are missing a file, from the manifest. None → 0 requests.
-//   2. Download `low` and `high` for each. A file that exists is never re-fetched or
-//      overwritten: images are immutable, so history only grows when cards are new.
-//   3. Write the manifest (sorted, so its diffs stay readable).
+//   2. Download the missing sizes. A file that exists is never re-fetched or overwritten:
+//      images are immutable, so history only grows when cards are new.
+//   3. Write the manifest (local-images.serializeIndex: sorted, one entry per line, and
+//      without PokéWallet's card ids, which stay in the gitignored catalogue).
 // Stops cleanly at the request cap or when the live quota (read from PokéWallet's
 // response headers) is down to the reserve; the next run carries on where it stopped.
 //
-// PUBLISHING: img/ and data/img-index.json are GITIGNORED until PokéWallet has agreed to
-// us republishing their images. Until then this fills a local copy you can see in the dev
-// server, and the live site behaves exactly as before. See README "Hosted card images".
+// PUBLISHED: img/ and data/img-index.json are committed and served by GitHub Pages, with
+// PokéWallet credited in the site footer. Every manifest entry names its `source`, so
+// their images can be withdrawn in one pass — see README "Hosted card images".
 //
 // The key (POKEWALLET_IO_PROD_KEY, .env.local or the environment) is never logged or
 // written: the client never records headers. With no key, this exits 0 and does nothing.
 //
-// Run: node tools/build-images.mjs [--dry-run] [--max N] [--pokemon "A,B" | --all]
+// Run: node tools/build-images.mjs [--dry-run] [--max N] [--sizes low,high] [--pokemon "A,B" | --all]
 // =============================================================================
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -39,7 +44,7 @@ import { fileURLToPath } from 'node:url';
 import { loadEnvKey } from './lib/env-key.mjs';
 import { createClient, extFor } from './lib/pokewallet.mjs';
 import { cleanTuple, japaneseOnly } from './lib/jp-catalog.mjs';
-import { imagePath, emptyIndex, IMAGE_SIZES } from '../js/api/local-images.js';
+import { imagePath, emptyIndex, serializeIndex, IMAGE_SIZES } from '../js/api/local-images.js';
 import { assignJpKeys, jpImageKeyFor } from '../js/api/jp-model.js';
 import { namesSpecies } from '../js/api/providers/tcgdex.js';
 
@@ -53,6 +58,7 @@ const dryRun = args.includes('--dry-run');
 const all = args.includes('--all');
 const argOf = flag => { const i = args.indexOf(flag); return i >= 0 ? args[i + 1] : null; };
 const maxRequests = Math.max(1, parseInt(argOf('--max'), 10) || 400);
+const SIZES = (argOf('--sizes') || 'low').split(',').map(s => s.trim()).filter(Boolean);
 const say = msg => console.log(`[build-images] ${msg}`);
 const readJSON = f => JSON.parse(readFileSync(f, 'utf8'));
 
@@ -68,14 +74,13 @@ function readIndex() {
 }
 
 function writeIndex(idx) {
-  const images = Object.fromEntries(Object.keys(idx.images).sort().map(k => [k, idx.images[k]]));
-  writeFileSync(INDEX_FILE, JSON.stringify({ schemaVersion: 1, builtAt: new Date().toISOString(), images }, null, 1) + '\n');
+  writeFileSync(INDEX_FILE, serializeIndex(idx, new Date().toISOString()));
 }
 
 /** Sizes still missing for `key`: absent from the manifest, or listed but gone from disk. */
 function missingSizes(idx, key) {
   const e = idx.images[key];
-  return IMAGE_SIZES.filter(s => !e?.sizes?.[s] || !existsSync(resolve(ROOT, imagePath(key, s, e.sizes[s]))));
+  return SIZES.filter(s => !e?.sizes?.[s] || !existsSync(resolve(ROOT, imagePath(key, s, e.sizes[s]))));
 }
 
 function pokemonList() {
@@ -106,7 +111,13 @@ async function main() {
     say('no catalogue in data/jp-catalog/ — run node tools/build-jp-catalog.mjs first.');
     return;
   }
+  const bad = SIZES.filter(s => !IMAGE_SIZES.includes(s));
+  if (bad.length || !SIZES.length) throw new Error(`--sizes takes ${IMAGE_SIZES.join(',')}; got "${argOf('--sizes')}"`);
   const idx = readIndex();
+  // A manifest written before serializeIndex still holds PokéWallet's card ids: rewrite
+  // it even when this run fetches nothing, so they never reach a commit.
+  const stale = Object.values(idx.images).some(e => 'ref' in e);
+  if (stale && !dryRun) { writeIndex(idx); say('rewrote data/img-index.json without source card ids.'); }
   const names = pokemonList();
   const gap = planFromCatalogue(names);
   const todo = gap.filter(g => missingSizes(idx, g.key).length);
@@ -134,7 +145,7 @@ async function main() {
         if (!existsSync(file)) { writeFileSync(file, buf); files++; bytes += buf.length; }
         entry.sizes = { ...entry.sizes, [size]: ext };
         // Recorded per size, so a run stopped between low and high keeps what it fetched.
-        idx.images[g.key] = { ...entry, source: 'pokewallet', ref: g.ref, fetched: new Date().toISOString().slice(0, 10) };
+        idx.images[g.key] = { sizes: entry.sizes, source: 'pokewallet', fetched: new Date().toISOString().slice(0, 10) };
         changed = true;
       }
     }

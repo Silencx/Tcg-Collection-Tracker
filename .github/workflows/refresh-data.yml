@@ -61,11 +61,21 @@ jobs:
           POKEWALLET_IO_PROD_KEY: ${{ secrets.POKEWALLET_IO_PROD_KEY }}
         run: node tools/build-jp-catalog.mjs
 
+      # Low-res scans for Japanese cards no other source has art for, from the catalogue the
+      # step above just built. Committed images are never fetched again, so a normal week
+      # costs only the cards that are new; --max keeps a week with many new sets inside
+      # one hour's quota alongside the catalogue walk. Same key, same continue-on-error.
+      - name: Fetch new Japanese card images
+        continue-on-error: true
+        env:
+          POKEWALLET_IO_PROD_KEY: ${{ secrets.POKEWALLET_IO_PROD_KEY }}
+        run: node tools/build-images.mjs --all --max 300
+
       - name: Commit and push if changed
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/
+          git add data/ img/
           if git diff --staged --quiet; then
             echo "No changes to commit"
           else

@@ -19,9 +19,9 @@ reference/
 npm-debug.log*
 
 # Env/secrets
-# .env.local holds the local build keys (POKEWALLET_IO_PROD_KEY, APITCG_KEY) — see
-# README "Build keys". CI supplies keys as repo secrets instead, so they are never
-# committed either way. The wildcard covers .env.production and friends too.
+# .env.local holds the local build key (POKEWALLET_IO_PROD_KEY, your dev key) — see
+# README "Build keys". CI supplies the production key as a repo secret instead, so it is
+# never committed either way. The wildcard covers .env.production and friends too.
 .env
 .env.*
 *.key
@@ -35,12 +35,9 @@ tools/pokewallet-probe-images/
 tools/jp-gap-size-report.md
 tools/jp-gap-size.json
 
-# Hosted card images (tools/build-images.mjs). LOCAL ONLY until PokéWallet agrees to us
-# republishing them: committing either path publishes the files on GitHub Pages. To go
-# live, delete these two lines and add the build step to refresh-data.yml (README,
-# "Hosted card images").
-img/
-data/img-index.json
+# Hosted card images (img/ + data/img-index.json, tools/build-images.mjs) ARE committed:
+# GitHub Pages serves them. To withdraw them, see README "Hosted card images".
+#
 # Japanese card catalogue (tools/build-jp-catalog.mjs). data/jp-cat/ — set names, card
 # numbers and card names — IS committed: the app serves it. Everything below stays local:
 # the build-side copy carries PokéWallet's own card ids, and the raw per-set cache is

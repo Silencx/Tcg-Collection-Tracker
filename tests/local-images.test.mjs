@@ -5,7 +5,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  setSlug, cardNumber, imagePath, lookupImage, emptyIndex,
+  setSlug, cardNumber, imagePath, lookupImage, emptyIndex, serializeIndex,
 } from '../js/api/local-images.js';
 import { jpImageKeyFor, jpNumKey } from '../js/api/jp-model.js';
 const jpImageKey = (jpset, jpnum) => jpImageKeyFor(setSlug(jpset), jpNumKey(jpnum));
@@ -41,6 +41,20 @@ test('lookup returns the asked size, falls back to the other, and misses cleanly
   assert.equal(lookupImage(idx, 'jp/a/3', 'low'), null);
   assert.equal(lookupImage(null, 'jp/a/1', 'low'), null);
   assert.deepEqual(emptyIndex().images, {});
+});
+
+test('the published manifest is sorted, one entry per line, and never carries the source\'s card id', () => {
+  const text = serializeIndex({ images: {
+    'jp/b/2': { sizes: { low: 'jpg' }, source: 'pokewallet', ref: 'pk_secret_2', fetched: '2026-11-16' },
+    'jp/a/1': { sizes: { low: 'png' }, source: 'pokewallet', ref: 'pk_secret_1', fetched: '2026-11-16' },
+  } }, '2026-11-16T20:00:00.000Z');
+  const idx = JSON.parse(text);
+  assert.deepEqual(Object.keys(idx.images), ['jp/a/1', 'jp/b/2']);
+  assert.deepEqual(idx.images['jp/a/1'], { sizes: { low: 'png' }, source: 'pokewallet', fetched: '2026-11-16' });
+  assert.ok(!text.includes('pk_secret'));
+  assert.equal(text.split('\n').filter(l => l.startsWith('"jp/')).length, 2);
+  assert.equal(lookupImage(idx, 'jp/a/1', 'high'), 'img/jp/a/1-low.png');
+  assert.deepEqual(JSON.parse(serializeIndex(emptyIndex(), null)).images, {});
 });
 
 // ── matching ──────────────────────────────────────────────────────────────────

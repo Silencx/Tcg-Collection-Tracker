@@ -19,7 +19,7 @@
 // carries its `source`, so all of one source's images can be removed in one pass.
 //
 // Pure apart from loadImageIndex(), which is the one fetch, and is safe to call when the
-// manifest does not exist (it is gitignored until publishing is allowed — see README).
+// manifest does not exist (a fork or local checkout without images — see README).
 // =============================================================================
 
 export const IMAGE_SIZES = ['low', 'high'];
@@ -59,6 +59,22 @@ export function lookupImage(index, key, size) {
 /** An empty, valid manifest. */
 export function emptyIndex() {
   return { schemaVersion: 1, builtAt: null, images: {} };
+}
+
+/**
+ * The manifest as published: keys sorted, one entry per line, and only the fields named
+ * here. Every Master Set visitor downloads it, so it stays lean, and a field like the
+ * source's own card id (which the build keeps in its gitignored catalogue) can never ride
+ * along into a public file.
+ * @param {object} index { images: { key: { sizes, source, fetched, … } } }
+ * @param {string} builtAt
+ */
+export function serializeIndex(index, builtAt) {
+  const lines = Object.keys(index?.images || {}).sort().map(k => {
+    const { sizes, source, fetched } = index.images[k];
+    return `${JSON.stringify(k)}:${JSON.stringify({ sizes, source, fetched })}`;
+  });
+  return `{"schemaVersion":1,"builtAt":${JSON.stringify(builtAt)},"images":{\n${lines.join(',\n')}\n}}\n`;
 }
 
 // ── browser side ─────────────────────────────────────────────────────────────
