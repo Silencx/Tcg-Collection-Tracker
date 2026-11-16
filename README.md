@@ -196,8 +196,8 @@ drop the workflow step. The app needs no change: with the files gone it falls ba
 Bulbapedia on its own.
 
 ```bash
-npm run build-jp-catalog                 # fetch (needs the key)
-npm run build-jp-catalog -- --emit-only  # rebuild data/jp-cat/ from the local copy, no requests
+npm run build-jp-catalog                       # fetch (needs the key)
+node tools/build-jp-catalog.mjs --emit-only    # rebuild data/jp-cat/ from the local copy, no requests
 ```
 
 ### Hosted card images
@@ -219,9 +219,12 @@ catalogue, so run build-jp-catalog first. The weekly job fetches only cards that
   (default 400). It stops at the live quota reserve; run it again to continue.
 
 ```bash
-npm run build-images -- --all --dry-run    # how many cards still need a file
-npm run build-images -- --all --max 1200   # one hour's worth of the gap
+node tools/build-images.mjs --all --dry-run    # how many cards still need a file
+node tools/build-images.mjs --all --max 1200   # one hour's worth of the gap
 ```
+
+Pass flags to the scripts with `node`, not through `npm run x -- …`: PowerShell drops the
+`--`, and npm then takes `--all` and `--max` as its own options.
 
 **Withdrawing them.** If PokéWallet asks, delete every `img/` file whose manifest entry
 says `"source":"pokewallet"` (today that is all of them, so `git rm -r img
