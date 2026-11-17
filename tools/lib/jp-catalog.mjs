@@ -104,10 +104,11 @@ export function japaneseOnly(sets, cards) {
 
 /**
  * May this run replace the committed app files (data/jp-cat/)? Only a COMPLETE walk may:
- * the weekly CI run has no cache, so a walk cut short by the quota or an outage would
- * otherwise commit a catalogue missing whole sets — and every visitor would lose those
- * cards until the next good week. Also refuses a set list that shrank by more than 10%
- * against the committed one, which is what a degraded /sets answer looks like.
+ * when CI's kept cache is lost, the walk starts over from nothing and takes several days
+ * on the free tier, and publishing part of it would commit a catalogue missing whole
+ * sets — every visitor would lose those cards until it finished. Also refuses a set list
+ * that shrank by more than 10% against the committed one, which is what a degraded
+ * /sets answer looks like.
  * @returns {{ok:boolean, why:string|null}}
  */
 export function publishCheck({ incomplete = 0, sets = 0, committedSets = 0 } = {}) {
@@ -117,6 +118,35 @@ export function publishCheck({ incomplete = 0, sets = 0, committedSets = 0 } = {
     return { ok: false, why: `only ${sets} sets against ${committedSets} committed` };
   }
   return { ok: true, why: null };
+}
+
+/**
+ * Which sets a run fetches, in order. The raw answer for each set is cached (and CI keeps
+ * that cache between runs), so a run only pays for what may have changed:
+ *   1. new      no cached copy: a new release, or the first fill;
+ *   2. changed  /sets reports a different card_count than the cached copy;
+ *   3. stale    the `rotate` least recently fetched of the rest, so a fix PokéWallet makes
+ *               without changing the count still arrives, within sets/rotate runs.
+ * `refresh` takes every set. The request cap and the live quota can still stop the run
+ * part-way; whatever is left comes first next time (new) or stays oldest (stale).
+ * @param {Array<{set_id, card_count}>} jpSets  /sets entries, in their order
+ * @param {(id:string) => ({count:number|null, fetched:number}|null)} cachedOf
+ *   the cached copy's card_count and fetch time (ms), or null when there is none
+ * @param {{refresh?:boolean, rotate?:number}} [opts]
+ * @returns {Array<{set:object, why:'new'|'changed'|'stale'|'refresh'}>}
+ */
+export function planFetch(jpSets, cachedOf, { refresh = false, rotate = 0 } = {}) {
+  if (refresh) return jpSets.map(set => ({ set, why: 'refresh' }));
+  const fresh = [], changed = [], rest = [];
+  for (const set of jpSets) {
+    const c = cachedOf(String(set.set_id));
+    if (!c) fresh.push({ set, why: 'new' });
+    else if (c.count != null && Number(set.card_count) !== c.count) changed.push({ set, why: 'changed' });
+    else rest.push({ set, fetched: c.fetched || 0 });
+  }
+  const stale = rest.sort((a, b) => a.fetched - b.fetched)        // stable: ties keep /sets order
+    .slice(0, Math.max(0, rotate)).map(({ set }) => ({ set, why: 'stale' }));
+  return [...fresh, ...changed, ...stale];
 }
 
 /** Pages needed for a set at `limit` rows per page; at least one. */

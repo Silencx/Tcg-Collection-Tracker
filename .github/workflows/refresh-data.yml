@@ -1,8 +1,13 @@
 name: Refresh card data
 
+# Monday: everything. The other six days: only the Japanese card list and its images,
+# which fit PokéWallet's free tier (100 requests an hour) only in small daily steps — see
+# tools/build-jp-catalog.mjs, COST. A daily run also keeps the PokéWallet cache in use:
+# GitHub evicts a cache nobody restores for 7 days.
 on:
   schedule:
     - cron: '0 6 * * 1'
+    - cron: '0 6 * * 0,2-6'
   workflow_dispatch:
     inputs:
       add:
@@ -12,6 +17,12 @@ on:
 
 permissions:
   contents: write
+
+# A manual run started while the scheduled one is going waits for it, so the two never
+# race to push.
+concurrency:
+  group: refresh-data
+  cancel-in-progress: false
 
 jobs:
   refresh:
@@ -46,25 +57,47 @@ jobs:
 
       # No argument: build-data.mjs reads data/prebuilt.json, falling back to
       # DEFAULT_POKEMON. It writes data/sets.json, the per-Pokémon shards under
-      # data/cards|jp/, and data/index.json.
+      # data/cards|jp/, and data/index.json. Mondays and manual runs only.
       - name: Build data
+        if: ${{ github.event.schedule != '0 6 * * 0,2-6' }}
         run: node tools/build-data.mjs
 
-      # The Japanese card list (data/jp-cat/: every Japanese set, any Pokémon) from
-      # PokéWallet, ~490 requests. POKEWALLET_IO_PROD_KEY is optional: without it the
-      # script exits cleanly and the committed list stays as it is. Only a COMPLETE walk
-      # replaces the committed files, so a run cut short by the quota cannot shrink the
-      # list. continue-on-error: a PokéWallet outage must not cost the week's TCGdex refresh.
+      # PokéWallet's raw answer for every Japanese set, kept from run to run so a run only
+      # pays for what may have changed. A new key each run, restored by prefix, so the
+      # newest copy wins. It holds PokéWallet's own card ids, so it is never committed;
+      # note that any workflow in this repository, a pull request's included, could
+      # restore it.
+      - name: Restore the PokéWallet cache
+        uses: actions/cache/restore@v6
+        with:
+          path: tools/.cache/pokewallet/jp-sets
+          key: pokewallet-jp-sets-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: pokewallet-jp-sets-
+
+      # The Japanese card list (data/jp-cat/: every Japanese set, any Pokémon). With the
+      # cache: new sets, sets whose card count changed, and the 40 read longest ago —
+      # ≈45 requests, every set re-read within ~12 days. With the cache lost: the whole
+      # walk again, over several days on the free tier, and only a COMPLETE walk replaces
+      # the committed files, so the list stays as it was meanwhile. The key is optional:
+      # without it the script exits cleanly. continue-on-error: a PokéWallet outage must
+      # not cost the rest of the run.
       - name: Build Japanese card list
         continue-on-error: true
         env:
           POKEWALLET_IO_PROD_KEY: ${{ secrets.POKEWALLET_IO_PROD_KEY }}
-        run: node tools/build-jp-catalog.mjs
+        run: node tools/build-jp-catalog.mjs --rotate 40
+
+      - name: Save the PokéWallet cache
+        if: ${{ always() && hashFiles('tools/.cache/pokewallet/jp-sets/*.json') != '' }}
+        uses: actions/cache/save@v6
+        with:
+          path: tools/.cache/pokewallet/jp-sets
+          key: pokewallet-jp-sets-${{ github.run_id }}-${{ github.run_attempt }}
 
       # Low-res scans for Japanese cards no other source has art for, from the catalogue the
-      # step above just built. Committed images are never fetched again, so a normal week
-      # costs only the cards that are new; --max keeps a week with many new sets inside
-      # one hour's quota alongside the catalogue walk. Same key, same continue-on-error.
+      # step above just built. Committed images are never fetched again, so a normal day
+      # costs only the cards that are new; whatever the hour's quota leaves for, the next
+      # day picks up. Same key, same continue-on-error.
       - name: Fetch new Japanese card images
         continue-on-error: true
         env:
