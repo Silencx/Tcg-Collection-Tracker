@@ -202,16 +202,21 @@ node tools/build-jp-catalog.mjs --emit-only    # rebuild data/jp-cat/ from the l
 
 ### Hosted card images
 
-About 10,700 Japanese cards are in sets the Limitless CDN has no scans for.
+About 10,000 Japanese cards are in sets the Limitless CDN has no scans for.
 `tools/build-images.mjs` fills exactly that gap from PokéWallet into
-`img/jp/<set>/<number>-low.<ext>` (200×280, ~13 KB) plus a manifest,
-`data/img-index.json`, both committed and served by Pages. It works from the build-side
-catalogue, so run build-jp-catalog first. The weekly job fetches only cards that are new.
+`img/jp/<set>/<number>-low.<ext>` (low-res: 200×280 for most, about 255×361 for some;
+~20 KB each, ~190 MB in all) plus a manifest, `data/img-index.json`, both committed and
+served by Pages. It works from the build-side catalogue, so run build-jp-catalog first.
+The weekly job fetches only cards that are new.
 
 - **Gaps only, write once.** A card that already has art elsewhere is never fetched, and
   a file that exists is never fetched again, so a normal run costs 0 requests.
 - **Low only.** The preview reuses the grid image. `--sizes low,high` adds the 500×699
   scan, but all of them would pass a gigabyte, more than a Pages repo should carry.
+- **Not every card gets one.** About 560 cards answer 404 (PokéWallet lists the card but
+  has no scan), and a few come back far larger than low-res (748×536, 1024×734). Both are
+  recorded in the manifest as `unavailable`, keep their placeholder, and are not asked
+  for again. Delete a card's manifest entry to retry it.
 - **Our ids, not theirs.** Paths come from our set names and card numbers; the manifest
   carries no PokéWallet card ids, and every entry names its `source`.
 - By default it covers the pre-built Pokémon; `--pokemon "A,B"` picks others, `--all`

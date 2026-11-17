@@ -150,9 +150,57 @@ export function createClient(key, { maxRequests = 300, reserve = 10, retryDelays
   };
 }
 
-/** File extension for a downloaded image. */
+/**
+ * File extension for a downloaded image: from its first bytes, then the content type.
+ * The bytes win because the header is not reliable: 309 of 9,435 `low` images were PNGs
+ * sent as image/jpeg (2026-11-17).
+ */
 export function extFor(contentType, buf) {
+  if (buf?.length >= 12) {
+    if (buf[0] === 0x89 && buf.toString('ascii', 1, 4) === 'PNG') return 'png';
+    if (buf.toString('ascii', 8, 12) === 'WEBP') return 'webp';
+    if (buf[0] === 0xff && buf[1] === 0xd8) return 'jpg';
+  }
   if (/png/i.test(contentType || '')) return 'png';
-  if (/webp/i.test(contentType || '') || (buf && buf.toString('ascii', 8, 12) === 'WEBP')) return 'webp';
+  if (/webp/i.test(contentType || '')) return 'webp';
   return 'jpg';
+}
+
+/**
+ * Pixel size of a PNG or JPEG, read from its header; null when it cannot be told.
+ * `size=low` is nominally 200×280, but a few cards come back far larger (1024×734 PNGs,
+ * 500×700 JPEGs), which build-images must not publish as "low-res".
+ * @param {Buffer} buf
+ * @returns {{width:number, height:number}|null}
+ */
+export function imageSize(buf) {
+  if (!buf || buf.length < 24) return null;
+  if (buf[0] === 0x89 && buf.toString('ascii', 1, 4) === 'PNG') {
+    return { width: buf.readUInt32BE(16), height: buf.readUInt32BE(20) };
+  }
+  if (buf[0] !== 0xff || buf[1] !== 0xd8) return null;
+  // JPEG: walk the segments to the first start-of-frame (SOF0–SOF15, bar DHT/JPG/DAC).
+  for (let i = 2; i + 9 < buf.length;) {
+    if (buf[i] !== 0xff) { i++; continue; }
+    const m = buf[i + 1];
+    if (m === 0xff) { i++; continue; }                                         // fill byte
+    if (m === 0x01 || (m >= 0xd0 && m <= 0xd9)) { i += 2; continue; }          // no length
+    if (m >= 0xc0 && m <= 0xcf && m !== 0xc4 && m !== 0xc8 && m !== 0xcc) {
+      return { width: buf.readUInt16BE(i + 7), height: buf.readUInt16BE(i + 5) };
+    }
+    i += 2 + buf.readUInt16BE(i + 2);
+  }
+  return null;
+}
+
+// The most pixels a `low` image may have and still be published. Normal `low` images have
+// 56,000 (200×280) to 145,000 (322×450; booster packs are 200×406); the `high` size has
+// 350,000 (500×699). Measured 2026-11-17: 18 of 9,407 came back at 748×536 or 1024×734.
+// Pixels, not the longest side, so a tall-but-small pack image is not turned away.
+export const LOW_MAX_PIXELS = 200_000;
+
+/** The image's size when it is larger than low-res, else null (also when unreadable). */
+export function oversizeForLow(buf) {
+  const d = imageSize(buf);
+  return d && d.width * d.height > LOW_MAX_PIXELS ? d : null;
 }

@@ -10,7 +10,8 @@ import {
 import { jpImageKeyFor, jpNumKey } from '../js/api/jp-model.js';
 const jpImageKey = (jpset, jpnum) => jpImageKeyFor(setSlug(jpset), jpNumKey(jpnum));
 import {
-  setMatchKey, numberMatchKey, matchJpRows, createClient, extFor, SET_ALIASES,
+  setMatchKey, numberMatchKey, matchJpRows, createClient, extFor, imageSize, oversizeForLow,
+  LOW_MAX_PIXELS, SET_ALIASES,
 } from '../tools/lib/pokewallet.mjs';
 
 // ── layout ────────────────────────────────────────────────────────────────────
@@ -190,8 +191,43 @@ test('a connection that stays down stops the run as NETWORK, not a crash', async
   assert.equal(tries, 3);
 });
 
-test('image extensions follow the content type, then the bytes', () => {
+// Smallest headers that carry a size: a PNG signature + IHDR, and a JPEG with an APP0
+// segment before its start-of-frame.
+function pngHeader(w, h) {
+  const b = Buffer.alloc(33);
+  Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(b);
+  b.writeUInt32BE(13, 8); b.write('IHDR', 12, 'ascii'); b.writeUInt32BE(w, 16); b.writeUInt32BE(h, 20);
+  return b;
+}
+function jpegHeader(w, h) {
+  const app0 = Buffer.from([0xff, 0xe0, 0x00, 0x10, ...Buffer.alloc(14)]);
+  const sof = Buffer.from([0xff, 0xc0, 0x00, 0x11, 0x08, h >> 8, h & 255, w >> 8, w & 255, ...Buffer.alloc(12)]);
+  return Buffer.concat([Buffer.from([0xff, 0xd8]), app0, sof]);
+}
+
+test('image extensions follow the bytes, then the content type', () => {
   assert.equal(extFor('image/jpeg'), 'jpg');
   assert.equal(extFor('image/png'), 'png');
   assert.equal(extFor(null, Buffer.from('RIFF\0\0\0\0WEBPVP8 ')), 'webp');
+  assert.equal(extFor('image/jpeg', pngHeader(255, 361)), 'png');   // a PNG sent as image/jpeg
+  assert.equal(extFor('image/png', jpegHeader(200, 280)), 'jpg');
+});
+
+test('the pixel size is read from PNG and JPEG headers', () => {
+  assert.deepEqual(imageSize(pngHeader(1024, 734)), { width: 1024, height: 734 });
+  assert.deepEqual(imageSize(jpegHeader(200, 280)), { width: 200, height: 280 });
+  assert.equal(imageSize(Buffer.from('RIFF\0\0\0\0WEBPVP8 \0\0\0\0\0\0\0\0\0\0\0\0')), null);
+  assert.equal(imageSize(Buffer.alloc(4)), null);
+});
+
+test('only low-res images pass as `low`; an unreadable size is let through', () => {
+  assert.equal(oversizeForLow(jpegHeader(200, 280)), null);
+  assert.equal(oversizeForLow(pngHeader(255, 361)), null);
+  assert.equal(oversizeForLow(jpegHeader(200, 406)), null);         // a booster pack: tall, still small
+  assert.equal(oversizeForLow(pngHeader(322, 450)), null);
+  assert.equal(oversizeForLow(jpegHeader(LOW_MAX_PIXELS / 400, 400)), null);
+  assert.deepEqual(oversizeForLow(jpegHeader(500, 700)), { width: 500, height: 700 });
+  assert.deepEqual(oversizeForLow(jpegHeader(748, 536)), { width: 748, height: 536 });
+  assert.deepEqual(oversizeForLow(pngHeader(1024, 734)), { width: 1024, height: 734 });
+  assert.equal(oversizeForLow(Buffer.alloc(40)), null);
 });
