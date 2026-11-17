@@ -46,6 +46,43 @@ test('shared set names get their code; repeats and prints never collide', () => 
   for (let i = 0; i < cards.length; i++) assert.ok(isStableJpId(jpCardId(setKeys[cards[i][0]], numKeys[i])));
 });
 
+// What happened on 2026-11-17: PokéWallet listed a second "Start Deck 100" and the first
+// one's key gained a code suffix, orphaning every card owned in it.
+test('a published set keeps its key when a set with the same name appears', () => {
+  const prior = [{ key: 'start-deck-100', name: 'Start Deck 100', code: 'SI' }];
+  const sets = [
+    { name: 'Start Deck 100', code: 'SI', id: '1' },
+    { name: 'Start Deck 100', code: 'sI100', id: '2' },
+  ];
+  assert.deepEqual(assignJpKeys(sets, [], prior).setKeys, ['start-deck-100', 'start-deck-100-si100']);
+  // Without the published list it falls back to suffixing both, as before.
+  assert.deepEqual(assignJpKeys(sets, []).setKeys, ['start-deck-100-si', 'start-deck-100-si100']);
+});
+
+test('the published keys are a fixed point: rebuilding against them changes nothing', () => {
+  const sets = [
+    { name: 'Battle Academy', code: 'svI', id: '1' }, { name: 'Battle Academy', code: 'svIba', id: '2' },
+    { name: 'Expansion Pack', code: null, id: '3' },
+  ];
+  const first = assignJpKeys(sets, []).setKeys;
+  const prior = sets.map((s, i) => ({ ...s, key: first[i] }));
+  assert.deepEqual(assignJpKeys([...sets].reverse(), [], prior).setKeys, [...first].reverse());
+});
+
+test('a new set never takes a key another set holds or held', () => {
+  // Two names that slug alike ("Intro Pack Neo (Chikorita)" and "Intro Pack Neo Chikorita")
+  // used to share one key, mixing both sets' cards under one id.
+  const prior = [{ key: 'intro-pack-neo-chikorita', name: 'Intro Pack Neo (Chikorita)', code: '24160' },
+    { key: 'gone-set', name: 'Gone Set', code: 'G' }];
+  const sets = [
+    { name: 'Intro Pack Neo (Chikorita)', code: '24160', id: '1' },
+    { name: 'Intro Pack Neo Chikorita', code: 'IPNC', id: '2' },
+    { name: 'Gone Set', code: 'G2', id: '3' },
+  ];
+  assert.deepEqual(assignJpKeys(sets, [], prior).setKeys,
+    ['intro-pack-neo-chikorita', 'intro-pack-neo-chikorita-ipnc', 'gone-set-g2']);
+});
+
 // ── eras ──────────────────────────────────────────────────────────────────────
 test('eras come from the Japanese release date first', () => {
   assert.equal(jpEra('ADV2', '2004-01-16'), 'ex');

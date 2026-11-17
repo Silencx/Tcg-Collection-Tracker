@@ -5,7 +5,8 @@
 //
 // THE ID: `JP_{setKey}_{numKey}`, e.g. JP_miracle-of-the-desert_1. All lower case.
 //   setKey  the set's name slugged (local-images.setSlug); a name two sets share
-//           ("Battle Academy", "Champion Road") gets its code appended.
+//           ("Battle Academy", "Champion Road") gets its code appended. Once
+//           published, a set keeps its key (assignJpKeys, `prior`).
 //   numKey  the card number without padding or total ("001/053" → "1"); a card with no
 //           printed number — every Japanese WotC and early-DP card — is keyed on its
 //           name instead ("n-pikachu"), with "-2", "-3" for repeats within a set.
@@ -35,20 +36,44 @@ export function jpImageKeyFor(setKey, numKey) { return `jp/${setKey}/${numKey}`;
 /** An id already in the new format — lower case, two slug segments. */
 export function isStableJpId(id) { return /^JP_[a-z0-9-]+_[a-z0-9-]+$/.test(String(id)); }
 
+/** What identifies a set from one build to the next: its name and code (PokéWallet's own
+ *  set id never leaves the build). */
+export const jpSetIdentity = s => `${s.name}\u0000${s.code ?? ''}`;
+
 /**
  * Give every set a key and every card a numKey, deterministically, in place.
  * `sets` [{name, code, id}], `cards` [[setIndex, number, name, print, …]] (catalogue
  * tuples). Separately-listed prints share their base card's number, so they get the
  * same numKey with "--{print}" appended and never take a base card's slot. (A slug never
  * starts with "-", so "--" cannot occur in a base key, and the id stays isStableJpId.)
+ *
+ * `prior` is the published set list (data/jp-cat/sets.json, [{key, name, code}]). A set
+ * found there by name + code keeps the key it was published under, whatever else
+ * changed: on 2026-11-17 PokéWallet listed a second "Start Deck 100", and suffixing both
+ * renamed the first, so every card owned in it lost its id. Only a set not published
+ * before gets a fresh key, and never one another set holds or held.
  * @returns {{setKeys:string[], numKeys:string[]}} parallel to sets / cards
  */
-export function assignJpKeys(sets, cards) {
+export function assignJpKeys(sets, cards, prior = []) {
   const counts = new Map();
   for (const s of sets) counts.set(s.name, (counts.get(s.name) || 0) + 1);
+  const published = new Map();                       // identity → its keys, in order
+  for (const p of prior) (published.get(jpSetIdentity(p)) || published.set(jpSetIdentity(p), []).get(jpSetIdentity(p))).push(p.key);
+  const held = new Set(prior.map(p => p.key));
+  const used = new Set();
   const setKeys = sets.map(s => {
+    const k = published.get(jpSetIdentity(s))?.find(x => !used.has(x));
+    if (k) used.add(k);
+    return k || null;
+  });
+  sets.forEach((s, i) => {
+    if (setKeys[i]) return;
     const base = setSlug(s.name);
-    return counts.get(s.name) > 1 ? `${base}-${setSlug(s.code || s.id)}` : base;
+    const coded = `${base}-${setSlug(s.code || s.id)}`;
+    let k = counts.get(s.name) > 1 || used.has(base) || held.has(base) ? coded : base;
+    for (let n = 2; used.has(k) || held.has(k); n++) k = `${coded}-${n}`;
+    used.add(k);
+    setKeys[i] = k;
   });
   const taken = sets.map(() => new Map());
   const numKeys = cards.map(c => {

@@ -76,7 +76,7 @@ jobs:
 
       # The Japanese card list (data/jp-cat/: every Japanese set, any Pokémon). With the
       # cache: new sets, sets whose card count changed, and the 40 read longest ago —
-      # ≈45 requests, every set re-read within ~12 days. With the cache lost: the whole
+      # ≈45 requests, every set re-read within ~14 days. With the cache lost: the whole
       # walk again, over several days on the free tier, and only a COMPLETE walk replaces
       # the committed files, so the list stays as it was meanwhile. The key is optional:
       # without it the script exits cleanly. continue-on-error: a PokéWallet outage must

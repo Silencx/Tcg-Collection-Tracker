@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   canonicalSetName, parseReleaseDate, splitPrint, splitNumberSuffix, cardTuple, cleanTuple,
-  isJapaneseSet, japaneseOnly, pagesFor, publishCheck, planFetch,
+  isJapaneseSet, japaneseOnly, pagesFor, publishCheck, planFetch, dropTwinSets,
 } from '../tools/lib/jp-catalog.mjs';
 import { limitlessCodeVariants } from '../tools/lib/limitless.mjs';
 
@@ -69,6 +69,58 @@ test('Thai and Indonesian promo sets are not Japanese; Chinese/Japanese promos a
   );
   assert.deepEqual(sets.map(s => s.pwName), ['A', 'B']);
   assert.deepEqual(cards, [[0, '1', 'x'], [1, '3', 'z']]);
+});
+
+// A set with `n` numbered cards 1..n named after `names` (cycled), as catalogue tuples.
+const numbered = (setIndex, n, names = ['Abra', 'Kadabra', 'Alakazam', 'Pikachu', 'Raichu', 'Eevee']) =>
+  Array.from({ length: n }, (_, i) => [setIndex, `${String(i + 1).padStart(3, '0')}/${n}`, `${names[i % names.length]} ${i}`, null]);
+
+test('a new set that repeats a published one is left out; the published one never is', () => {
+  const sets = [
+    { name: 'Pokemon Card 151', code: 'SV2a', limitless: 'SV2a' },
+    { name: 'SV2a', code: 'xsv2a', limitless: null },                // PokéWallet's second copy
+    { name: 'Expansion Pack', code: '23721', limitless: null },
+    { name: 'Evolutions Collection 1', code: 'EC1', limitless: null }, // bigger, but new
+  ];
+  const cards = [
+    ...numbered(0, 20), ...numbered(1, 20).map(c => [1, c[1].split('/')[0].replace(/^0+/, ''), c[2], null]),
+    ...numbered(2, 10).map(c => [2, '', c[2], null]),
+    ...numbered(3, 10).map(c => [3, '', c[2], null]), ...numbered(3, 4).map(c => [3, '', `Extra ${c[2]}`, null]),
+  ];
+  const prior = [{ name: 'Pokemon Card 151', code: 'SV2a' }, { name: 'Expansion Pack', code: '23721' }];
+  const out = dropTwinSets(sets, cards, prior);
+  assert.deepEqual(out.sets.map(s => s.code), ['SV2a', '23721']);
+  assert.deepEqual(out.dropped.map(d => `${d.set.code}=${d.twinOf.code}`).sort(), ['EC1=23721', 'xsv2a=SV2a']);
+  assert.ok(out.cards.every(c => c[0] === 0 || c[0] === 1));
+  assert.equal(out.cards.length, 30);
+});
+
+test('twins: partial overlap, small sets, numberless against numbered, and a chain', () => {
+  const sets = [
+    { name: 'Old', code: 'O', limitless: null },
+    { name: 'Half', code: 'H', limitless: null },     // 6 of 10 repeat Old: kept
+    { name: 'Tiny', code: 'T', limitless: null },     // 4 cards, all repeats: too small to judge
+    { name: 'Names', code: 'N', limitless: null },    // numberless, same names as Old's numbered cards: kept
+    { name: 'Copy', code: 'C', limitless: null },     // new copy of Old
+    { name: 'Copy of copy', code: 'CC', limitless: null },
+  ];
+  const old = numbered(0, 20);
+  const cards = [
+    ...old,
+    ...old.slice(0, 6).map(c => [1, ...c.slice(1)]), ...numbered(1, 4).map(c => [1, `X${c[1]}`, `Other ${c[2]}`, null]),
+    ...old.slice(0, 4).map(c => [2, ...c.slice(1)]),
+    ...old.slice(0, 10).map(c => [3, '', c[2], null]),
+    ...old.map(c => [4, ...c.slice(1)]),
+    ...old.slice(0, 15).map(c => [5, ...c.slice(1)]),
+  ];
+  const out = dropTwinSets(sets, cards, [{ name: 'Old', code: 'O' }]);
+  assert.deepEqual(out.sets.map(s => s.code), ['O', 'H', 'T', 'N']);
+  assert.deepEqual(out.dropped.map(d => `${d.set.code}=${d.twinOf.code}`).sort(), ['C=O', 'CC=O']);
+  // Nothing published yet: the same rules, the stronger set of each pair stays.
+  assert.equal(dropTwinSets(sets.slice(0, 1).concat(sets[4]), [...old, ...old.map(c => [1, ...c.slice(1)])]).sets.length, 1);
+  // Separately-listed prints never count as repeats.
+  assert.equal(dropTwinSets(sets, cards.map(c => (c[0] === 4 ? [4, c[1], c[2], 'Mirror Holofoil'] : c)),
+    [{ name: 'Old', code: 'O' }]).sets.some(s => s.code === 'C'), true);
 });
 
 test('only a complete walk may replace the committed card list', () => {
