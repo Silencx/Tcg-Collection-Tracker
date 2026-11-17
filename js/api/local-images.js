@@ -9,7 +9,10 @@
 // (or be swapped for another) without moving a file:
 //   img/jp/{setKey}/{numKey}-{size}.{ext}        e.g. img/jp/miracle-of-the-desert/1-low.jpg
 //   data/img-index.json  { schemaVersion, builtAt, images: { "jp/miracle-of-the-desert/1":
-//                          { sizes: { low: "jpg", high: "jpg" }, source, ref, fetched } } }
+//                          { sizes: { low: "jpg" }, source, fetched, unavailable? } } }
+// `unavailable` lists sizes the source answered 404 for: it lists the card but has no
+// scan. The build skips those instead of paying for the same 404 every run; delete the
+// entry to ask again.
 // `{setKey}/{numKey}` is the card's stable identity from api/jp-model.js — the same two
 // parts as its checklist id JP_{setKey}_{numKey}. Sizes: `low` for the grid, `high` for
 // the preview — the same split as TCGdex's low.webp / high.png.
@@ -19,7 +22,7 @@
 // carries its `source`, so all of one source's images can be removed in one pass.
 //
 // Pure apart from loadImageIndex(), which is the one fetch, and is safe to call when the
-// manifest does not exist (it is gitignored until publishing is allowed — see README).
+// manifest does not exist (a fork or local checkout without images — see README).
 // =============================================================================
 
 export const IMAGE_SIZES = ['low', 'high'];
@@ -56,9 +59,38 @@ export function lookupImage(index, key, size) {
   return null;
 }
 
+/**
+ * Of `sizes`, the ones the build should still download for one manifest entry: not
+ * recorded, or recorded but the file is gone. Sizes the source has no scan for are skipped.
+ * @param {object|undefined} entry  manifest entry
+ * @param {string[]} sizes
+ * @param {(size:string, ext:string) => boolean} fileExists
+ */
+export function sizesToFetch(entry, sizes, fileExists) {
+  return sizes.filter(s => !entry?.unavailable?.includes(s)
+    && (!entry?.sizes?.[s] || !fileExists(s, entry.sizes[s])));
+}
+
 /** An empty, valid manifest. */
 export function emptyIndex() {
   return { schemaVersion: 1, builtAt: null, images: {} };
+}
+
+/**
+ * The manifest as published: keys sorted, one entry per line, and only the fields named
+ * here. Every Master Set visitor downloads it, so it stays lean, and a field like the
+ * source's own card id (which the build keeps in its gitignored catalogue) can never ride
+ * along into a public file.
+ * @param {object} index { images: { key: { sizes, source, fetched, unavailable?, … } } }
+ * @param {string} builtAt
+ */
+export function serializeIndex(index, builtAt) {
+  const lines = Object.keys(index?.images || {}).sort().map(k => {
+    const { sizes, source, fetched, unavailable } = index.images[k];
+    const entry = { sizes, source, fetched, ...(unavailable?.length && { unavailable }) };
+    return `${JSON.stringify(k)}:${JSON.stringify(entry)}`;
+  });
+  return `{"schemaVersion":1,"builtAt":${JSON.stringify(builtAt)},"images":{\n${lines.join(',\n')}\n}}\n`;
 }
 
 // ── browser side ─────────────────────────────────────────────────────────────

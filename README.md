@@ -143,12 +143,12 @@ can't be reassigned across files). The markup uses inline `onclick="fn()"` handl
 |---|---|---|---|
 | `tools/build-data.mjs` (`npm run build-data`) | TCGdex, Bulbapedia, `data/prebuilt.json` | `data/sets.json`, `data/index.json`, `data/cards/`, `data/jp/` | none |
 | `tools/build-jp-catalog.mjs` (`npm run build-jp-catalog`) | PokéWallet | `data/jp-cat/` (committed), `data/jp-catalog/` + report (local) | `POKEWALLET_IO_PROD_KEY` |
-| `tools/build-images.mjs` (`npm run build-images`) | `data/jp-catalog/`, PokéWallet | `img/`, `data/img-index.json` (local only) | `POKEWALLET_IO_PROD_KEY` |
+| `tools/build-images.mjs` (`npm run build-images`) | `data/jp-catalog/`, PokéWallet | `img/`, `data/img-index.json` (committed) | `POKEWALLET_IO_PROD_KEY` |
 | `tools/check.mjs` | `js/`, `tools/` | — | none |
 | `tools/apitcg-probe.mjs`, `tools/pokewallet-probe.mjs`, `tools/jp-gap-size.mjs` | research probes; reports stay local | — | their own |
 
-`.github/workflows/refresh-data.yml` runs build-data and build-jp-catalog every Monday
-and commits `data/`. Run it by hand from the **Actions** tab to widen coverage: its
+`.github/workflows/refresh-data.yml` runs build-data, build-jp-catalog and build-images
+every Monday and commits `data/` and `img/`. Run it by hand from the **Actions** tab to widen coverage: its
 `add` input appends Pokémon to `data/prebuilt.json`, so the next scheduled run keeps
 them. A visitor tracking pre-built Pokémon makes zero API calls; coverage is
 per-Pokémon, so for three Pokémon where two are pre-built only the third is fetched live.
@@ -196,37 +196,55 @@ drop the workflow step. The app needs no change: with the files gone it falls ba
 Bulbapedia on its own.
 
 ```bash
-npm run build-jp-catalog                 # fetch (needs the key)
-npm run build-jp-catalog -- --emit-only  # rebuild data/jp-cat/ from the local copy, no requests
+npm run build-jp-catalog                       # fetch (needs the key)
+node tools/build-jp-catalog.mjs --emit-only    # rebuild data/jp-cat/ from the local copy, no requests
 ```
 
-### Hosted card images (build-time only, not live yet)
+### Hosted card images
 
-About 10,700 Japanese cards are in sets the Limitless CDN has no scans for, so they show
-a placeholder. `tools/build-images.mjs` fills exactly that gap from PokéWallet into
-`img/jp/<set>/<number>-{low,high}.<ext>` plus a manifest, `data/img-index.json`. It
-works from the local catalogue, so run build-jp-catalog first.
+About 10,000 Japanese cards are in sets the Limitless CDN has no scans for.
+`tools/build-images.mjs` fills exactly that gap from PokéWallet into
+`img/jp/<set>/<number>-low.<ext>` (low-res: 200×280 for most, about 255×361 for some;
+~20 KB each, ~190 MB in all) plus a manifest, `data/img-index.json`, both committed and
+served by Pages. It works from the build-side catalogue, so run build-jp-catalog first.
+The weekly job fetches only cards that are new.
 
 - **Gaps only, write once.** A card that already has art elsewhere is never fetched, and
   a file that exists is never fetched again, so a normal run costs 0 requests.
-- **Our ids, not theirs.** Paths come from our set names and card numbers, and every
-  manifest entry names its `source`, so one source's images can be removed in one pass.
+- **Low only.** The preview reuses the grid image. `--sizes low,high` adds the 500×699
+  scan, but all of them would pass a gigabyte, more than a Pages repo should carry.
+- **Not every card gets one.** About 560 cards answer 404 (PokéWallet lists the card but
+  has no scan), and a few come back far larger than low-res (748×536, 1024×734). Both are
+  recorded in the manifest as `unavailable`, keep their placeholder, and are not asked
+  for again. Delete a card's manifest entry to retry it.
+- **Our ids, not theirs.** Paths come from our set names and card numbers; the manifest
+  carries no PokéWallet card ids, and every entry names its `source`.
 - By default it covers the pre-built Pokémon; `--pokemon "A,B"` picks others, `--all`
   takes every gap card. `--dry-run` shows the plan; `--max N` caps the requests
   (default 400). It stops at the live quota reserve; run it again to continue.
 
-**Not published yet.** `img/` and `data/img-index.json` are gitignored until PokéWallet
-agrees to us republishing their images; until then the files only show up in your local
-dev server (a missing manifest is treated as empty). To go live: delete those two lines
-from `.gitignore`, and run `node tools/build-images.mjs` in `refresh-data.yml` after the
-catalogue step.
+```bash
+node tools/build-images.mjs --all --dry-run    # how many cards still need a file
+node tools/build-images.mjs --all --max 1200   # one hour's worth of the gap
+```
+
+Pass flags to the scripts with `node`, not through `npm run x -- …`: PowerShell drops the
+`--`, and npm then takes `--all` and `--max` as its own options.
+
+**Withdrawing them.** If PokéWallet asks, delete every `img/` file whose manifest entry
+says `"source":"pokewallet"` (today that is all of them, so `git rm -r img
+data/img-index.json`), remove the "Fetch new Japanese card images" workflow step, and
+drop PokéWallet from the footer's scan credit. The app needs no change: a missing
+manifest is read as empty, and those tiles go back to placeholders. Removed files stay in
+git history unless the history is rewritten.
 
 ### Build keys
 
 Keys are only ever read by `tools/`, never shipped in `js/`. Locally they go in
 `.env.local` (gitignored); in CI they are repository secrets.
-`POKEWALLET_IO_PROD_KEY` serves the catalogue, image and PokéWallet probe tools;
-`APITCG_KEY` is read only by `tools/apitcg-probe.mjs`. Without a key, the build
+`POKEWALLET_IO_PROD_KEY` serves the catalogue, image and PokéWallet probe tools (use a
+separate development key locally; the production key lives only in the repository
+secret). `APITCG_KEY` is read only by the retired `tools/apitcg-probe.mjs`. Without a key, the build
 scripts skip their API steps and exit cleanly, so a fork's weekly job still succeeds.
 
 ### Deploy (GitHub Pages)
