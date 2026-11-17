@@ -117,11 +117,11 @@ js/                   config, state (one shared `state` object), storage, main (
   api/                data: router, the TCGdex provider + data/ snapshot reader,
                       Japanese cards (jp-source, jp-model, bulba-jp), image URLs, variants
   ui/                 one module per mode and feature, plus DOM-free *-model.js halves
-data/                 the pre-built snapshot (committed, refreshed weekly by CI)
+data/                 the pre-built snapshot (committed, refreshed by CI)
 tools/                build scripts, the checker, research probes; tools/lib/ helpers
 tests/                node:test suites — pure logic, plus source scans for invariants
 docs/                 design notes
-.github/workflows/    ci.yml (check + test), refresh-data.yml (weekly data build)
+.github/workflows/    ci.yml (check + test), refresh-data.yml (data build: weekly, Japanese daily)
 ```
 
 Start with `js/main.js` (boot, mode switching, the window handler manifest),
@@ -148,7 +148,9 @@ can't be reassigned across files). The markup uses inline `onclick="fn()"` handl
 | `tools/apitcg-probe.mjs`, `tools/pokewallet-probe.mjs`, `tools/jp-gap-size.mjs` | research probes; reports stay local | — | their own |
 
 `.github/workflows/refresh-data.yml` runs build-data, build-jp-catalog and build-images
-every Monday and commits `data/` and `img/`. Run it by hand from the **Actions** tab to widen coverage: its
+every Monday, and the two PokéWallet steps alone on the other days (see "Daily
+refresh" below); it commits `data/` and `img/` when they changed. Run it by hand from
+the **Actions** tab to widen coverage: its
 `add` input appends Pokémon to `data/prebuilt.json`, so the next scheduled run keeps
 them. A visitor tracking pre-built Pokémon makes zero API calls; coverage is
 per-Pokémon, so for three Pokémon where two are pre-built only the third is fetched live.
@@ -183,20 +185,30 @@ keep that line for as long as the list is published. Japanese checklist ids are
 are moved over once at boot (`js/ui/jp-migrate.js`), and an id it cannot place with
 certainty is kept, never dropped.
 
-**Weekly refresh.** The workflow step needs the `POKEWALLET_IO_PROD_KEY` repository
-secret; without it the step does nothing. A full walk is ~490 requests in one run, and
-CI starts with no cache, so the key's hourly limit has to cover that (the free tier's
-100/hour and 1,000/day do not). Only a **complete** walk replaces the committed files —
-a run stopped by the quota or an outage leaves them as they were — and a file whose
-rows did not change keeps its timestamp, so an unchanged catalogue adds nothing to the
-weekly commit.
+**Daily refresh.** The workflow step needs the `POKEWALLET_IO_PROD_KEY` repository
+secret; without it the step does nothing. Reading every set is ~490 requests, more than
+PokéWallet's free tier allows in an hour (100), so the script keeps each set's raw
+answer in `tools/.cache/pokewallet/jp-sets/` and CI keeps that folder between runs
+(`actions/cache`). Each daily run then reads only new sets, sets whose card count
+changed, and the 40 read longest ago (`--rotate 40`): about 45 requests, with every set
+re-read within ~12 days.
+
+- Only a **complete** walk replaces the committed files. If the cache is lost (GitHub
+  evicts one unused for 7 days; the daily run prevents that), the walk starts over and
+  takes about six days on the free tier, and the committed list stays as it was until
+  it is done.
+- A file whose rows did not change keeps its timestamp, so a quiet day commits nothing.
+- The cache holds PokéWallet's own card ids. It is never committed, but any workflow in
+  this repository, a pull request's included, could restore it.
+- `--refresh` re-reads every set in one go (a paid plan's quota, or several runs).
 
 **Withdrawing it.** If PokéWallet asks, revert the commit that added `data/jp-cat/` and
 drop the workflow step. The app needs no change: with the files gone it falls back to
 Bulbapedia on its own.
 
 ```bash
-npm run build-jp-catalog                       # fetch (needs the key)
+npm run build-jp-catalog                       # fetch what is new or changed (needs the key)
+node tools/build-jp-catalog.mjs --rotate 40    # ... plus the 40 sets read longest ago, as CI does
 node tools/build-jp-catalog.mjs --emit-only    # rebuild data/jp-cat/ from the local copy, no requests
 ```
 
@@ -207,7 +219,7 @@ About 10,000 Japanese cards are in sets the Limitless CDN has no scans for.
 `img/jp/<set>/<number>-low.<ext>` (low-res: 200×280 for most, about 255×361 for some;
 ~20 KB each, ~190 MB in all) plus a manifest, `data/img-index.json`, both committed and
 served by Pages. It works from the build-side catalogue, so run build-jp-catalog first.
-The weekly job fetches only cards that are new.
+The daily job fetches only cards that are new.
 
 - **Gaps only, write once.** A card that already has art elsewhere is never fetched, and
   a file that exists is never fetched again, so a normal run costs 0 requests.
@@ -245,7 +257,7 @@ Keys are only ever read by `tools/`, never shipped in `js/`. Locally they go in
 `POKEWALLET_IO_PROD_KEY` serves the catalogue, image and PokéWallet probe tools (use a
 separate development key locally; the production key lives only in the repository
 secret). `APITCG_KEY` is read only by the retired `tools/apitcg-probe.mjs`. Without a key, the build
-scripts skip their API steps and exit cleanly, so a fork's weekly job still succeeds.
+scripts skip their API steps and exit cleanly, so a fork's refresh job still succeeds.
 
 ### Deploy (GitHub Pages)
 
@@ -254,8 +266,8 @@ scripts skip their API steps and exit cleanly, so a fork's weekly job still succ
    branch**, branch `main`, folder `/ (root)`.
 3. The site serves at `https://<user>.github.io/<repo>/`.
 
-Everything is static; the only "backend" is the weekly Action that refreshes
-`data/`. Visitors cannot add to that cache — Pages accepts no writes, so wider
+Everything is static; the only "backend" is the scheduled Action that refreshes
+`data/` and `img/`. Visitors cannot add to that cache — Pages accepts no writes, so wider
 coverage means adding Pokémon to the pre-built list.
 
 ### Docs

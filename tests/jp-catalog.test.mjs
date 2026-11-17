@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   canonicalSetName, parseReleaseDate, splitPrint, splitNumberSuffix, cardTuple, cleanTuple,
-  isJapaneseSet, japaneseOnly, pagesFor, publishCheck,
+  isJapaneseSet, japaneseOnly, pagesFor, publishCheck, planFetch,
 } from '../tools/lib/jp-catalog.mjs';
 import { limitlessCodeVariants } from '../tools/lib/limitless.mjs';
 
@@ -77,6 +77,30 @@ test('only a complete walk may replace the committed card list', () => {
   assert.equal(publishCheck({ incomplete: 3, sets: 454, committedSets: 457 }).ok, false); // stopped at the quota
   assert.equal(publishCheck({ incomplete: 0, sets: 120, committedSets: 457 }).ok, false); // degraded /sets
   assert.equal(publishCheck({ incomplete: 0, sets: 0 }).ok, false);
+});
+
+test('a run fetches new sets, then changed ones, then the oldest few of the rest', () => {
+  const sets = [
+    { set_id: 1, card_count: 50 },    // cached, same count, fetched day 3
+    { set_id: 2, card_count: 60 },    // not cached: new
+    { set_id: 3, card_count: 72 },    // cached at 70: changed
+    { set_id: 4, card_count: 10 },    // cached, fetched day 1 (oldest)
+    { set_id: 5, card_count: 20 },    // cached, fetched day 2
+  ];
+  const cache = { 1: { count: 50, fetched: 3 }, 3: { count: 70, fetched: 9 }, 4: { count: 10, fetched: 1 }, 5: { count: 20, fetched: 2 } };
+  const cachedOf = id => cache[id] || null;
+  const plan = (o) => planFetch(sets, cachedOf, o).map(p => `${p.set.set_id}:${p.why}`);
+  assert.deepEqual(plan(), ['2:new', '3:changed']);                                // no rotation
+  assert.deepEqual(plan({ rotate: 2 }), ['2:new', '3:changed', '4:stale', '5:stale']);
+  assert.deepEqual(plan({ rotate: 99 }), ['2:new', '3:changed', '4:stale', '5:stale', '1:stale']);
+  assert.equal(plan({ refresh: true, rotate: 2 }).length, 5);
+  assert.ok(plan({ refresh: true }).every(p => p.endsWith(':refresh')));
+});
+
+test('a cached copy with no recorded time or count is rotated first, never treated as changed', () => {
+  const sets = [{ set_id: 'a', card_count: 5 }, { set_id: 'b', card_count: 5 }];
+  const cachedOf = id => (id === 'a' ? { count: 5, fetched: 100 } : { count: null, fetched: 0 });
+  assert.deepEqual(planFetch(sets, cachedOf, { rotate: 1 }).map(p => `${p.set.set_id}:${p.why}`), ['b:stale']);
 });
 
 test('Limitless codes are tried as spelled first — the CDN is case-sensitive', () => {

@@ -21,23 +21,27 @@
 // HEAD requests. CI has no gap file, so without the carry-over a weekly rebuild would
 // mark every modern set as unscanned.
 //
-// COST: /sets once, then one request per 200 cards of each set — ≈491 requests in all
-// (sized 2026-10-30). Every set's raw answer is cached in tools/.cache/, so a run that
-// stops at the quota reserve resumes where it stopped and never pays for a set twice;
-// --refresh ignores the cache. The client reads the live hourly/daily quota from
-// PokéWallet's response headers and stops before it runs out.
+// COST: /sets once, then one request per 200 cards of each set — ≈491 requests for all of
+// them (sized 2026-10-30), more than the free tier's 100 an hour. Every set's raw answer is
+// cached in tools/.cache/pokewallet/jp-sets/ (CI keeps it between runs with actions/cache),
+// so a run fetches only what may have changed (jp-catalog.planFetch): sets with no cached
+// copy, sets whose card count changed, and with --rotate N the N fetched longest ago. A
+// daily CI run with --rotate 40 costs ≈45 requests and re-reads every set within ~12 days.
+// A run stopped by the quota resumes where it stopped; --refresh fetches every set. The
+// client reads the live hourly/daily quota from PokéWallet's response headers and stops
+// before it runs out.
 //
 // The key (POKEWALLET_IO_PROD_KEY, .env.local or the environment) is never logged or
-// written. Run: node tools/build-jp-catalog.mjs [--max N] [--refresh | --emit-only]
+// written. Run: node tools/build-jp-catalog.mjs [--max N] [--rotate N] [--refresh | --emit-only]
 // =============================================================================
 
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadEnvKey } from './lib/env-key.mjs';
 import { createClient, listOf, matchJpRows } from './lib/pokewallet.mjs';
 import {
-  canonicalSetName, parseReleaseDate, cardTuple, cleanTuple, isJapaneseSet, japaneseOnly, pagesFor, publishCheck,
+  canonicalSetName, parseReleaseDate, cardTuple, cleanTuple, isJapaneseSet, japaneseOnly, pagesFor, planFetch, publishCheck,
 } from './lib/jp-catalog.mjs';
 import { stampBuiltAt } from './lib/built-at.mjs';
 import { JP_BULBA_SET_MAP } from '../js/api/bulba-jp.js';
@@ -58,6 +62,8 @@ const refresh = args.includes('--refresh');
 const emitOnly = args.includes('--emit-only');
 const maxArg = args.indexOf('--max');
 const maxRequests = maxArg >= 0 ? Math.max(1, parseInt(args[maxArg + 1], 10) || 0) : 700;
+const rotateArg = args.indexOf('--rotate');
+const rotate = rotateArg >= 0 ? Math.max(0, parseInt(args[rotateArg + 1], 10) || 0) : 0;
 const say = m => console.log(`[jp-catalog] ${m}`);
 const readJSON = f => JSON.parse(readFileSync(f, 'utf8'));
 
@@ -70,6 +76,19 @@ if (emitOnly) {
 const key = loadEnvKey('POKEWALLET_IO_PROD_KEY');
 if (!key) { say('no POKEWALLET_IO_PROD_KEY configured — nothing to do (set it in .env.local).'); process.exit(0); }
 const cacheFile = id => resolve(CACHE_DIR, `${String(id).replace(/[^\w-]/g, '_')}.json`);
+
+/** The cached copy's card count and fetch time, for planFetch; null when there is none. */
+function cachedOf(id) {
+  const file = cacheFile(id);
+  if (!existsSync(file)) return null;
+  try {
+    const { set, fetched } = readJSON(file);
+    // Copies cached before `fetched` was recorded fall back to the file's own time.
+    return { count: set?.card_count != null ? Number(set.card_count) : null, fetched: Date.parse(fetched) || statSync(file).mtimeMs };
+  } catch {
+    return null;                                    // unreadable: fetch it again
+  }
+}
 
 async function main() {
   mkdirSync(CACHE_DIR, { recursive: true });
@@ -88,13 +107,19 @@ async function main() {
   const committedFile0 = resolve(APP_DIR, 'sets.json');
   if (existsSync(committedFile0)) for (const s of readJSON(committedFile0).sets || []) committedLimitless.set(`${s.name}\u0000${s.code}`, s.limitless ?? null);
 
-  let fetchedSets = 0, cachedSets = 0, stoppedWhy = null;
+  const plan = planFetch(jpSets, cachedOf, { refresh, rotate });
+  const why = plan.reduce((m, p) => (m[p.why] = (m[p.why] || 0) + 1, m), {});
+  say(`to fetch: ${Object.entries(why).map(([k, n]) => `${n} ${k}`).join(', ') || 'nothing'}`
+    + ` (${jpSets.length - plan.length} set(s) kept from the cache).`);
+
+  let fetchedSets = 0, stoppedWhy = null;
+  const fetchedNow = new Set();
   const incomplete = [];
   const failed = [];
   try {
-    for (const s of jpSets) {
+    for (const { set: s } of plan) {
       const file = cacheFile(s.set_id);
-      if (!refresh && existsSync(file)) { cachedSets++; continue; }
+      const fetched = new Date().toISOString();
       const rows = [];
       const pages = pagesFor(s.card_count, PAGE);
       try {
@@ -105,22 +130,30 @@ async function main() {
           if (list.length < PAGE) break;
         }
       } catch (e) {
-        if (e.code === 'BUDGET') throw e;
+        if (e.code === 'BUDGET' || e.code === 'NETWORK') throw e;
         // /sets lists some set ids that /sets/:id then answers 404 "Set not found" for
-        // (24002, 2026-10-30). One dead entry must not abort a 491-request walk: a 404
-        // is cached as "unavailable" so later runs do not pay for it again (--refresh
-        // retries it); anything else is left uncached and retried on the next run.
+        // (24002, 2026-10-30). One dead entry must not abort the walk: a 404 is cached as
+        // "unavailable", with the time, so it waits its turn in the rotation like any set.
+        // A set we already hold good rows for keeps them: a 404 is no reason to drop cards
+        // from the app. Anything else is left as it was and retried on a later run.
         failed.push(`${s.name} [${s.set_id}]: ${e.status ? 'HTTP ' + e.status : e.message}`);
-        if (e.status === 404) writeFileSync(file, JSON.stringify({ set: s, rows: [], unavailable: 404 }));
+        if (e.status === 404) {
+          const prev = existsSync(file) ? readJSON(file) : null;
+          writeFileSync(file, JSON.stringify(prev && !prev.unavailable
+            ? { ...prev, fetched }
+            : { set: s, rows: [], unavailable: 404, fetched }));
+        }
         continue;
       }
-      writeFileSync(file, JSON.stringify({ set: s, rows }));
+      writeFileSync(file, JSON.stringify({ set: s, rows, fetched }));
+      fetchedNow.add(String(s.set_id));
       fetchedSets++;
     }
   } catch (e) {
-    if (e.code !== 'BUDGET') throw e;
+    if (e.code !== 'BUDGET' && e.code !== 'NETWORK') throw e;
     stoppedWhy = e.message;
   }
+  const cachedSets = jpSets.filter(s => !fetchedNow.has(String(s.set_id)) && existsSync(cacheFile(s.set_id))).length;
 
   // Assemble from the cache — the sets fetched now plus every earlier run's.
   const sets = [];
@@ -167,7 +200,7 @@ async function main() {
   const q = client.quota;
   say(`${sets.length}/${jpSets.length} sets, ${cards.length} card rows. Fetched ${fetchedSets} set(s) now, ${cachedSets} from cache; ${client.spent} request(s).`
     + (q.hour != null ? ` Quota left: ${q.hour}/${q.limitHour} this hour, ${q.day}/${q.limitDay} today.` : ''));
-  if (stoppedWhy) say(`stopped early (${stoppedWhy}) — ${incomplete.length} set(s) still to fetch; run again to continue.`);
+  if (stoppedWhy) say(`stopped early (${stoppedWhy}) — ${incomplete.length} set(s) not fetched yet; run again to continue.`);
   say('wrote data/jp-catalog/ (build side), data/jp-cat/ (what the app reads), tools/jp-catalog-report.md');
 }
 
