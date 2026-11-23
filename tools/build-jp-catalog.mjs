@@ -4,7 +4,8 @@
 //
 // WHY: the app's Japanese cards come from Bulbapedia wikitext (one page per Pokémon; it
 // answers our builds with 403) and are only shown for the 21 sets in JP_BULBA_SET_MAP,
-// which was written for the Seedot line. PokéWallet lists 462 Japanese sets.
+// which was written for the Seedot line. PokéWallet lists 525 Japanese sets (2026-11-17),
+// some of them twice (jp-catalog.dropTwinSets).
 //
 // WHAT IT WRITES:
 //   data/jp-cat/                committed: what the app reads (see writeAppFiles below);
@@ -21,12 +22,12 @@
 // HEAD requests. CI has no gap file, so without the carry-over a weekly rebuild would
 // mark every modern set as unscanned.
 //
-// COST: /sets once, then one request per 200 cards of each set — ≈491 requests for all of
-// them (sized 2026-10-30), more than the free tier's 100 an hour. Every set's raw answer is
+// COST: /sets once, then one request per 200 cards of each set — ≈560 requests for all of
+// them (525 sets on 2026-11-17), more than the free tier's 100 an hour. Every set's raw answer is
 // cached in tools/.cache/pokewallet/jp-sets/ (CI keeps it between runs with actions/cache),
 // so a run fetches only what may have changed (jp-catalog.planFetch): sets with no cached
 // copy, sets whose card count changed, and with --rotate N the N fetched longest ago. A
-// daily CI run with --rotate 40 costs ≈45 requests and re-reads every set within ~12 days.
+// daily CI run with --rotate 40 costs ≈45 requests and re-reads every set within ~14 days.
 // A run stopped by the quota resumes where it stopped; --refresh fetches every set. The
 // client reads the live hourly/daily quota from PokéWallet's response headers and stops
 // before it runs out.
@@ -41,7 +42,8 @@ import { fileURLToPath } from 'node:url';
 import { loadEnvKey } from './lib/env-key.mjs';
 import { createClient, listOf, matchJpRows } from './lib/pokewallet.mjs';
 import {
-  canonicalSetName, parseReleaseDate, cardTuple, cleanTuple, isJapaneseSet, japaneseOnly, pagesFor, planFetch, publishCheck,
+  canonicalSetName, parseReleaseDate, cardTuple, cleanTuple, dropTwinSets, isJapaneseSet, japaneseOnly, pagesFor,
+  planFetch, publishCheck,
 } from './lib/jp-catalog.mjs';
 import { stampBuiltAt } from './lib/built-at.mjs';
 import { JP_BULBA_SET_MAP } from '../js/api/bulba-jp.js';
@@ -214,9 +216,21 @@ async function main() {
  * out cannot leave a stale shard behind — but a file whose content did not change keeps
  * its committed builtAt (stampBuiltAt), so an unchanged catalogue produces no diff.
  */
+/** The set list the app is served now (data/jp-cat/sets.json), or [] before the first build. */
+function publishedSets() {
+  try { return readJSON(resolve(APP_DIR, 'sets.json')).sets || []; } catch { return []; }
+}
+
 function writeAppFiles(allSets, rawCards, builtAt) {
-  const { sets, cards } = japaneseOnly(allSets, rawCards.map(cleanTuple));
-  const { setKeys, numKeys } = assignJpKeys(sets, cards);
+  // What is published now: sets in it keep their keys and are never dropped as twins.
+  const prior = publishedSets();
+  const jp = japaneseOnly(allSets, rawCards.map(cleanTuple));
+  const { sets, cards, dropped } = dropTwinSets(jp.sets, jp.cards, prior);
+  if (dropped.length) {
+    say(`left out ${dropped.length} set(s) that repeat another: `
+      + dropped.map(d => `${d.set.name} [${d.set.code}] = ${d.twinOf.name} [${d.twinOf.code}]`).join('; '));
+  }
+  const { setKeys, numKeys } = assignJpKeys(sets, cards, prior);
   const appSets = sets.map((s, i) => ({
     key: setKeys[i], name: s.name, code: s.code, date: s.date, era: jpEra(s.code, s.date),
     limitless: s.limitless, sym: JP_BULBA_SET_MAP[s.name]?.sym || null, cards: s.cards,

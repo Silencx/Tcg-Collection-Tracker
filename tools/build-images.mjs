@@ -10,7 +10,8 @@
 // written by tools/build-jp-catalog.mjs — run that first). It covers every Japanese set,
 // and each card's PokéWallet id is already in it, so this costs image requests only,
 // nothing to search. Keys come from jp-model.assignJpKeys over the same cleaned rows the
-// app's files were written from, so file names match tile ids.
+// app's files were written from (twins dropped, published keys kept), so file names match
+// tile ids.
 // WHICH POKÉMON: the pre-built list (data/index.json) by default; --pokemon "A,B" for
 // others; --all for every gap card in the catalogue (≈10,700, one request each at the
 // default size, so pass a --max to match the hour's quota).
@@ -45,7 +46,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { loadEnvKey } from './lib/env-key.mjs';
 import { createClient, extFor, oversizeForLow } from './lib/pokewallet.mjs';
-import { cleanTuple, japaneseOnly } from './lib/jp-catalog.mjs';
+import { cleanTuple, dropTwinSets, japaneseOnly } from './lib/jp-catalog.mjs';
 import { imagePath, emptyIndex, serializeIndex, sizesToFetch, IMAGE_SIZES } from '../js/api/local-images.js';
 import { assignJpKeys, jpImageKeyFor } from '../js/api/jp-model.js';
 import { namesSpecies } from '../js/api/providers/tcgdex.js';
@@ -93,11 +94,15 @@ function pokemonList() {
 
 /** Gap cards from the catalogue: [{key, ref, label}] — refs known, nothing to search. */
 function planFromCatalogue(names) {
-  // The same clean-up and the same Japanese-only filter as the app's files, so the keys —
-  // and therefore the file names — come out identical.
-  const { sets, cards } = japaneseOnly(readJSON(resolve(CAT_DIR, 'sets.json')).sets,
+  // The same clean-up, Japanese-only filter, twin filter and published keys as the app's
+  // files (build-jp-catalog writeAppFiles), so the keys — and therefore the file names —
+  // come out identical, and a set left out as a twin gets no images either.
+  let prior = [];
+  try { prior = readJSON(resolve(ROOT, 'data/jp-cat/sets.json')).sets || []; } catch { /* none published yet */ }
+  const jp = japaneseOnly(readJSON(resolve(CAT_DIR, 'sets.json')).sets,
     readJSON(resolve(CAT_DIR, 'cards.json')).cards.map(cleanTuple));
-  const { setKeys, numKeys } = assignJpKeys(sets, cards);
+  const { sets, cards } = dropTwinSets(jp.sets, jp.cards, prior);
+  const { setKeys, numKeys } = assignJpKeys(sets, cards, prior);
   const out = [];
   cards.forEach((c, i) => {
     if (c[3] || sets[c[0]].limitless) return;                  // a print, or Limitless has the set

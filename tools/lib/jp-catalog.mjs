@@ -8,6 +8,7 @@
 // =============================================================================
 
 import { SET_ALIASES, setMatchKey } from './pokewallet.mjs';
+import { jpSetIdentity } from '../../js/api/jp-model.js';
 
 /**
  * PokéWallet set name → the name we show and key checklist ids on.
@@ -100,6 +101,66 @@ export function japaneseOnly(sets, cards) {
   const keptCards = [];
   for (const c of cards) if (remap.has(c[0])) keptCards.push([remap.get(c[0]), ...c.slice(1)]);
   return { sets: keptSets, cards: keptCards };
+}
+
+/** A set is a twin when at least this share of its cards repeat ONE other set… */
+export const TWIN_SHARE = 0.7;
+/** …and it has at least this many cards to compare (smaller sets are left alone). */
+export const TWIN_MIN_CARDS = 5;
+
+const twinName = s => String(s ?? '').normalize('NFKD').toLowerCase().replace(/[^a-z0-9]/g, '');
+const twinNumber = n => String(n ?? '').split('/')[0].trim().toLowerCase().replace(/^0+(?=.)/, '');
+
+/**
+ * PokéWallet lists some sets twice, under another name or code: "xsv2a" repeats Pokémon
+ * Card 151 (SV2a), "Evolutions Collection 1" repeats the Japanese Base Set, "Rulers of the
+ * Gym" repeats Rocket Gang. Each would show as a second tile with the same cards, and its
+ * images would be fetched twice. This drops a set that is NOT in the published list
+ * (`prior`, data/jp-cat/sets.json) when TWIN_SHARE of its cards repeat one other set that
+ * stays. A published set is never dropped, whatever arrives later: that would take away
+ * cards people already own. Between two new sets, the one Limitless has, then the bigger
+ * one, stays.
+ * Cards compare by number + name. A card with no number compares by name, and only with
+ * the other set's numberless cards, so a numberless promo list of common Pokémon does not
+ * match every big numbered set. Separately-listed prints are left out.
+ * `sets` [{name, code, limitless}], `cards` [[setIndex, number, name, print, …]].
+ * @returns {{sets, cards, dropped: {set, twinOf}[]}} card set indices remapped
+ */
+export function dropTwinSets(sets, cards, prior = []) {
+  const published = new Set(prior.map(jpSetIdentity));
+  const isNew = sets.map(s => !published.has(jpSetIdentity(s)));
+  const size = sets.map(() => 0);
+  const sigs = sets.map(() => new Set());
+  for (const c of cards) {
+    size[c[0]]++;
+    if (!c[3]) sigs[c[0]].add(`${twinNumber(c[1]) || '-'}|${twinName(c[2])}`);
+  }
+  const holders = new Map();                     // card signature → set indices
+  sigs.forEach((ss, i) => ss.forEach(g => (holders.get(g) || holders.set(g, []).get(g)).push(i)));
+  // Published first, then on Limitless, then bigger, then listed first: a total order.
+  const rank = i => [isNew[i] ? 0 : 1, sets[i].limitless ? 1 : 0, size[i], -i];
+  const cmp = (a, b) => { const x = rank(a), y = rank(b); for (let k = 0; k < x.length; k++) if (x[k] !== y[k]) return y[k] - x[k]; return 0; };
+  // Strongest first, so every set a candidate could repeat is already settled — a new set
+  // that repeats another new set which itself repeats a published one ends up dropped too.
+  const twinOf = new Map();
+  for (const b of sets.map((_, i) => i).sort(cmp)) {
+    if (!isNew[b] || sigs[b].size < TWIN_MIN_CARDS) continue;
+    const hits = new Map();
+    for (const g of sigs[b]) {
+      for (const a of holders.get(g)) if (a !== b && !twinOf.has(a) && cmp(a, b) < 0) hits.set(a, (hits.get(a) || 0) + 1);
+    }
+    let best = -1, n = 0;
+    for (const [a, k] of hits) if (k > n) { best = a; n = k; }
+    if (best >= 0 && n >= TWIN_SHARE * sigs[b].size) twinOf.set(b, best);
+  }
+  if (!twinOf.size) return { sets, cards, dropped: [] };
+  const remap = new Map();
+  const keptSets = [];
+  sets.forEach((s, i) => { if (!twinOf.has(i)) { remap.set(i, keptSets.length); keptSets.push(s); } });
+  const keptCards = [];
+  for (const c of cards) if (remap.has(c[0])) keptCards.push([remap.get(c[0]), ...c.slice(1)]);
+  const dropped = [...twinOf].map(([b, a]) => ({ set: sets[b], twinOf: sets[a] }));
+  return { sets: keptSets, cards: keptCards, dropped };
 }
 
 /**

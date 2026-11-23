@@ -185,13 +185,26 @@ keep that line for as long as the list is published. Japanese checklist ids are
 are moved over once at boot (`js/ui/jp-migrate.js`), and an id it cannot place with
 certainty is kept, never dropped.
 
+Two rules keep those ids stable as PokéWallet's list changes. Each rebuild reads the
+published `data/jp-cat/sets.json` first:
+
+- **A published set keeps its key**, matched by name + code, even when a second set with
+  the same name appears.
+- **A new set that mostly repeats another set is left out.** PokéWallet lists some sets
+  twice under other names, for example `xsv2a` for Pokémon Card 151, or "Evolutions
+  Collection 1" for the Japanese Base Set. A set is left out when at least 70% of its
+  cards repeat one set that stays. A published set is never left out.
+
+The build log names every set it leaves out (`left out N set(s) that repeat another`).
+`build-images` applies the same rules, so a left-out set gets no images.
+
 **Daily refresh.** The workflow step needs the `POKEWALLET_IO_PROD_KEY` repository
-secret; without it the step does nothing. Reading every set is ~490 requests, more than
+secret; without it the step does nothing. Reading every set is ~560 requests, more than
 PokéWallet's free tier allows in an hour (100), so the script keeps each set's raw
 answer in `tools/.cache/pokewallet/jp-sets/` and CI keeps that folder between runs
 (`actions/cache`). Each daily run then reads only new sets, sets whose card count
 changed, and the 40 read longest ago (`--rotate 40`): about 45 requests, with every set
-re-read within ~12 days.
+re-read within ~14 days.
 
 - Only a **complete** walk replaces the committed files. If the cache is lost (GitHub
   evicts one unused for 7 days; the daily run prevents that), the walk starts over and
