@@ -95,11 +95,12 @@ export const CACHE_TTL  = 24*60*60*1000; // 24h EN card-data cache TTL
 
 // Image-availability negative cache (js/api/img-cache.js).
 //
-// TTL is long because the thing being remembered barely moves: TCGdex has no card
-// images AT ALL for zh-Hant/th/id (verified across bw4→sv05, every era), and the
-// per-card gaps in the Latin languages are individual missing scans. A week keeps
-// the console quiet and the requests down while still letting newly-added artwork
-// appear on its own — nothing here is ever a permanent verdict.
+// TTL is long because the thing being remembered barely moves: TW/TH/ID tiles built
+// from EN ids (Master Set, TMS) are near-certain misses, since those languages' set ids
+// share none with English, and the per-card gaps in the Latin languages are individual
+// missing scans. A week keeps the console quiet and the requests down while still
+// letting newly-added artwork appear on its own — nothing here is ever a permanent
+// verdict.
 export const IMG_FAIL_TTL = 7*24*60*60*1000;
 // Cap so a big Pokémon list can't grow this blob without bound (65 cards × 9
 // languages is ~585 entries for the default list). Oldest entries are evicted.
@@ -107,7 +108,10 @@ export const IMG_FAIL_MAX = 4000;
 
 // ── LANGUAGES (data languages with TCGdex coverage) ───────────────────────────
 export const LANGUAGES = [
-  // code = TCGdex image CDN prefix  apiCode = TCGdex REST API language code
+  // code = the app's language key (data maps, picker, sets.json)
+  // apiCode = TCGdex's language code, for the REST API AND the image CDN folder. They
+  // differ only for TW: art is under /zh-tw/, and /zh-Hant/ is a 404 folder. Build card
+  // image URLs with api/card-image-model.js, never from `code`.
   { code:'en',      apiCode:'en',    badge:'EN', color:'#1565c0', label:'English',                     hasSetsApi:true  },
   { code:'de',      apiCode:'de',    badge:'DE', color:'#5b4000', label:'German',                      hasSetsApi:true  },
   { code:'fr',      apiCode:'fr',    badge:'FR', color:'#1a237e', label:'French',                      hasSetsApi:true  },

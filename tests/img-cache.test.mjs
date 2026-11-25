@@ -1,8 +1,8 @@
 // img-cache.js is the negative cache that stops the app re-requesting image URLs
-// already known to 404/403 (TCGdex has no artwork at all for zh-Hant/th/id; Limitless
-// 403s individual scans). It reads localStorage at IMPORT time, so the shim has to be
-// installed before the dynamic import below — no other test in this suite needs
-// browser globals, hence the local shim rather than a shared helper.
+// already known to 404/403 (TW/TH/ID tiles built from EN ids almost never have a TCGdex
+// scan; Limitless 403s individual scans). It reads localStorage at IMPORT time, so the
+// shim has to be installed before the dynamic import below — no other test in this
+// suite needs browser globals, hence the local shim rather than a shared helper.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
@@ -91,7 +91,7 @@ test('metaSources removes known-bad candidates, and recheck ignores the cache', 
 
 test('a meta with no viable candidates yields nothing to request', async () => {
   const { mod } = await freshModule();
-  const m = mod.imgMeta([A], [A]);   // th/id: one url, and it does not exist
+  const m = mod.imgMeta([A], [A]);   // one url, and it does not exist
   mod.markBad(A);
   assert.deepEqual(mod.metaSources(m), [],
     'this is the case that makes print show the placeholder on the FIRST run');

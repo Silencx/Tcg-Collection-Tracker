@@ -15,8 +15,9 @@ import {
   LANGUAGES, PLACEHOLDER_LANGS, BADGE_ORDER,
 } from '../config.js';
 import {
-  limitlessJpUrl, tcgdexAssetBase, tcgdexSymbolUrl, tcgdexSerieSegment,
+  limitlessJpUrl, tcgdexSymbolUrl, tcgdexSerieSegment,
 } from '../api/images.js';
+import { tcgdexCardBase, isMisfiledCdnUrl } from '../api/card-image-model.js';
 import { router } from '../api/router.js';
 import { viableSources, markBad, markGood } from '../api/img-cache.js';
 import { loadImageIndex, localImage } from '../api/local-images.js';
@@ -196,14 +197,15 @@ async function openTmsPopup(pokeName){
 
 // ── TMS: Fetch card data for one Pokémon ─────────────────────────────────────
 async function fetchTmsCardsForPoke(pokeName){
-  // A cached list is rebuilt, once, when it predates either of two fixes:
+  // A cached list is rebuilt, once, when it predates any of three fixes:
   //   • the stable JP ids (no `imgKey` on its JP cards) — it predates the catalogue,
   //     so refetch rather than show the old, shorter JP list;
   //   • the real CDN series (no `serie` on its other cards) — its image URLs were built
-  //     from the id-slicing guess, which 404s for a large minority of sets.
+  //     from the id-slicing guess, which 404s for a large minority of sets;
+  //   • the zh-tw image folder (a TW URL under /zh-Hant/, which is always a 404).
   if(state.tmsPokeCache.has(pokeName)){
     const cached=state.tmsPokeCache.get(pokeName);
-    const stale=c=>c&&(c.lang==='JP'?!c.imgKey:!c.serie);
+    const stale=c=>c&&(c.lang==='JP'?!c.imgKey:(!c.serie||isMisfiledCdnUrl(c.imgSrc)));
     if(!cached.some(stale)) return cached;
   }
 
@@ -222,7 +224,8 @@ async function fetchTmsCardsForPoke(pokeName){
   const cards=[]; const seen=new Set();
 
   // EN + international + placeholder languages, hydrated from TCGdex (onerror hides
-  // missing-language images in the popup, same as the Master Set).
+  // missing-language images in the popup, same as the Master Set). These are EN ids,
+  // and TW/TH/ID set ids share none with English, so those tiles mostly get no scan.
   for(const tc of tcgCards){
     if(!tc||typeof tc.id!=='string'||!tc.id.includes('-')||seen.has(tc.id)) continue;
     seen.add(tc.id);
@@ -235,7 +238,8 @@ async function fetchTmsCardsForPoke(pokeName){
     const symSrc=(meta.symbols&&meta.symbols[tcgdexSetId])||tcgdexSymbolUrl(series,tcgdexSetId);
     for(const langDef of LANGUAGES){
       const id=`${langDef.badge}_${tc.id}`;
-      const base=tcgdexAssetBase(langDef.code, series, tcgdexSetId, tcgdexLocalId);
+      // The CDN folder, not langDef.code: TW art lives under zh-tw (card-image-model.js).
+      const base=tcgdexCardBase(langDef.code, series, tcgdexSetId, tcgdexLocalId);
       state._tmsCardPokemon.set(id,pokeName);
       cards.push({id,pokeName,setId:tcgdexSetId,setName,releaseDate,localId:tcgdexLocalId,lang:langDef.badge,langColor:langDef.color,imgSrc:`${base}/low.webp`,hiSrc:`${base}/high.webp`,symSrc,serie:series,variants:tc.variants||null});
     }

@@ -21,6 +21,7 @@
 
 import { LANGUAGES } from '../../config.js';
 import { tcgdexAssetBase, tcgdexSerieSegment } from '../images.js';
+import { listedImageBase } from '../card-image-model.js';
 import { normalizeVariants } from '../variants.js';
 
 const API = 'https://api.tcgdex.net/v2';
@@ -468,15 +469,17 @@ export function readCardCount(raw) {
  * which is one request for the whole set — cheaper than the per-name sweep the master
  * index needs.
  *
- * Emits the SAME card shape as getCards, deliberately: single-set mode reuses the
- * master-set tile renderer, and a second shape would mean a second renderer.
+ * Emits the same card shape as getCards, with one difference: `image` is null for a card
+ * TCGdex lists without a scan, instead of a guessed base. Single-set mode reads it to
+ * decide whether to request an image at all.
  * `species` is the card's own name here — there is no queried Pokémon to attribute it
  * to — which is also what makes the per-Pokémon dividers group sensibly.
  *
  * @param {string} [opts.lang] LANGUAGES `code` to fetch in. zh-Hant/th/id sets exist
  *   ONLY in their own language's namespace — /en/sets/SC2b is a 404 — so the caller
  *   must pass the language the set actually belongs to.
- * @returns {Promise<{cards:Array, set:{id,name,releaseDate,symbol,logo,serie,count}}>}
+ * @returns {Promise<{cards:Array, set:{id,name,releaseDate,symbol,logo,serie,count,lang}}>}
+ *   `set.lang` is the LANGUAGES `code` the set was fetched in (zh-Hant, not zh-tw).
  */
 // withVariants used to default FALSE here: over REST it cost one request per card, 162
 // extra for Temporal Forces on every entry into the mode. GraphQL answers the whole set
@@ -486,7 +489,7 @@ export function readCardCount(raw) {
 export async function getSetCards(setId, { signal, withVariants = true, lang = 'en' } = {}) {
   const def = LANGUAGES.find(l => l.code === lang);
   const apiCode = def?.apiCode || 'en';
-  const cdnLang = def?.code || 'en';
+  const appLang = def?.code || 'en';
   const s = await getJSON(`${API}/${apiCode}/sets/${encodeURIComponent(setId)}`, signal);
   const list = Array.isArray(s?.cards) ? s.cards : [];
   // An empty `cards` array is a legitimate TCGdex answer, not a transport failure — it
@@ -503,7 +506,11 @@ export async function getSetCards(setId, { signal, withVariants = true, lang = '
       id: c.id,
       name: c.name || c.id,
       species: c.name || c.id,
-      image: c.image || tcgdexAssetBase(cdnLang, serie, setId, splitId(c.id).localId),
+      // The listing's own base, or null: a card listed without `image` has no scan on
+      // the CDN (card-image-model.js), so there is nothing worth building a URL for.
+      // Unlike getCards, where `image` is always a base because buildSetsMap reads the
+      // set and era from it.
+      image: listedImageBase(c.image),
       localId: c.localId != null ? String(c.localId) : splitId(c.id).localId,
     }));
 
@@ -519,7 +526,7 @@ export async function getSetCards(setId, { signal, withVariants = true, lang = '
       logo: s.logo ? assetUrl(s.logo) : null,
       serie: s.serie || { id: serie, name: serie },
       count: readCardCount(s.cardCount),
-      lang: cdnLang,
+      lang: appLang,
     },
   };
 }

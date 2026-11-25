@@ -15,7 +15,8 @@ import {
 import {
   LANGUAGES, PLACEHOLDER_LANGS, BADGE_ORDER, CACHE_TTL,
 } from '../config.js';
-import { limitlessJpUrl, tcgdexAssetBase, tcgdexSymbolUrl } from '../api/images.js';
+import { limitlessJpUrl, tcgdexSymbolUrl } from '../api/images.js';
+import { tcgdexCardBase } from '../api/card-image-model.js';
 import { router } from '../api/router.js';
 import { variantBadges, printsSummary } from '../api/variants.js';
 import { loadImageIndex, localImage } from '../api/local-images.js';
@@ -912,7 +913,10 @@ function renderBySet(enCards, setNamesAll, container, setMeta = { dates: {}, sym
           for(const langDef of LANGUAGES){
             const id=`${langDef.badge}_${card.id}`, isDone=state.checked.has(id);
             // TCGdex asset CDN for every language; a missing scan falls to the placeholder.
-            const base=tcgdexAssetBase(langDef.code, card.series, card.setId, card.localId);
+            // The folder is TCGdex's (zh-tw for TW), not langDef.code: card-image-model.js.
+            // These are EN ids, and TW/TH/ID set ids share none with English, so those
+            // tiles mostly 404 once and are then skipped by the negative cache.
+            const base=tcgdexCardBase(langDef.code, card.series, card.setId, card.localId);
             const loSrc=`${base}/low.webp`, hiSrc=`${base}/high.webp`;
             state._meta.set(id,{name:{en:card.name,native:(state.nativeNames[langDef.badge]||{})[spec]||null},setName:si.enName,num:`#${card.localId}`,lang:langDef.badge,langColor:langDef.color,...imgMeta([loSrc],[hiSrc]),symSrc:si.symSrc,...pmeta});
             // hiSrc is not passed — mkImgWrap only renders the low-res tile; the high-res

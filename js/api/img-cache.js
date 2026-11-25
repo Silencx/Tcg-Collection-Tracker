@@ -1,15 +1,17 @@
 // =============================================================================
 // img-cache.js — negative cache for card-image URLs that don't exist.
 //
-// WHY: the app builds image URLs by STRING TEMPLATE for every language (see
-// renderBySet in ui/masterset.js), because the checklist must show every language
-// whether or not artwork exists — "never a shorter list" (providers/tcgdex.js).
+// WHY: Master Set and the TMS popup build image URLs by STRING TEMPLATE for every
+// language (see renderBySet in ui/masterset.js), because the checklist must show every
+// language whether or not artwork exists — "never a shorter list" (providers/tcgdex.js).
 // The cost is requests that can never succeed:
 //
-//   • TCGdex has NO card images for zh-Hant / th / id — verified 404 across
-//     bw4, xy11, sm7, swsh11 and sv05, i.e. every era. Whole-language absence.
-//   • The Latin languages are near-complete but have sparse per-card gaps
-//     (e.g. it/sm/sm7/1 404s while sm7/2 and sm7/3 are fine).
+//   • Those cards are known by their EN ids. TW, TH and ID set ids share none with
+//     English, so their tiles there are near-certain 404s. (TCGdex does hold scans for
+//     about a third of TW, TH and ID cards, under their own set ids. Single-set mode
+//     shows those, and asks the set listing first instead of collecting 404s: see
+//     api/card-image-model.js.)
+//   • The Latin languages are near-complete but have per-card and per-set gaps.
 //   • Limitless returns 403 for scans it doesn't hold (SM7_105 vs SM7_6).
 //
 // Both CDNs answer a miss with an XML error body. TCGdex additionally mislabels
@@ -35,7 +37,8 @@ const failed = new Map();
 // TCGdex serves every quality of one card from a single directory
 // (/{lang}/{series}/{set}/{localId}/low.webp, /high.png, …), and a card the CDN does
 // not hold is a missing S3 PREFIX — the error body is literally NoSuchKey. Measured:
-// low and high always agree (404/404 for th/id/zh-Hant, 200/200 for en/de).
+// low and high always agree (404/404 for zh-tw/SV/SV1S/021, 200/200 for
+// zh-tw/SV/SV1S/001 and it/sm/sm7/1).
 //
 // So a TCGdex failure is remembered against the DIRECTORY, not the file. That makes
 // the knowledge transferable: the grid only ever requests low.webp, while preview and
