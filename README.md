@@ -25,10 +25,10 @@ The three checklists are kept separately, so ticking a card in one never changes
 In Master set a **☰ Sets** sidebar jumps between sets; the 🔔 bell keeps the app's messages.
 
 ### Pick your own Pokémon
-**+ Add Pokémon** opens a picker over a built-in catalogue of 357 species spanning
-Gens 1–9 — a popular subset, not the full National Dex. Your list is saved locally and
-can hold as many Pokémon as you like. The True master set browser uses the same
-catalogue.
+**+ Add Pokémon** opens a picker over the full National Dex: all 1,025 species, Gens 1–9.
+Search by English name, by the name in another language ("Glurak", "ピカチュウ"), or by
+dex number ("25"). Your list is saved locally and can hold as many Pokémon as you like.
+The True master set browser uses the same catalogue.
 
 ### Languages, and cameo appearances
 - **English, German, French, Spanish, Italian, Portuguese** show real card images from
@@ -39,8 +39,9 @@ catalogue.
   for them yet; **Korean and Simplified Chinese** have no public card database at all.
   All five show a placeholder tile with the card's name, set and number.
 
-Native Pokémon names on placeholder tiles cover only the three demo Pokémon so far;
-anything else shows its English name.
+Placeholder tiles show the Pokémon's name in the card's language for every species:
+Japanese, Korean, both Chinese scripts, and German, French, Spanish or Italian wherever
+that name differs from the English one. Thai and Indonesian tiles show the English name.
 
 Search also catches **cameo** appearances — cards where your Pokémon shows up
 alongside another (Tag Team cards, partner promos, etc.) — since matching is
@@ -115,7 +116,8 @@ index.html            markup; boots js/main.js as a module
 css/style.css         all styles (six palettes, fluid type scale)
 js/                   config, state (one shared `state` object), storage, main (boot + modes)
   api/                data: router, the TCGdex provider + data/ snapshot reader,
-                      Japanese cards (jp-source, jp-model, bulba-jp), image URLs, variants
+                      Japanese cards (jp-source, jp-model, bulba-jp), image URLs, variants,
+                      the Pokémon catalogue (species, species-model)
   ui/                 one module per mode and feature, plus DOM-free *-model.js halves
 data/                 the pre-built snapshot (committed, refreshed by CI)
 tools/                build scripts, the checker, research probes; tools/lib/ helpers
@@ -130,6 +132,8 @@ Start with `js/main.js` (boot, mode switching, the window handler manifest),
 **Data flow:**
 - EN cards: `data/cards/<slug>.json` shards → live TCGdex for any Pokémon they lack.
 - Set names, dates, symbols: `data/sets.json` → live TCGdex.
+- Pokémon catalogue and native names: `data/species.json` → the built-in 357 in
+  `js/config.js` (see "Pokémon catalogue" below).
 - Japanese cards: `data/jp-cat/` catalogue → Bulbapedia (`data/jp/` shards → live).
 - A user-triggered **Refresh** skips the snapshot and fetches EN cards and set data live.
 
@@ -144,6 +148,7 @@ can't be reassigned across files). The markup uses inline `onclick="fn()"` handl
 | `tools/build-data.mjs` (`npm run build-data`) | TCGdex, Bulbapedia, `data/prebuilt.json`, `data/jp-cat/` | `data/sets.json`, `data/index.json`, `data/cards/`, `data/jp/`, `tools/coverage-report.md` (local) | none |
 | `tools/build-jp-catalog.mjs` (`npm run build-jp-catalog`) | PokéWallet | `data/jp-cat/` (committed), `data/jp-catalog/` + report (local) | `POKEWALLET_IO_PROD_KEY` |
 | `tools/build-images.mjs` (`npm run build-images`) | `data/jp-catalog/`, PokéWallet | `img/`, `data/img-index.json` (committed) | `POKEWALLET_IO_PROD_KEY` |
+| `tools/build-species.mjs` (`npm run build-species`; one-off, per new generation) | PokéAPI | `data/species.json` | none |
 | `tools/check.mjs` | `js/`, `tools/` | — | none |
 | `tools/apitcg-probe.mjs`, `tools/pokewallet-probe.mjs`, `tools/jp-gap-size.mjs` | research probes; reports stay local | — | their own |
 
@@ -195,6 +200,32 @@ denominator most of a set's cards print (`001/011` → 11). Promo sets (`001/SV-
 numberless early sets have none and are counted as unchecked, as is any set whose card
 list request failed. TCG Pocket sets are left out. The report never changes `data/` and
 never fails the build.
+
+### Pokémon catalogue
+
+The add-Pokémon picker, the first-run modal, the True master set browser, the dashboard's
+"N of M" and the native names on placeholder tiles all read one list: every species from
+[PokéAPI](https://pokeapi.co/), built by `tools/build-species.mjs` into
+`data/species.json` (dex number, generation, English name, and the name in each language
+that differs from English; about 40 KB gzipped). Boot loads it onto `state`
+(`js/api/species.js`); if it takes over 1.5 s, the first screen uses the built-in list and
+the full one takes over when it arrives.
+
+It is a one-off, not part of the weekly job: rerun it when a new generation comes out.
+It needs no key. Each species' answer is kept in `tools/.cache/pokeapi/species/`
+(gitignored), so the first run costs ~1,026 requests and a rerun only fetches what is new;
+`--refresh` fetches everything again. If any species fails, nothing is written. English
+names are stored with a straight apostrophe ("Farfetch'd"), the way TCGdex spells them.
+
+```bash
+node tools/build-species.mjs              # fetch what the cache lacks, write data/species.json
+node tools/build-species.mjs --refresh    # fetch every species again
+```
+
+**Withdrawing it.** Delete `data/species.json` and drop PokéAPI from the footer. The app
+needs no change: without the file it falls back to the hand-picked 357 species in
+`POKEMON_CATALOG` and the demo Pokémon's names in `NATIVE_NAMES` (`js/config.js`). A
+Pokémon someone already tracks stays on their list either way.
 
 ### Japanese card catalogue
 
@@ -329,6 +360,7 @@ Card data and images come from:
 - [PokéWallet](https://pokewallet.io/) — the Japanese card list (every Japanese set; `data/jp-cat/`)
 - [Bulbapedia](https://bulbapedia.bulbagarden.net/) — Japanese card listings (fallback)
 - [Limitless TCG](https://limitlesstcg.com/) — Japanese card scans
+- [PokéAPI](https://pokeapi.co/) — the Pokémon catalogue and its names in other languages (`data/species.json`)
 
 This project is [MIT-licensed](LICENSE) and is not affiliated with, endorsed
 by, or sponsored by Nintendo, The Pokémon Company, or The Pokémon Company

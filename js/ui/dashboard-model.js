@@ -126,6 +126,16 @@ export function summarise({ msIds = [], tmsIds = [], setIds = [], pokemon = [], 
 }
 
 /**
+ * "3 of 1,025": the Pokémon tracked, against the catalogue the app can track. The
+ * catalogue is state.speciesCatalog, so the denominator is the full National Dex when
+ * data/species.json loaded and the built-in 357 when it did not.
+ */
+export function trackedOfCatalog(tracked = [], catalog = []) {
+  const n = x => x.toLocaleString('en-US');
+  return `${n(tracked.length)} of ${n(catalog.length)}`;
+}
+
+/**
  * Bar heights for the per-language breakdown, as percentages of the LARGEST language
  * rather than of the total: with English at 65 and everything else in single figures,
  * share-of-total bars are all invisible together.

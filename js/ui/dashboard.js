@@ -20,9 +20,8 @@
 // =============================================================================
 
 import { state, saveSetTarget } from '../state.js';
-import { POKEMON_CATALOG } from '../config.js';
 import { getSetMeta } from '../api/providers/snapshot.js';
-import { summarise, languageBars, plural, formatSetDate, expansionRows } from './dashboard-model.js';
+import { summarise, languageBars, plural, formatSetDate, expansionRows, trackedOfCatalog } from './dashboard-model.js';
 import { langColor } from './masterset.js';
 import { el } from './dom.js';
 
@@ -297,7 +296,7 @@ export function renderDashboard() {
     summary.append(
       // 'of N' where N is the catalogue this app can actually track. A bare "3" says
       // nothing; the pair says how much room is left.
-      stat('Pokémon tracked', `${sum.pokemon} of ${POKEMON_CATALOG.length}`),
+      stat('Pokémon tracked', trackedOfCatalog(state.pokemonList, state.speciesCatalog)),
       // 'Master set cards', not 'Cards owned': with three independent checklists a single
       // unqualified total would read as the whole collection while counting one third of
       // it. Each checklist's own number is on its own card below.

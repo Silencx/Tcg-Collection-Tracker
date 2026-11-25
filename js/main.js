@@ -43,6 +43,8 @@ import { renderDashboard } from './ui/dashboard.js';
 import { renderSetMode, changeSet, selectAllSet, resetSet, openSetName } from './ui/setmode.js';
 import { setPrintView, swapPrintView, syncPrintViewUI } from './ui/printview.js';
 import { migrateJpIdsOnBoot } from './ui/jp-migrate.js';
+import { loadSpecies } from './api/species.js';
+import { mergeNativeNames } from './api/species-model.js';
 
 // LOAD-BEARING: setPalette clears the previous theme with classList.remove(...PALETTES),
 // so a palette missing from this list can be added but never removed. It must stay in
@@ -362,10 +364,28 @@ function finishBoot() {
     '| pokémon:', state.pokemonList.join(', '));
 }
 
+// The full Pokémon catalogue and its native names (data/species.json, from PokéAPI)
+// replace the built-in lists on `state` before the first render reads them. Never
+// rejects: without the file the built-in 357 stay.
+let booted = false;
+const speciesReady = loadSpecies().then(sp => {
+  if (!sp) { console.info('[boot] data/species.json unavailable; using the built-in catalogue'); return; }
+  state.speciesCatalog = sp.catalog;
+  state.nativeNames = mergeNativeNames(state.nativeNames, sp.native);
+  // Late (see below): Home's "N of M" is already on screen, and redrawing it is cheap.
+  if (booted && state.appMode === 'dash') renderDashboard();
+});
+// Boot waits for it only so long: past that, the first paint uses the built-in lists and
+// the next render picks up the full ones.
+const SPECIES_WAIT_MS = 1500;
+
 // Japanese ticks move to the stable id format BEFORE the first render reads them. With no
 // old-format id stored this resolves at once, without a request; a failure must never
 // block the app, so boot finishes either way.
-migrateJpIdsOnBoot().catch(err => console.warn('[boot] JP id migration skipped:', err.message)).finally(finishBoot);
+Promise.all([
+  migrateJpIdsOnBoot().catch(err => console.warn('[boot] JP id migration skipped:', err.message)),
+  Promise.race([speciesReady, new Promise(r => setTimeout(r, SPECIES_WAIT_MS))]),
+]).finally(() => { booted = true; finishBoot(); });
 
 // ── GLOBAL HANDLERS (wiring manifest for inline onclick= in index.html) ───────
 // Anything the markup calls inline MUST appear here or the click will throw a

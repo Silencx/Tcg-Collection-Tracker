@@ -17,6 +17,7 @@ import {
   SETTARGETSTORE, SETCHKSTORE, SETPICKERSTORE,
   CHKPRINTSTORE, SETCHKPRINTSTORE, TMSPRINTSTORE, PRINTVIEWSTORE,
   BADGE_ORDER, DEFAULT_POKEMON, DEFAULT_MODE, DEFAULT_PRINT_VIEW, isValidPrintView,
+  POKEMON_CATALOG, NATIVE_NAMES,
 } from './config.js';
 import { prunePrints } from './ui/prints-model.js';
 
@@ -84,6 +85,12 @@ export const state = {
   tmsPrints:        new Set(),  // Set<printId>, True Master Set (beside `tmsIncluded`)
   // 'off' | 'chips' | 'tiles'. A shareable setting, like the language filters.
   printView:        (v => isValidPrintView(v) ? v : DEFAULT_PRINT_VIEW)(storage.get(PRINTVIEWSTORE)),
+
+  // — Pokémon catalogue, runtime only —
+  // The built-in lists until boot loads data/species.json (main.js), which replaces them
+  // with the full National Dex; they stay if the file is missing (api/species-model.js).
+  speciesCatalog:   POKEMON_CATALOG,   // [{name, dex, gen}], dex order
+  nativeNames:      NATIVE_NAMES,      // badge → {englishName: native name}
 
   // — Runtime only (never persisted) —
   _meta:            new Map(),  // cardId → render metadata
