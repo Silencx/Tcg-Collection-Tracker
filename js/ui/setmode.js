@@ -20,7 +20,7 @@
 // =============================================================================
 
 import { state, saveSetChk, saveSsPrints, saveSetTarget, saveSetPicker } from '../state.js';
-import { LANGUAGES, PLACEHOLDER_LANGS, NATIVE_NAMES } from '../config.js';
+import { LANGUAGES, PLACEHOLDER_LANGS } from '../config.js';
 import { router } from '../api/router.js';
 import { tcgdexAssetBase, tcgdexSerieSegment } from '../api/images.js';
 import {
@@ -296,7 +296,7 @@ function assetBaseFor(card, code) {
 function cardMeta(card, def) {
   const base = assetBaseFor(card, def.code || null);
   return {
-    name: { en: card.name, native: (NATIVE_NAMES[def.badge] || {})[card.species || card.name] || null },
+    name: { en: card.name, native: (state.nativeNames[def.badge] || {})[card.species || card.name] || null },
     setName: openSet?.name || state.ssTarget,
     num: `#${card.localId}`,
     lang: def.badge,
@@ -331,7 +331,7 @@ function cardTile(card, badge, color, code, pr = null) {
   if (pr) tile.setAttribute('aria-label', pr.label);
 
   const wrap = el('div', 'img-wrap');
-  const nat = (NATIVE_NAMES[badge] || {})[card.species || card.name] || null;
+  const nat = (state.nativeNames[badge] || {})[card.species || card.name] || null;
   // Placeholder first, image underneath — same ordering as mkImgWrap and the TMS popup,
   // so a language with no artwork shows a card-shaped stand-in rather than an empty box.
   const ph = mkPlaceholderEl(openSet?.symbol || null, badge, color, card.name, nat,

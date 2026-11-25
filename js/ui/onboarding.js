@@ -7,7 +7,7 @@
 // when POKESTORE has never been saved (a fresh browser — not a restored session/shared link, which
 // already persists its own Pokémon list via applySession's savePoke() call).
 //
-// Lets a first-time visitor search POKEMON_CATALOG and pick their own tracked
+// Lets a first-time visitor search the Pokémon catalogue (state.speciesCatalog) and pick their own tracked
 // Pokémon instead of silently loading the Seedot/Nuzleaf/Shiftry demo list.
 // "Try the demo" keeps DEFAULT_POKEMON. Either path saves via the normal
 // savePoke() — identical persistence to any other Pokémon-list edit.
@@ -18,7 +18,9 @@
 // =============================================================================
 
 import { state, savePoke } from '../state.js';
-import { DEFAULT_POKEMON, POKEMON_CATALOG } from '../config.js';
+import { DEFAULT_POKEMON } from '../config.js';
+import { searchSpecies } from '../api/species-model.js';
+import { escapeHtml } from './html.js';
 
 /**
  * Show the modal.
@@ -60,11 +62,11 @@ export function showFirstRunModal(onDone, onCancel) {
   const startBtn = overlay.querySelector('.first-run-start');
 
   function renderGrid() {
-    const q = search.value.trim().toLowerCase();
-    const matches = q ? POKEMON_CATALOG.filter(p => p.name.toLowerCase().includes(q)) : POKEMON_CATALOG;
+    // Names come from data/species.json, so they are escaped like any other data.
+    const matches = searchSpecies(state.speciesCatalog, search.value, { native: state.nativeNames });
     grid.innerHTML = matches.length ? matches.map(p => `
-      <div class="first-run-tile${selected.has(p.name) ? ' selected' : ''}" data-name="${p.name}">
-        <div class="first-run-tile-name">${p.name}</div>
+      <div class="first-run-tile${selected.has(p.name) ? ' selected' : ''}" data-name="${escapeHtml(p.name)}">
+        <div class="first-run-tile-name">${escapeHtml(p.name)}</div>
         <div class="first-run-tile-dex">#${p.dex}</div>
       </div>`).join('') : '<p class="first-run-empty">No matches.</p>';
   }

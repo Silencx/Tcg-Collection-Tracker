@@ -19,7 +19,8 @@
 // =============================================================================
 
 import { state, savePoke } from '../state.js';
-import { POKEMON_CATALOG, LANGUAGES, PLACEHOLDER_LANGS, BADGE_ORDER } from '../config.js';
+import { LANGUAGES, PLACEHOLDER_LANGS, BADGE_ORDER } from '../config.js';
+import { searchSpecies } from '../api/species-model.js';
 import { flagSvg } from './flags.js';
 import { escapeHtml } from './html.js';
 
@@ -90,7 +91,7 @@ function showModal({ title, sub, search, paint, foot }) {
 /**
  * Add / remove tracked Pokémon.
  *
- * EMPTY UNTIL YOU TYPE, deliberately. The catalogue is 357 entries; rendering all of
+ * EMPTY UNTIL YOU TYPE, deliberately. The catalogue is the whole National Dex; rendering all of
  * them on open buys a wall of names nobody scrolls and a visibly slow first paint, and
  * the thing you came here to do is name one Pokémon. The already-tracked ones ARE shown
  * straight away, because removing one is the other half of what this modal is for.
@@ -129,9 +130,8 @@ export function openPokemonPicker(onChange) {
         list.appendChild(hint('Type a name to add a Pokémon.'));
         return;
       }
-      const needle = q.toLowerCase();
-      const matches = POKEMON_CATALOG
-        .filter(p => p.name.toLowerCase().includes(needle) && !tracked.includes(p.name))
+      // English or native name, or a dex number (api/species-model.js).
+      const matches = searchSpecies(state.speciesCatalog, q, { native: state.nativeNames, exclude: tracked })
         .slice(0, 60);
       list.appendChild(sectionLabel(matches.length ? 'Add' : 'No matches'));
       if (!matches.length) return;

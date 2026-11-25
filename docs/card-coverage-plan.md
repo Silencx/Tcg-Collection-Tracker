@@ -69,17 +69,28 @@ Notes from building it:
 `POKEMON_CATALOG` in `js/config.js` is a hand-picked 357. Replace it with the full
 National Dex.
 
-- [ ] `tools/build-species.mjs`: one-off (rerun per new generation) import from PokéAPI
+- [x] `tools/build-species.mjs`: one-off (rerun per new generation) import from PokéAPI
   of every species: dex number, generation, and the species name in every language the
   app supports.
-- [ ] Write it to `data/species.json` (committed). Keep `POKEMON_CATALOG` as the fallback
+- [x] Write it to `data/species.json` (committed). Keep `POKEMON_CATALOG` as the fallback
   when the file is missing.
-- [ ] Use the localised names for placeholder tiles, so `NATIVE_NAMES` stops being
+- [x] Use the localised names for placeholder tiles, so `NATIVE_NAMES` stops being
   limited to the three demo Pokémon.
-- [ ] Update the "357" wording in the README, the dashboard and the TMS browser.
-- [ ] Tests: picker search, dashboard "N of M" count, fallback when the file is missing.
+- [x] Update the "357" wording in the README, the dashboard and the TMS browser.
+- [x] Tests: picker search, dashboard "N of M" count, fallback when the file is missing.
 
 Done when: any Pokémon can be picked, and placeholder tiles show its native name.
+
+Notes from building it:
+
+- PokéAPI's GraphQL endpoint answered 401 (2026-11-25), so the tool walks the REST API:
+  one list request plus one per species, cached locally so a rerun only fetches new ones.
+- Native names come from PokéAPI's ja-hrkt (katakana, as printed), ko, zh-hant, zh-hans,
+  de, fr, es and it; a name equal to the English one is not stored. It has no Thai names,
+  and its pt-br list is empty.
+- All 357 built-in names are in the file with the same spelling, so nobody's tracked list
+  changes. The built-in list had Garganacl as #962; it is #934 (fixed in the fallback).
+- Search also matches native names and dex numbers.
 
 ## Phase 3: Full English (and other language) card list from TCGdex
 

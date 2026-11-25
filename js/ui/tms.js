@@ -12,7 +12,7 @@ import {
   state, saveTms, saveTmsPrints, saveTmsFilter, saveTmsCache, removeTmsCache,
 } from '../state.js';
 import {
-  LANGUAGES, PLACEHOLDER_LANGS, NATIVE_NAMES, BADGE_ORDER, POKEMON_CATALOG,
+  LANGUAGES, PLACEHOLDER_LANGS, BADGE_ORDER,
 } from '../config.js';
 import {
   limitlessJpUrl, tcgdexAssetBase, tcgdexSymbolUrl, tcgdexSerieSegment,
@@ -24,6 +24,7 @@ import { getJpCards } from '../api/jp-source.js';
 import { jpImageKeyFor } from '../api/jp-model.js';
 import { langColor, mkPlaceholderEl, variantBadgesHtml } from './masterset.js';
 import { escapeHtml } from './html.js';
+import { searchSpecies, catalogGens } from '../api/species-model.js';
 import { openLanguagePicker, renderLangSummary } from './pickers.js';
 import {
   printsOf, tracksPrints, printId, applyPrint, applyCard, clearPrintsOf, printUnset, slotCount,
@@ -58,7 +59,7 @@ function tmsCountForPoke(pokeName){
 /**
  * pokeName → number of included cards, built in ONE pass over tmsIncluded.
  *
- * The grid render needs a count for each of up to 357 tiles, and
+ * The grid render needs a count for each of up to ~1,000 tiles, and
  * tmsCountForPoke walks the whole of tmsIncluded every time it is called — so
  * the render was O(tiles × includes). One shared map makes it O(tiles + includes).
  */
@@ -87,8 +88,10 @@ function renderTMS(){
   // Toolbar: gen filter + search
   const toolbar=document.createElement('div'); toolbar.className='tms-toolbar';
   const genDiv=document.createElement('div'); genDiv.className='tms-gen-filter';
-  [0,1,2,3,4,5,6,7,8,9].forEach((g,i)=>{
-    const lbl=['All','Gen 1','Gen 2','Gen 3','Gen 4','Gen 5','Gen 6','Gen 7','Gen 8','Gen 9'][i];
+  // One button per generation the catalogue holds, so a new generation in data/species.json
+  // gets its button without a code change.
+  [0,...catalogGens(state.speciesCatalog)].forEach(g=>{
+    const lbl=g?`Gen ${g}`:'All';
     const btn=document.createElement('button'); btn.className='tms-gen-btn'+(state.tmsGenFilter===g?' active':'');
     btn.textContent=lbl;
     btn.onclick=()=>{
@@ -105,7 +108,7 @@ function renderTMS(){
   // Grid-only re-render, debounced. This used to call renderTMS(), which wipes
   // #tms-app — destroying the very input being typed into, so focus and caret
   // were lost after each character and the field could not hold a whole word.
-  // 120ms is long enough that a fast typist filters the 357-tile catalog once
+  // 120ms is long enough that a fast typist filters the ~1,000-tile catalog once
   // instead of once per keystroke, short enough to still feel immediate.
   srch.oninput=e=>{
     const q=e.target.value.trim().toLowerCase();
@@ -141,11 +144,7 @@ function renderTmsGrid(){
   const grid=document.getElementById('tms-poke-grid'); if(!grid) return;
   grid.innerHTML='';
 
-  const filtered=POKEMON_CATALOG.filter(p=>{
-    if(state.tmsGenFilter!==0&&p.gen!==state.tmsGenFilter) return false;
-    if(state.tmsSearchQ&&!p.name.toLowerCase().includes(state.tmsSearchQ)) return false;
-    return true;
-  });
+  const filtered=searchSpecies(state.speciesCatalog,state.tmsSearchQ,{native:state.nativeNames,gen:state.tmsGenFilter});
   if(!filtered.length){
     const empty=document.createElement('div'); empty.className='tms-no-results';
     empty.textContent='No Pokémon match the current filter.'; grid.appendChild(empty);
@@ -367,7 +366,7 @@ function tmsPopupTile(c,pokeName,pr,chips){
   // immediately and let the image load underneath it, so a popup full of
   // missing-language prints never shows a grid of empty boxes while the 404s land.
   const wrap=document.createElement('div'); wrap.className='img-wrap';
-  const nat=(NATIVE_NAMES[c.lang]||{})[pokeName]||null;
+  const nat=(state.nativeNames[c.lang]||{})[pokeName]||null;
   const ph=mkPlaceholderEl(c.symSrc,c.lang,c.langColor,pokeName,nat,c.setName,c.localId);
   wrap.appendChild(ph);
   // Known-missing artwork is skipped without a request (img-cache.js), the same as

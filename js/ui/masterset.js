@@ -13,7 +13,7 @@ import {
   loadCache, saveCache, clearCardCache,
 } from '../state.js';
 import {
-  LANGUAGES, PLACEHOLDER_LANGS, NATIVE_NAMES, BADGE_ORDER, CACHE_TTL,
+  LANGUAGES, PLACEHOLDER_LANGS, BADGE_ORDER, CACHE_TTL,
 } from '../config.js';
 import { limitlessJpUrl, tcgdexAssetBase, tcgdexSymbolUrl } from '../api/images.js';
 import { router } from '../api/router.js';
@@ -414,7 +414,7 @@ function removePoke(name){
   onPokemonListChanged();
 }
 
-// No name normalization here: the picker only ever hands back a POKEMON_CATALOG entry,
+// No name normalization here: the picker only ever hands back a state.speciesCatalog entry,
 // which already carries the real casing ('Ho-Oh', 'Tapu Koko'). Title-casing a typed
 // name got those wrong, and the API then matched nothing.
 
@@ -562,7 +562,7 @@ function updCount(block,n){ const e=block.querySelector('.set-count'); if(e) e.t
 // never collapses), and leaving it unpositioned keeps `loading="lazy"` behaving exactly
 // as it did before this change. Overlaying the *image* instead would have altered the
 // layout of every lazy image in the grid — not worth the risk for the same visual result.
-// speciesName: the Pokémon this card was matched for. NATIVE_NAMES is keyed by
+// speciesName: the Pokémon this card was matched for. state.nativeNames is keyed by
 // species, while cardName is the real printed name ("Seedot & Nuzleaf-GX"), so
 // the two differ on cameo cards. Defaults to cardName for callers with no species.
 // A URL that has already 404'd/403'd is skipped WITHOUT a request (img-cache.js), so
@@ -571,7 +571,7 @@ function updCount(block,n){ const e=block.querySelector('.set-count'); if(e) e.t
 function mkImgWrap(loSrc,cardName,localId,enSetName,symSrc,badge,bColor,cardId,speciesName=cardName){
   const wrap=document.createElement('div');
   wrap.className='img-wrap';
-  const nat=(NATIVE_NAMES[badge]||{})[speciesName]||null;
+  const nat=(state.nativeNames[badge]||{})[speciesName]||null;
   const allSources=[loSrc].filter(Boolean);
 
   // Retry is only offered once every candidate has failed — otherwise the button would
@@ -800,7 +800,7 @@ function buildSetsMap(enCards, setNamesAll, setMeta = { dates: {}, symbols: {} }
     map.get(setId).cards.push({
       localId, series, setId,
       // name = the card's real printed name (shown, and grouped on);
-      // species = the Pokémon it was matched for (keys NATIVE_NAMES). Providers
+      // species = the Pokémon it was matched for (keys state.nativeNames). Providers
       // that don't distinguish the two fall back to name.
       name:card.name, species:card.species||card.name,
       // Checklist id, TCGdex format ("sv05-163").
@@ -876,16 +876,16 @@ function renderBySet(enCards, setNamesAll, container, setMeta = { dates: {}, sym
       const groups=[];
       byPokemon.forEach((cards,pokeName)=>{
         const groupStart=count;
-        // Pokémon name divider — all names inline. NATIVE_NAMES is keyed by
+        // Pokémon name divider — all names inline. state.nativeNames is keyed by
         // SPECIES while the divider shows the card's real printed name, so look
         // up via the species the provider matched ('Nuzleaf' for a card printed
         // 'Seedot & Nuzleaf-GX'), falling back to the displayed name for
         // providers that don't set it.
         const speciesKey=cards[0]?.species||pokeName;
         const altNames=[...new Set([
-          NATIVE_NAMES.JP?.[speciesKey],
-          NATIVE_NAMES.TW?.[speciesKey],
-          NATIVE_NAMES.KR?.[speciesKey],
+          state.nativeNames.JP?.[speciesKey],
+          state.nativeNames.TW?.[speciesKey],
+          state.nativeNames.KR?.[speciesKey],
         ].filter(Boolean))].join(' · ');
         const divider=document.createElement('div');
         divider.className='poke-divider';
@@ -901,7 +901,7 @@ function renderBySet(enCards, setNamesAll, container, setMeta = { dates: {}, sym
         grid.appendChild(divider);
 
         cards.forEach(card=>{
-          // NATIVE_NAMES is keyed by species, not by printed card name.
+          // state.nativeNames is keyed by species, not by printed card name.
           const spec=card.species||card.name;
           // Per-print tracking: the card's prints, once for all its language tiles (the
           // variant data is the EN card's, exactly as the footer badges already use it).
@@ -914,7 +914,7 @@ function renderBySet(enCards, setNamesAll, container, setMeta = { dates: {}, sym
             // TCGdex asset CDN for every language; a missing scan falls to the placeholder.
             const base=tcgdexAssetBase(langDef.code, card.series, card.setId, card.localId);
             const loSrc=`${base}/low.webp`, hiSrc=`${base}/high.webp`;
-            state._meta.set(id,{name:{en:card.name,native:(NATIVE_NAMES[langDef.badge]||{})[spec]||null},setName:si.enName,num:`#${card.localId}`,lang:langDef.badge,langColor:langDef.color,...imgMeta([loSrc],[hiSrc]),symSrc:si.symSrc,...pmeta});
+            state._meta.set(id,{name:{en:card.name,native:(state.nativeNames[langDef.badge]||{})[spec]||null},setName:si.enName,num:`#${card.localId}`,lang:langDef.badge,langColor:langDef.color,...imgMeta([loSrc],[hiSrc]),symSrc:si.symSrc,...pmeta});
             // hiSrc is not passed — mkImgWrap only renders the low-res tile; the high-res
             // candidate reaches the preview/print via _meta.hiSources above.
             const mkWrap=()=>mkImgWrap(loSrc,card.name,card.localId,si.enName,si.symSrc,langDef.badge,langDef.color,id,spec);
@@ -946,7 +946,7 @@ function renderBySet(enCards, setNamesAll, container, setMeta = { dates: {}, sym
           // Placeholder langs (KR, SC)
           for(const pl of PLACEHOLDER_LANGS){
             const id=`${pl.badge}_${card.id}`, isDone=state.checked.has(id);
-            const nat=(NATIVE_NAMES[pl.badge]||{})[spec]||null;
+            const nat=(state.nativeNames[pl.badge]||{})[spec]||null;
             state._meta.set(id,{name:{en:card.name,native:nat},setName:si.enName,num:`#${card.localId}`,lang:pl.badge,langColor:pl.color,...imgMeta([],[]),symSrc:si.symSrc});
             const el=document.createElement('div');
             el.className='card'+(isDone?' done':''); el.dataset.id=id; el.dataset.lang=pl.badge;
@@ -1204,7 +1204,7 @@ async function fetchAndInjectJPCards(container){
     const groups=[];   // per-group tile counts — see setGridHeightHint
     byPokemon.forEach((cards,enName)=>{
       const groupStart=count;
-      const jpNat=NATIVE_NAMES.JP?.[enName]||'';
+      const jpNat=state.nativeNames.JP?.[enName]||'';
       const divider=document.createElement('div'); divider.className='poke-divider';
       // Nodes, not markup — enName comes from Bulbapedia wikitext.
       divider.appendChild(document.createTextNode(enName));
@@ -1225,7 +1225,7 @@ async function fetchAndInjectJPCards(container){
         const limitless=jpnum?limitlessJpUrl(si.code,jpnum):null;
         const imgKey=jpImageKeyFor(setKey,numKey);
         const loList=[limitless,localImage(imgKey,'low')], hiList=[limitless,localImage(imgKey,'high')];
-        const jpNatName=NATIVE_NAMES.JP?.[enName]||null;
+        const jpNatName=state.nativeNames.JP?.[enName]||null;
 
         state._meta.set(id,{
           name:{en:cardName||enName,native:jpNatName},

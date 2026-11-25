@@ -26,7 +26,6 @@
 // =============================================================================
 
 import { state } from '../state.js';
-import { NATIVE_NAMES } from '../config.js';
 import { buildPlaceholderHTML } from './masterset.js';
 import { imgMeta, metaSources } from '../api/img-cache.js';
 import { setModeMetas, openSetName } from './setmode.js';
@@ -257,7 +256,7 @@ function tmsMetas() {
     const pc = state.tmsPokeCache.get(poke);    if (!pc) return;
     const c = pc.find(x => x.id === id);        if (!c) return;
     const m = {
-      name: { en: poke, native: (NATIVE_NAMES[c.lang] || {})[poke] || null },
+      name: { en: poke, native: (state.nativeNames[c.lang] || {})[poke] || null },
       setName: c.setName, num: `#${c.localId}`, lang: c.lang, langColor: c.langColor,
       symSrc: c.symSrc, ...imgMeta([c.imgSrc], [c.hiSrc]),
     };

@@ -132,7 +132,9 @@ export const PLACEHOLDER_LANGS = [
 ];
 
 // ── NATIVE POKéMON NAMES (for missing-image placeholder cards) ────────────────
-// Hand-maintained, and covers only the demo Pokémon. Readers fall back to the English
+// The FALLBACK: the app reads state.nativeNames, which boot fills from data/species.json
+// (every species, from PokéAPI; js/api/species-model.js). This hand-made table covers only
+// the demo Pokémon and is what stays when that file is missing. Readers fall back to the English
 // name for anything missing. No TH table: TCGdex has no Thai card names. No ID table:
 // Indonesian cards use the English Pokémon names.
 export const NATIVE_NAMES = {
@@ -157,8 +159,9 @@ export const ERA_MAP = {
 };
 
 // ── POKéMON CATALOGUE (Gen 1–9, dex# + gen) ───────────────────────────────────
-// THE catalogue: the add-Pokémon picker, the first-run modal, the TMS browser and the
-// dashboard's "N of 357" all draw on it. A popular subset, not the full National Dex.
+// The FALLBACK catalogue: the add-Pokémon picker, the first-run modal, the TMS browser and the
+// dashboard's "N of M" read state.speciesCatalog, which boot fills from data/species.json
+// (the full National Dex). This hand-picked subset of 357 is what stays without that file.
 export const POKEMON_CATALOG = [
   // Gen 1
   {name:'Bulbasaur',dex:1,gen:1},{name:'Ivysaur',dex:2,gen:1},{name:'Venusaur',dex:3,gen:1},
@@ -317,7 +320,7 @@ export const POKEMON_CATALOG = [
   {name:'Fuecoco',dex:909,gen:9},{name:'Crocalor',dex:910,gen:9},{name:'Skeledirge',dex:911,gen:9},
   {name:'Quaxly',dex:912,gen:9},{name:'Quaxwell',dex:913,gen:9},{name:'Quaquaval',dex:914,gen:9},
   {name:'Pawmot',dex:923,gen:9},
-  {name:'Garganacl',dex:962,gen:9},
+  {name:'Garganacl',dex:934,gen:9},
   {name:'Armarouge',dex:936,gen:9},{name:'Ceruledge',dex:937,gen:9},
   {name:'Annihilape',dex:979,gen:9},
   {name:'Gholdengo',dex:1000,gen:9},
