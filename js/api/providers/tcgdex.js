@@ -250,6 +250,10 @@ export async function getCards(names, { signal, withVariants = true, setSeries =
  *   map and the per-language series lists the single-set picker groups by. 116 requests,
  *   so it is on by default for the build and off for the browser, which reads them from
  *   the committed snapshot.
+ * @param {(langCode:string, setId:string, set:object)=>void} [opts.onDetail] called with
+ *   every /sets/{id} answer the sweep below reads, so the build can use the card lists it
+ *   already paid for (tools/lib/coverage.mjs) without a second sweep. Nothing it returns
+ *   or throws reaches the result.
  * @returns {Promise<{names,dates,symbols,logos,counts,setSeries,series,lang}>}
  *   names:     { langCode: { setId: localizedName } }
  *   dates:     { setId: 'YYYY-MM-DD' }                — release dates (drives set/era sort)
@@ -269,7 +273,7 @@ export async function getCards(names, { signal, withVariants = true, setSeries =
  * go in `lang` as sparse overrides rather than duplicating all five maps nine times
  * (measured: 88 KB this way, 275 KB duplicated, on a file fetched every boot).
  */
-export async function getSetMeta({ signal, setIds = [], allEnSets = false, withSeries = true } = {}) {
+export async function getSetMeta({ signal, setIds = [], allEnSets = false, withSeries = true, onDetail } = {}) {
   const eligible = LANGUAGES.filter(l => l.hasSetsApi && l.apiCode);
   const results = await Promise.allSettled(
     eligible.map(l => getJSON(`${API}/${l.apiCode}/sets`, signal).then(s => ({ l, s })))
@@ -343,6 +347,7 @@ export async function getSetMeta({ signal, setIds = [], allEnSets = false, withS
     await pooledForEach(need, DETAIL_CONCURRENCY, async id => {
       try {
         const s = await getJSON(`${API}/${l.apiCode}/sets/${id}`, signal);
+        try { onDetail?.(l.code, id, s); } catch { /* a caller's hook never costs the meta */ }
         // First writer wins, and EN sweeps first, so the flat map holds EN's value for
         // every id English has. A later language that DISAGREES records an override
         // rather than overwriting — that is the whole invariant this shape rests on.

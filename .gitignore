@@ -35,6 +35,9 @@ tools/pokewallet-probe-images/
 tools/jp-gap-size-report.md
 tools/jp-gap-size.json
 
+# Coverage gap table written by tools/build-data.mjs (its summary is in the build log).
+tools/coverage-report.md
+
 # Hosted card images (img/ + data/img-index.json, tools/build-images.mjs) ARE committed:
 # GitHub Pages serves them. To withdraw them, see README "Hosted card images".
 #

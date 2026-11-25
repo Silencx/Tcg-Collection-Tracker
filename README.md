@@ -141,7 +141,7 @@ can't be reassigned across files). The markup uses inline `onclick="fn()"` handl
 
 | Script | Reads | Writes | Key |
 |---|---|---|---|
-| `tools/build-data.mjs` (`npm run build-data`) | TCGdex, Bulbapedia, `data/prebuilt.json` | `data/sets.json`, `data/index.json`, `data/cards/`, `data/jp/` | none |
+| `tools/build-data.mjs` (`npm run build-data`) | TCGdex, Bulbapedia, `data/prebuilt.json`, `data/jp-cat/` | `data/sets.json`, `data/index.json`, `data/cards/`, `data/jp/`, `tools/coverage-report.md` (local) | none |
 | `tools/build-jp-catalog.mjs` (`npm run build-jp-catalog`) | PokéWallet | `data/jp-cat/` (committed), `data/jp-catalog/` + report (local) | `POKEWALLET_IO_PROD_KEY` |
 | `tools/build-images.mjs` (`npm run build-images`) | `data/jp-catalog/`, PokéWallet | `img/`, `data/img-index.json` (committed) | `POKEWALLET_IO_PROD_KEY` |
 | `tools/check.mjs` | `js/`, `tools/` | — | none |
@@ -165,6 +165,36 @@ per-Pokémon, so for three Pokémon where two are pre-built only the third is fe
   id: always go through `tcgdexSerieSegment` in `js/api/images.js`.
 - Sets in `DIGITAL_SERIES` (`js/config.js`; TCG Pocket) are left out of the single-set
   picker.
+
+### Coverage report
+
+`build-data` ends by naming every set, per language, where the card list we serve is
+shorter than the set (`tools/lib/coverage.mjs`). It costs no requests: it reuses the card
+list of every set in every language that the set sweep already reads, plus the committed
+Japanese catalogue. The summary goes to the build log (the Monday run in **Actions**), one
+line per language, `-N` for cards missing and `+N` for duplicates:
+
+```
+[coverage]   de: 13 set(s), 491 card(s) missing — basep -29, bw11 -9, …
+```
+
+The full table, with the missing numbers, is written to `tools/coverage-report.md`, which
+stays local. Three kinds of gap:
+
+- **Missing**: a number from 1 to the set's official size has no card. The run is
+  checked number by number, so a secret rare above the official size never hides a hole.
+  A set TCGdex lists with no cards at all misses every number.
+- **Short**: the official run is complete, but another language lists more cards for the
+  same set (usually secret rares). TCGdex's own "total" is the number of cards it holds
+  in that language, not a printed figure, so a set's total is the most cards any
+  language lists for it.
+- **Duplicate**: one number listed twice (`001` and `1`), or more cards than the total.
+
+Japanese sets have no official size from PokéWallet, so it is read off the cards: the
+denominator most of a set's cards print (`001/011` → 11). Promo sets (`001/SV-P`) and the
+numberless early sets have none and are counted as unchecked, as is any set whose card
+list request failed. TCG Pocket sets are left out. The report never changes `data/` and
+never fails the build.
 
 ### Japanese card catalogue
 
@@ -287,6 +317,8 @@ coverage means adding Pokémon to the pre-built list.
 
 - [`docs/design-language.md`](docs/design-language.md) — this app's visual language,
   compared with DexTCG's, and where the gaps are worth closing.
+- [`docs/card-coverage-plan.md`](docs/card-coverage-plan.md) — the phased plan for
+  listing every card that exists; each phase is ticked off in the PR that does it.
 
 ---
 
