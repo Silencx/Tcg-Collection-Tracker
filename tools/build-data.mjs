@@ -8,6 +8,8 @@
 //   data/cards/<slug>.json  one EN card shard per Pokémon
 //   data/jp/<slug>.json     one Bulbapedia JP shard per Pokémon
 //   data/index.json         exact Pokémon name → shard filename
+// and ends with a coverage summary in the log — every set, per language, where we list
+// fewer cards than the set has — plus the full table in tools/coverage-report.md (local).
 // The app reads these first (instant, no rate limits, any number of users) and only
 // hits the live API for what they lack or on a user-triggered refresh.
 //
@@ -19,18 +21,21 @@
 // list, and committing it would drop every other Pokémon's shards from the snapshot.
 // =============================================================================
 
-import { writeFileSync, mkdirSync, existsSync, readFileSync } from 'node:fs';
+import { writeFileSync, mkdirSync, existsSync, readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
-import { DEFAULT_POKEMON, SCHEMA_VERSION } from '../js/config.js';
+import { DEFAULT_POKEMON, SCHEMA_VERSION, DIGITAL_SERIES } from '../js/config.js';
 import { getCards, getSetMeta } from '../js/api/providers/tcgdex.js';
 import { fetchJpRawByName } from '../js/api/bulba-jp.js';
 import { uniqueSlug } from '../js/slug.js';
 import { planJpSnapshot } from './lib/jp-keep.mjs';
 import { stampBuiltAt } from './lib/built-at.mjs';
+import { findGaps, tcgdexEntries, jpEntries, summaryLines, reportMarkdown } from './lib/coverage.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const DATA_DIR = resolve(ROOT, 'data');
+// Local only (gitignored): the full gap table behind the build log's coverage summary.
+const COVERAGE_REPORT = resolve(ROOT, 'tools', 'coverage-report.md');
 
 // Which Pokémon to build.
 //   1. data/prebuilt.json — the checked-in list the weekly job builds, which is how
@@ -77,7 +82,16 @@ async function main() {
   // to ~200 pooled detail calls, the slowest thing in the boot path. One bounded weekly
   // cost here removes it for everybody, pre-built Pokémon or not.
   console.log('[build-data] fetching set metadata from TCGdex (all EN sets)…');
-  const meta = await getSetMeta({ allEnSets: true, withSeries: true });
+  // The sweep reads every set's card list in every language for its date; keep the card
+  // numbers for the coverage report at the end. A set whose request failed is absent.
+  const setNumbers = {};
+  const meta = await getSetMeta({
+    allEnSets: true, withSeries: true,
+    onDetail: (lang, id, s) => {
+      if (!Array.isArray(s?.cards)) return;
+      (setNumbers[lang] ||= {})[id] = s.cards.map(c => String(c?.localId ?? String(c?.id ?? '').split('-').pop()));
+    },
+  });
   const langCount = Object.keys(meta.names || {}).length;
   const nameCount = Object.keys(meta.names?.en || {}).length;
   const allIds = new Set(Object.values(meta.names || {}).flatMap(m => Object.keys(m)));
@@ -240,6 +254,38 @@ async function main() {
     console.warn(`[build-data] ! JP data NOT refreshed for ${jpKept.length}/${POKEMON.length} ` +
       `Pokémon (${jpKept.join(', ')}); committed copies kept — see the JP warnings above`);
   }
+
+  reportCoverage(meta, setNumbers, builtAt);
+}
+
+// ── COVERAGE ──
+// Every set we list fewer cards for than the set has, per language (tools/lib/coverage.mjs):
+// TCGdex's card lists from the sweep above, and the committed Japanese catalogue. Reporting
+// only, after everything is written: it never changes data/ and never fails the build.
+function reportCoverage(meta, setNumbers, builtAt) {
+  try {
+    const entries = tcgdexEntries(meta, setNumbers, { skip: id => DIGITAL_SERIES.has(meta.setSeries?.[id]) });
+    const jp = readJpCatalogue();
+    if (jp) entries.push(...jpEntries(jp.sets, jp.rows));
+    else console.log('[coverage] no Japanese catalogue in data/jp-cat/; Japanese sets not checked');
+    const result = findGaps(entries);
+    for (const line of summaryLines(result)) console.log(line);
+    writeFileSync(COVERAGE_REPORT, reportMarkdown(result, { builtAt }));
+    console.log('[coverage] full table: tools/coverage-report.md (local only)');
+  } catch (e) {
+    console.warn(`[coverage] ! report failed (${e.message}); the data above is unaffected`);
+  }
+}
+
+/** data/jp-cat/ as {sets, rows}, or null when it is missing or unreadable. */
+function readJpCatalogue() {
+  const sets = readJSON('jp-cat/sets.json')?.sets;
+  if (!Array.isArray(sets)) return null;
+  const rows = [];
+  for (const f of readdirSync(resolve(DATA_DIR, 'jp-cat'))) {
+    if (/^cards-.+\.json$/.test(f)) rows.push(...(readJSON(`jp-cat/${f}`)?.rows || []));
+  }
+  return { sets, rows };
 }
 
 main().catch((err) => {
