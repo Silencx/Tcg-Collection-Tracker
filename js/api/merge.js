@@ -49,7 +49,7 @@ export function mergeCardSets(names, lists) {
 }
 
 // Provider strength, weakest last.
-const SOURCE_RANK = { snapshot: 0, tcgdex: 1 };
+const SOURCE_RANK = { catalogue: 0, snapshot: 0, tcgdex: 1 };
 
 /**
  * The weakest provider that actually contributed.

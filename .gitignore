@@ -31,6 +31,7 @@ npm-debug.log*
 # to republish it) — keep it local (tools/*-probe.mjs, tools/jp-gap-size.mjs).
 tools/apitcg-probe-report.md
 tools/pokewallet-probe-report.md
+tools/tcgdex-catalog-probe-report.md
 tools/pokewallet-probe-images/
 tools/jp-gap-size-report.md
 tools/jp-gap-size.json

@@ -97,26 +97,56 @@ Notes from building it:
 Same pattern as `data/jp-cat/`, so the app stops depending on one name search per
 Pokémon.
 
-- [ ] VERIFY: does `GET /v2/en/cards` with no filter return the short list of every card
+- [x] VERIFY: does `GET /v2/en/cards` with no filter return the short list of every card
   in one answer? If yes, use it; if no, walk `/v2/{lang}/sets` then `/v2/{lang}/sets/{id}`
   (about 200 requests per language, keyless).
-- [ ] `tools/build-catalog.mjs` writes `data/cat/{lang}/cards-{a-z,0}.json` (split by
+- [x] `tools/build-catalog.mjs` writes `data/cat/{lang}/cards-{a-z,0}.json` (split by
   first letter, like `jp-cat`): id, set id, local number, name, category (Pokémon /
   Trainer / Energy).
-- [ ] Languages: en first, then de, fr, es, it, pt, zh-Hant, th, id (their set lists
+- [x] Languages: en first, then de, fr, es, it, pt, zh-Hant, th, id (their set lists
   differ).
-- [ ] Router: catalogue first, then the existing per-Pokémon shards, then live TCGdex.
+- [x] Router: catalogue first, then the existing per-Pokémon shards, then live TCGdex.
   Print variants still come from the existing GraphQL step.
-- [ ] Single-set mode can read its card list from the catalogue instead of always going
+- [x] Single-set mode can read its card list from the catalogue instead of always going
   live.
-- [ ] With the catalogue in place, the 60-Pokémon cap in `refresh-data.yml` only limits
+- [x] With the catalogue in place, the 60-Pokémon cap in `refresh-data.yml` only limits
   variant shards; update its comment and the README.
-- [ ] Hook it into the weekly workflow; byte-for-byte unchanged files; size check in the
+- [x] Hook it into the weekly workflow; byte-for-byte unchanged files; size check in the
   build log.
-- [ ] Tests: catalogue reader, router order, a missing catalogue falls back cleanly.
+- [x] Tests: catalogue reader, router order, a missing catalogue falls back cleanly.
 
 Done when: a Pokémon that isn't pre-built shows its full English list without a live
 name search.
+
+Notes from building it:
+
+- VERIFY held (2026-11-25, `tools/tcgdex-catalog-probe.mjs`): `/{lang}/cards` answers with
+  every card in one request in all nine languages (English: 23,912 cards, 2.3 MB, 0.6 s).
+  In English and Traditional Chinese it matched a full set walk card for card; in German
+  it has 262 cards more than the walk, from sets missing from `/de/sets` (POP Series,
+  McDonald's Collections, EX trainer kits), which are kept. List items carry no category, and the
+  `?category=` filter takes the language's own word (`Dresseur`, `Energía`), so the build
+  reads `/{lang}/categories` first: five requests a language. GraphQL refuses a `cards`
+  query with no filter.
+- Rows are `[set, number, name, category]`, plus a trailing `0` for a card TCGdex lists
+  without a scan (`/{lang}/cards` gives an `image` exactly where a set listing does:
+  2,146 of 7,436 zh-tw cards, 1,224 of 2,921 th, 1,152 of 2,788 id, 1,781 of 23,912 en),
+  so single-set mode's catalogue fallback requests the same scans as its live path. The
+  id is always `{set}-{number}` and the image address is always rebuilt from
+  `data/sets.json`'s series map (both checked on every card in every language), so
+  neither is stored. Category is one letter.
+- Matching uses the live search's own whole-word rule, and the shard a Pokémon is looked
+  up in always holds its cards (tested on every species). Against the live name search
+  for 20 awkward names (Mew, Nidoran♀, Farfetch'd, Ho-Oh, Porygon-Z, Type: Null, …) the
+  catalogue gave the same cards, names and image addresses; across all 1,025 species it
+  agreed with a scan of every card.
+- Single-set mode asks TCGdex first and uses the catalogue only when that fails: TCGdex
+  answers a set in one request with print badges, where the catalogue means loading all
+  of a language's shards.
+- Images for Traditional Chinese live under TCGdex's `zh-tw` folder, not `zh-Hant`
+  (`/zh-tw/SV/SV1S/001` is a 200, `/zh-Hant/…` a 404), so the catalogue builds them with
+  the API code, through `js/api/card-image-model.js` (added by the TW/TH/ID image fix,
+  #15, which moved the app's other TW image paths to `zh-tw`).
 
 ## Phase 4: Match by Pokédex number, not by name
 

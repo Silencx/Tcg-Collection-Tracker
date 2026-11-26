@@ -121,10 +121,11 @@ index.html            markup; boots js/main.js as a module
 css/style.css         all styles (six palettes, fluid type scale)
 js/                   config, state (one shared `state` object), storage, main (boot + modes)
   api/                data: router, the TCGdex provider + data/ snapshot reader,
+                      the TCGdex card catalogue (catalog, catalog-model),
                       Japanese cards (jp-source, jp-model, bulba-jp), image URLs, variants,
                       the Pokémon catalogue (species, species-model)
   ui/                 one module per mode and feature, plus DOM-free *-model.js halves
-data/                 the pre-built snapshot (committed, refreshed by CI)
+data/                 the pre-built snapshot and catalogues (committed, refreshed by CI)
 tools/                build scripts, the checker, research probes; tools/lib/ helpers
 tests/                node:test suites — pure logic, plus source scans for invariants
 docs/                 design notes
@@ -135,12 +136,15 @@ Start with `js/main.js` (boot, mode switching, the window handler manifest),
 `js/api/router.js` (where data comes from) and `js/ui/masterset.js` (the main grid).
 
 **Data flow:**
-- EN cards: `data/cards/<slug>.json` shards → live TCGdex for any Pokémon they lack.
+- EN cards: `data/cat/en/` catalogue → `data/cards/<slug>.json` shards → live TCGdex.
+  Print variants: the Pokémon's shard, else one live TCGdex GraphQL request.
+- Single set: live TCGdex → `data/cat/{lang}/` catalogue when TCGdex is down.
 - Set names, dates, symbols: `data/sets.json` → live TCGdex.
 - Pokémon catalogue and native names: `data/species.json` → the built-in 357 in
   `js/config.js` (see "Pokémon catalogue" below).
 - Japanese cards: `data/jp-cat/` catalogue → Bulbapedia (`data/jp/` shards → live).
-- A user-triggered **Refresh** skips the snapshot and fetches EN cards and set data live.
+- A user-triggered **Refresh** skips the catalogue and snapshot and fetches EN cards and
+  set data live.
 
 **State:** all app state lives on one exported `state` object (ES module bindings
 can't be reassigned across files). The markup uses inline `onclick="fn()"` handlers;
@@ -153,17 +157,20 @@ can't be reassigned across files). The markup uses inline `onclick="fn()"` handl
 | `tools/build-data.mjs` (`npm run build-data`) | TCGdex, Bulbapedia, `data/prebuilt.json`, `data/jp-cat/` | `data/sets.json`, `data/index.json`, `data/cards/`, `data/jp/`, `tools/coverage-report.md` (local) | none |
 | `tools/build-jp-catalog.mjs` (`npm run build-jp-catalog`) | PokéWallet | `data/jp-cat/` (committed), `data/jp-catalog/` + report (local) | `POKEWALLET_IO_PROD_KEY` |
 | `tools/build-images.mjs` (`npm run build-images`) | `data/jp-catalog/`, PokéWallet | `img/`, `data/img-index.json` (committed) | `POKEWALLET_IO_PROD_KEY` |
+| `tools/build-catalog.mjs` (`npm run build-catalog`) | TCGdex | `data/cat/` | none |
 | `tools/build-species.mjs` (`npm run build-species`; one-off, per new generation) | PokéAPI | `data/species.json` | none |
 | `tools/check.mjs` | `js/`, `tools/` | — | none |
-| `tools/apitcg-probe.mjs`, `tools/pokewallet-probe.mjs`, `tools/jp-gap-size.mjs` | research probes; reports stay local | — | their own |
+| `tools/apitcg-probe.mjs`, `tools/pokewallet-probe.mjs`, `tools/tcgdex-catalog-probe.mjs`, `tools/jp-gap-size.mjs` | research probes; reports stay local | — | their own |
 
-`.github/workflows/refresh-data.yml` runs build-data, build-jp-catalog and build-images
-every Monday, and the two PokéWallet steps alone on the other days (see "Daily
-refresh" below); it commits `data/` and `img/` when they changed. Run it by hand from
-the **Actions** tab to widen coverage: its
-`add` input appends Pokémon to `data/prebuilt.json`, so the next scheduled run keeps
-them. A visitor tracking pre-built Pokémon makes zero API calls; coverage is
-per-Pokémon, so for three Pokémon where two are pre-built only the third is fetched live.
+`.github/workflows/refresh-data.yml` runs build-data, build-catalog, build-jp-catalog and
+build-images every Monday, and the two PokéWallet steps alone on the other days (see
+"Daily refresh" below); it commits `data/` and `img/` when they changed. Every
+Pokémon's card list comes from the catalogue (see "Card catalogue" below). A pre-built
+Pokémon (`data/prebuilt.json`, at most 60) also has its print variants and its
+Bulbapedia Japanese rows baked in, so a visitor tracking only pre-built Pokémon makes zero
+API calls, and any other Pokémon costs one GraphQL request for its print badges. Run the
+workflow by hand from the **Actions** tab to pre-build more: its `add` input appends
+Pokémon to `data/prebuilt.json`, so the next scheduled run keeps them.
 
 - A data file whose contents did not change is written back byte for byte, `builtAt`
   included (`tools/lib/built-at.mjs`), and card lists are sorted by id, so a week with
@@ -205,6 +212,54 @@ denominator most of a set's cards print (`001/011` → 11). Promo sets (`001/SV-
 numberless early sets have none and are counted as unchecked, as is any set whose card
 list request failed. TCG Pocket sets are left out. The report never changes `data/` and
 never fails the build.
+
+### Card catalogue
+
+Every card TCGdex lists, in all nine languages it covers, is committed as a catalogue
+built by `tools/build-catalog.mjs`:
+
+```
+data/cat/index.json                  # which languages, how many cards, which shards
+data/cat/{lang}/cards-{a-z,0}.json   # [set, number, name, category, 0?], split by name letter
+```
+
+About 126,000 cards and 5 MB in all; English is 23,900 cards in 869 KB, and no shard is
+over 100 KB before gzip except the one `cards-0.json` of Traditional Chinese (247 KB) and
+of Thai (146 KB). A card is filed under the first letter of every word in its name, as in
+`data/jp-cat/`, so the master set loads one shard per Pokémon; a name with no Latin letter
+goes in `cards-0.json`. The card id is always `{set}-{number}` and the image address is
+rebuilt from `data/sets.json`, so neither is stored. Category is `P`, `T` or `E`
+(Pokémon, Trainer, Energy). A trailing `0` marks a card TCGdex lists without a scan, which
+is about two thirds of the Traditional Chinese, Thai and Indonesian cards.
+
+- **Master set and the True master set popup** read the English catalogue first
+  (`js/api/catalog.js`), so any Pokémon gets its full list without a live name search,
+  matched by the same whole-word rule as the live search. Print badges come from the
+  Pokémon's pre-built shard if it has one, else from one TCGdex GraphQL request; if that
+  fails, the cards still show, without badges.
+- **Single set** still asks TCGdex first: that is one request and brings print badges,
+  where the catalogue would load every shard of the language. When TCGdex is down, the set
+  is listed from the catalogue, with its name, date and count from `data/sets.json`, and
+  scans are requested for the same cards as when TCGdex answers.
+- **Refresh** skips the catalogue and searches TCGdex live, which is how a card added
+  since Monday shows up.
+
+The build needs no key: per language, `/{lang}/cards` (the whole list in one answer),
+`/{lang}/categories`, and the list once per category, because list items carry none.
+That is 45 requests, about 5 seconds, every Monday. A language is replaced only by a
+complete answer: one that fails, or lost more than a tenth of its cards, keeps its
+committed files (`--force` accepts the drop). The log prints each language's cards, sets,
+size and largest shard.
+
+```bash
+npm run build-catalog                 # every language
+node tools/build-catalog.mjs en de    # just these
+```
+
+**Withdrawing it.** Delete `data/cat/` and the "Build card catalogue" workflow step.
+TCGdex stays credited in the footer for its other data. The app needs no change: without
+`data/cat/index.json` the router goes back to the per-Pokémon shards and live TCGdex, and
+single-set mode simply has no fallback.
 
 ### Pokémon catalogue
 
@@ -346,8 +401,9 @@ scripts skip their API steps and exit cleanly, so a fork's refresh job still suc
 3. The site serves at `https://<user>.github.io/<repo>/`.
 
 Everything is static; the only "backend" is the scheduled Action that refreshes
-`data/` and `img/`. Visitors cannot add to that cache — Pages accepts no writes, so wider
-coverage means adding Pokémon to the pre-built list.
+`data/` and `img/`. Visitors cannot add to that cache — Pages accepts no writes. The card
+catalogue already lists every Pokémon; adding one to the pre-built list only bakes in its
+print badges and Bulbapedia Japanese rows.
 
 ### Docs
 
@@ -361,7 +417,7 @@ coverage means adding Pokémon to the pre-built list.
 ## Credits
 
 Card data and images come from:
-- [TCGdex](https://www.tcgdex.net/) — primary card index, set metadata, print variants, and images
+- [TCGdex](https://www.tcgdex.net/) — primary card index and the card catalogue (`data/cat/`), set metadata, print variants, and images
 - [PokéWallet](https://pokewallet.io/) — the Japanese card list (every Japanese set; `data/jp-cat/`)
 - [Bulbapedia](https://bulbapedia.bulbagarden.net/) — Japanese card listings (fallback)
 - [Limitless TCG](https://limitlesstcg.com/) — Japanese card scans

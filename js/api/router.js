@@ -1,9 +1,10 @@
 // =============================================================================
 // api/router.js — provider failover.
 //
-//   Master card index    : snapshot shards → TCGdex EN (no further fallback)
+//   Master card index    : catalogue (data/cat/) → snapshot shards → TCGdex EN.
+//                          Print variants: snapshot shards, then TCGdex GraphQL.
 //   Set names/dates/syms : snapshot → TCGdex
-//   Set cards (one set)  : TCGdex
+//   Set cards (one set)  : TCGdex → catalogue
 //   JA raw rows          : snapshot shards → live Bulbapedia. The app reads Japanese
 //                          cards through api/jp-source.js, which tries the PokéWallet
 //                          catalogue first and only then comes here.
@@ -19,8 +20,11 @@
 
 import { tcgdex } from './providers/tcgdex.js';
 import { snapshot } from './providers/snapshot.js';
+import { getCatalogCards, getCatalogSetCards } from './catalog.js';
+import { catalogSetInfo } from './catalog-model.js';
 import * as bulbaJp from './bulba-jp.js';
 import { mergeCardSets, mergeSource } from './merge.js';
+import { LANGUAGES } from '../config.js';
 
 const TIMEOUT_MS = 8000;
 
@@ -56,18 +60,55 @@ async function liveCards(names) {
 }
 
 /**
+ * The catalogue's answer for `names` (data/cat/: every English card, any Pokémon), with
+ * print variants added — from the per-Pokémon shards where a Pokémon is pre-built, from
+ * TCGdex GraphQL for the rest. The variants are best effort: a slow or failed answer
+ * costs the badges, never the list. null when there is no catalogue, or it has no card
+ * of any of these Pokémon; the caller then goes on as if it did not exist.
+ */
+async function catalogueCards(names) {
+  const { setSeries } = await snapshot.getSeries();
+  const cat = await getCatalogCards(names, { setSeries }).catch(() => null);
+  if (!cat?.cards.length) return null;
+
+  let shardHit = null;
+  try { shardHit = await snapshot.getCardsPartial(names); } catch { /* none pre-built */ }
+  const prebuilt = new Map((shardHit?.cards || []).map(c => [c.id, c]));
+  for (const c of cat.cards) {
+    const v = prebuilt.get(c.id)?.variants;
+    if (v) c.variants = v;
+  }
+  // A pre-built card the catalogue lacks (the two are built in the same run, so rarely)
+  // is kept: never a shorter list than the shards alone would give.
+  const cards = shardHit ? mergeCardSets(names, [cat.cards, shardHit.cards]) : cat.cards;
+
+  const covered = new Set(shardHit?.covered || []);
+  const liveNames = names.filter(n => !covered.has(n) && !cat.empty.includes(n));
+  if (liveNames.length && primaryHealthy) {
+    const want = new Set(liveNames);
+    const need = cards.filter(c => !c.variants && want.has(c.species));
+    await withTimeout(signal => tcgdex.getVariants(need, liveNames, { signal })).catch(() => {});
+  }
+  return { cards, source: 'catalogue' };
+}
+
+/**
  * Master card index for the given Pokémon names.
- * Order: pre-built snapshot (instant, no API) → live TCGdex.
- * A forced refresh skips the snapshot to fetch live.
+ * Order: catalogue (data/cat/) → pre-built snapshot shards → live TCGdex. The first two
+ * are static files, so the common case makes no card-list request at all.
+ * A forced refresh skips both to fetch live: it is how a card TCGdex added after this
+ * week's build shows up.
  *
  * `missing` is set only when a PARTIAL snapshot hit could not be completed live: the
  * snapshot's cards are served rather than thrown away, and the caller must neither
  * cache the result as complete nor stay silent about the names it lacks.
- * @returns {Promise<{cards:Array, source:'snapshot'|'tcgdex', missing?:string[]}>}
+ * @returns {Promise<{cards:Array, source:'catalogue'|'snapshot'|'tcgdex', missing?:string[]}>}
  */
 export async function getCards(names, { forceRefresh = false } = {}) {
   if (forceRefresh) primaryHealthy = true;
   if (!forceRefresh) {
+    const cat = await catalogueCards(names);
+    if (cat) return cat;
     let hit = null;
     try { hit = await snapshot.getCardsPartial(names); }
     catch (e) { /* snapshot miss/absent → go live */ }
@@ -148,14 +189,36 @@ function setMetaShape(meta = {}) {
 }
 
 /**
- * Every card in one set (single-set mode), live from TCGdex. The snapshot ships no
- * per-set shards, and the per-Pokémon ones cannot answer "what is in this set".
- * @returns {Promise<{cards:Array, set:Object, source:'tcgdex'}>}
+ * Every card in one set (single-set mode). Live TCGdex first: it is one request for the
+ * set, with print variants, where the catalogue would load every shard of the language.
+ * When TCGdex fails, the catalogue's list for that set, with the set's name, date and
+ * count from the snapshot (no print variants: those only come live). The per-Pokémon
+ * shards cannot answer "what is in this set" at all.
+ * @returns {Promise<{cards:Array, set:Object, source:'tcgdex'|'catalogue'}>}
  */
 export async function getSetCards(setId, { forceRefresh = false, lang = 'en' } = {}) {
   if (forceRefresh) primaryHealthy = true;
-  const live = await withTimeout(signal => tcgdex.getSetCards(setId, { signal, lang }));
-  return { ...live, source: 'tcgdex' };
+  try {
+    const live = await withTimeout(signal => tcgdex.getSetCards(setId, { signal, lang }));
+    return { ...live, source: 'tcgdex' };
+  } catch (err) {
+    const fromCat = await catalogueSetCards(setId, lang).catch(() => null);
+    if (fromCat) {
+      console.warn(`[router] TCGdex set ${setId} unavailable (${err.message}); using the catalogue`);
+      return fromCat;
+    }
+    throw err;
+  }
+}
+
+async function catalogueSetCards(setId, lang) {
+  const def = LANGUAGES.find(l => l.code === lang);
+  const code = def?.code || 'en';
+  const meta = await snapshot.getSetMeta().catch(() => ({}));
+  const setSeries = meta.setSeries || (await snapshot.getSeries()).setSeries;
+  const cards = await getCatalogSetCards(setId, { code, setSeries });
+  if (!cards) return null;
+  return { cards, set: catalogSetInfo(setId, code, meta), source: 'catalogue' };
 }
 
 /**

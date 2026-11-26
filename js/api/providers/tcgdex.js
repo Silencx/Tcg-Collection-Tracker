@@ -154,6 +154,14 @@ async function attachVariants(cards, filters, signal, apiCode = 'en') {
   });
 }
 
+/**
+ * Print variants for cards that came from somewhere else (the catalogue, data/cat/),
+ * looked up by Pokémon name like getCards does. In place, best effort, never throws.
+ */
+export async function getVariants(cards, names, { signal } = {}) {
+  await attachVariants(cards, (names || []).map(name => ({ name })), signal);
+}
+
 const escapeRe = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /**
@@ -531,4 +539,4 @@ export async function getSetCards(setId, { signal, withVariants = true, lang = '
   };
 }
 
-export const tcgdex = { getCards, getSetCards, getSetMeta, namesSpecies, readCardCount };
+export const tcgdex = { getCards, getSetCards, getSetMeta, getVariants, namesSpecies, readCardCount };

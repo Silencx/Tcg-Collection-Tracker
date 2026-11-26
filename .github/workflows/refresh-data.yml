@@ -38,7 +38,10 @@ jobs:
 
       # A manual run APPENDS to data/prebuilt.json rather than building a one-off
       # snapshot, which the next scheduled run would silently overwrite; widening
-      # coverage has to be durable to be worth anything.
+      # coverage has to be durable to be worth anything. Every Pokémon's card LIST already
+      # comes from the card catalogue (data/cat/, the step after Build data), so the cap
+      # only limits what pre-building adds: the print-variant shards (data/cards/) and the
+      # Bulbapedia Japanese rows (data/jp/), each a weekly list + detail sweep.
       - name: Extend the prebuilt list
         if: ${{ inputs.add != '' }}
         env:
@@ -50,7 +53,7 @@ jobs:
             const current = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) : [];
             const add = process.env.ADD.split(",").map(s => s.trim()).filter(Boolean);
             const merged = [...new Set([...current, ...add])];
-            if (merged.length > 60) throw new Error(`prebuilt list would reach ${merged.length}; cap is 60 (each entry costs a list request plus pooled detail calls every week)`);
+            if (merged.length > 60) throw new Error(`prebuilt list would reach ${merged.length}; cap is 60 (each entry costs a variant shard and a Bulbapedia sweep every week; card lists come from data/cat/ regardless)`);
             fs.writeFileSync(file, JSON.stringify(merged, null, 2) + "\n");
             console.log(`prebuilt list: ${current.length} -> ${merged.length}`);
           '
@@ -61,6 +64,16 @@ jobs:
       - name: Build data
         if: ${{ github.event.schedule != '0 6 * * 0,2-6' }}
         run: node tools/build-data.mjs
+
+      # Every card TCGdex lists, in all nine languages (data/cat/): the app reads it before
+      # the per-Pokémon shards, so any Pokémon gets its full list without a live name
+      # search. Keyless, 45 requests. A language whose answer fails or lost over a tenth of
+      # its cards keeps its committed files, and the log prints each language's size.
+      # continue-on-error: a TCGdex outage must not cost the rest of the run.
+      - name: Build card catalogue
+        if: ${{ github.event.schedule != '0 6 * * 0,2-6' }}
+        continue-on-error: true
+        run: node tools/build-catalog.mjs
 
       # PokéWallet's raw answer for every Japanese set, kept from run to run so a run only
       # pays for what may have changed. A new key each run, restored by prefix, so the
