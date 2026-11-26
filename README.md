@@ -56,6 +56,17 @@ Pikachu's too). Tag Team cards show up for every Pokémon on them. A card whose 
 plainly another Pokémon's is not moved by a wrong number: TCGdex numbers one "Electrode"
 as Gyarados, and it stays Electrode's (`js/api/match-model.js`).
 
+### Missing a card?
+Some cards no source lists: stamped promos, jumbo cards, oddities. Report one with the
+**Missing card** form (the "report a missing card" link in the site footer, or
+[open it here](https://github.com/Silencx/Tcg-Collection-Tracker/issues/new?template=missing-card.yml)):
+language, set, number, name and a link that shows the card. A bot checks the report
+within minutes. If it holds up, it opens a pull request that adds the card; if not, it
+comments with what to fix, and editing the issue checks it again. Once merged, the card
+shows in Master set and the True master set (English and Japanese cards) and in Single
+set (any language), with a placeholder tile. When a source later lists the card itself,
+the hand-added entry is removed and the report gets a comment.
+
 ### Print variant badges
 Each card's footer shows which prints exist: **H** holo, **RH** reverse holo,
 **1ED** 1st Edition, **SL** shadowless, **P** promo, and **+N** for anything
@@ -133,7 +144,9 @@ data/                 the pre-built snapshot and catalogues (committed, refreshe
 tools/                build scripts, the checker, research probes; tools/lib/ helpers
 tests/                node:test suites — pure logic, plus source scans for invariants
 docs/                 design notes
-.github/workflows/    ci.yml (check + test), refresh-data.yml (data build: weekly, Japanese daily)
+.github/workflows/    ci.yml (check + test), refresh-data.yml (data build: weekly, Japanese daily),
+                      missing-card.yml (a "Missing card" report → a pull request)
+.github/ISSUE_TEMPLATE/  the "Missing card" form
 ```
 
 Start with `js/main.js` (boot, mode switching, the window handler manifest),
@@ -150,6 +163,8 @@ Start with `js/main.js` (boot, mode switching, the window handler manifest),
 - Pokémon catalogue and native names: `data/species.json` → the built-in 357 in
   `js/config.js` (see "Pokémon catalogue" below).
 - Japanese cards: `data/jp-cat/` catalogue → Bulbapedia (`data/jp/` shards → live).
+- Cards no source lists: `data/overrides.json`, merged into each of the lists above last
+  (see "Missing cards" below).
 - A user-triggered **Refresh** skips the catalogue and snapshot and fetches EN cards and
   set data live.
 
@@ -166,12 +181,15 @@ can't be reassigned across files). The markup uses inline `onclick="fn()"` handl
 | `tools/build-images.mjs` (`npm run build-images`) | `data/jp-catalog/`, PokéWallet | `img/`, `data/img-index.json` (committed) | `POKEWALLET_IO_PROD_KEY` |
 | `tools/build-catalog.mjs` (`npm run build-catalog`) | TCGdex | `data/cat/` | none |
 | `tools/build-species.mjs` (`npm run build-species`; one-off, per new generation) | PokéAPI | `data/species.json` | none |
+| `tools/missing-card.mjs` (run by `missing-card.yml`) | an issue body, `data/` | `data/overrides.json` | none |
+| `tools/prune-overrides.mjs` | `data/overrides.json`, `data/cat/`, `data/jp-cat/` | `data/overrides.json` | none |
 | `tools/check.mjs` | `js/`, `tools/` | — | none |
 | `tools/apitcg-probe.mjs`, `tools/pokewallet-probe.mjs`, `tools/tcgdex-catalog-probe.mjs`, `tools/tcgdex-dexid-probe.mjs`, `tools/jp-gap-size.mjs` | research probes; reports stay local | — | their own |
 
 `.github/workflows/refresh-data.yml` runs build-data, build-catalog, build-jp-catalog and
 build-images every Monday, and the two PokéWallet steps alone on the other days (see
-"Daily refresh" below); it commits `data/` and `img/` when they changed. Every
+"Daily refresh" below); every day it ends with prune-overrides (see "Missing cards"
+below) and commits `data/` and `img/` when they changed. Every
 Pokémon's card list comes from the catalogue (see "Card catalogue" below). A pre-built
 Pokémon (`data/prebuilt.json`, at most 60) also has its print variants and its
 Bulbapedia Japanese rows baked in, so a visitor tracking only pre-built Pokémon makes zero
@@ -273,6 +291,63 @@ node tools/build-catalog.mjs en de    # just these
 TCGdex stays credited in the footer for its other data. The app needs no change: without
 `data/cat/index.json` the router goes back to the per-Pokémon shards and live TCGdex, and
 single-set mode simply has no fallback.
+
+### Missing cards
+
+Cards no source lists are added by hand to `data/overrides.json`, one row per card:
+
+```
+{ "lang": "en", "set": "swshp", "number": "SWSH020", "name": "Pikachu", "dexId": [25], "source": "<proof link>", "issue": 12 }
+```
+
+`set` is the TCGdex set id, or for Japanese the catalogue's set key
+(`data/jp-cat/sets.json`); `number` is spelled the way that set spells its numbers. The
+app reads the file once a session (`js/api/overrides.js`) and merges it last, never in
+place of a card a source lists (`js/api/overrides-model.js`):
+
+- **English** rows join Master set and the True master set popup, matched to Pokémon by
+  the same name-or-number rule as every other card.
+- **Any TCGdex language**: Single set for that set and language, in number order.
+- **Japanese** rows join the Japanese cards, for sets the Japanese catalogue has.
+
+Override tiles are placeholders: no source has a scan of the card either. A missing or
+malformed file means no overrides.
+
+**Reports.** Rows come from the "Missing card" issue form
+(`.github/ISSUE_TEMPLATE/missing-card.yml`). `.github/workflows/missing-card.yml` runs
+`tools/missing-card.mjs` on every opened or edited report. The script checks that the set
+exists in that language (`data/sets.json`, `data/jp-cat/sets.json`), that the number is
+plausible and takes the set's own style ("20" in SWSH Black Star Promos is `SWSH020`),
+that the committed card list does not already have it, and that the proof link is an
+https page on an allowed site (`PROOF_HOSTS` in `tools/lib/overrides.mjs`).
+
+- A valid report becomes a pull request from the branch `missing-card/issue-N` that
+  changes only `data/overrides.json`, with `Closes #N`. A person merges it.
+- An invalid one is labelled `needs-info` and gets a comment that says what to fix.
+- The issue body is untrusted input. It reaches the script only through an environment
+  variable, the job starts with no permissions and is given only what it needs, and it
+  never pushes to `main`; `tests/missing-card.test.mjs` scans the workflows for this.
+- Pull requests opened with the workflow's token start no other workflow, so CI runs
+  when the pull request is merged; `tests/overrides-model.test.mjs` checks the committed
+  file then.
+- One-time setting, for the pull requests: **Settings → Actions → General → Workflow
+  permissions → Allow GitHub Actions to create and approve pull requests**. Without it
+  the check and its comments still work, and opening the pull request fails in the
+  workflow log. The two labels are created by the workflow itself.
+
+**Pruning.** Every day the data refresh runs `tools/prune-overrides.mjs` after the card
+lists are rebuilt. A row whose card the committed list now has (same language, set and
+number, ignoring case and zero padding) is removed, and its report gets a comment after
+the push. A language whose list cannot be read keeps its rows.
+
+```bash
+node tools/missing-card.mjs --issue 12 --body-file body.md --out tmp/mc --dry-run   # check a report locally
+node tools/prune-overrides.mjs                                                     # drop rows a source now lists
+```
+
+**Withdrawing it.** Delete `data/overrides.json`, the issue form, the
+`missing-card.yml` workflow and the prune steps in `refresh-data.yml`. The app needs no
+change: without the file every list is exactly what its sources give.
 
 ### Pokémon catalogue
 
@@ -435,6 +510,7 @@ Card data and images come from:
 - [Bulbapedia](https://bulbapedia.bulbagarden.net/) — Japanese card listings (fallback)
 - [Limitless TCG](https://limitlesstcg.com/) — Japanese card scans
 - [PokéAPI](https://pokeapi.co/) — the Pokémon catalogue and its names in other languages (`data/species.json`)
+- Collectors' "Missing card" reports — cards no source lists (`data/overrides.json`)
 
 This project is [MIT-licensed](LICENSE) and is not affiliated with, endorsed
 by, or sponsored by Nintendo, The Pokémon Company, or The Pokémon Company

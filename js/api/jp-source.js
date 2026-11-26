@@ -10,6 +10,8 @@
 // With the catalogue present, Bulbapedia's snapshot still fills in cards the catalogue
 // lacks (World Champions Pack). Either way every row gets the stable id from
 // jp-model.js, so a tick survives the source changing underneath it.
+// Last, the Japanese overrides (data/overrides.json) add cards no source lists, for sets
+// the catalogue knows (overrides-model.js).
 //
 // @returns {{ rows: JpRow[], sets: Map<setKey, JpSet>, source: 'catalogue'|'bulbapedia' }}
 //   JpRow { id, setKey, number, numKey, cardName, pokemonName }
@@ -17,8 +19,10 @@
 // =============================================================================
 
 import { JP_BULBA_SET_MAP } from './bulba-jp.js';
-import { router } from './router.js';
+import { router, dexByName } from './router.js';
 import { snapshot } from './providers/snapshot.js';
+import { loadOverrides } from './overrides.js';
+import { overrideJpRows } from './overrides-model.js';
 import { namesSpecies } from './providers/tcgdex.js';
 import { setSlug } from './local-images.js';
 import { jpCardId, jpNumKey, speciesShardLetter } from './jp-model.js';
@@ -89,6 +93,7 @@ export async function getJpCards(names, { live = true } = {}) {
     // Whatever Bulbapedia's committed snapshot has that the catalogue does not.
     const snap = await snapshot.getJpRawPartial(names).catch(() => null);
     addBulbaRows(snap?.data, rows, sets, seen);
+    await addOverrideRows(names, rows, sets, seen);
     return { rows, sets, source: 'catalogue' };
   }
 
@@ -96,5 +101,12 @@ export async function getJpCards(names, { live = true } = {}) {
     ? await router.getJpRaw(names)
     : (await snapshot.getJpRawPartial(names).catch(() => null))?.data || [];
   addBulbaRows(raw, rows, sets, seen);
+  await addOverrideRows(names, rows, sets, seen);
   return { rows, sets, source: 'bulbapedia' };
+}
+
+async function addOverrideRows(names, rows, sets, seen) {
+  const over = await loadOverrides();
+  if (!over.some(r => r.lang === 'ja')) return;
+  rows.push(...overrideJpRows(over, names, sets, { seen, dexByName: await dexByName() }));
 }

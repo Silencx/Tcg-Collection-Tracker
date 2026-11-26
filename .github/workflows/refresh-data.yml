@@ -17,6 +17,7 @@ on:
 
 permissions:
   contents: write
+  issues: write   # comment on a "Missing card" report once its card is listed
 
 # A manual run started while the scheduled one is going waits for it, so the two never
 # race to push.
@@ -119,6 +120,14 @@ jobs:
           POKEWALLET_IO_PROD_KEY: ${{ secrets.POKEWALLET_IO_PROD_KEY }}
         run: node tools/build-images.mjs --all --max 300
 
+      # A hand-added card (data/overrides.json, from a "Missing card" report) leaves once a
+      # card list built above has it. Daily, because the Japanese list changes daily; no
+      # requests. The comment for each report goes to the runner's temp folder, posted
+      # after the push.
+      - name: Drop overrides a source now lists
+        continue-on-error: true
+        run: node tools/prune-overrides.mjs --report "$RUNNER_TEMP/pruned-overrides"
+
       - name: Commit and push if changed
         run: |
           git config user.name "github-actions[bot]"
@@ -130,3 +139,16 @@ jobs:
             git commit -m "chore: refresh card data"
             git push
           fi
+
+      # Only after the push, so a comment never announces a change that did not land.
+      - name: Tell reporters their card is now listed
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          shopt -s nullglob
+          for f in "$RUNNER_TEMP"/pruned-overrides/*.md; do
+            n=$(basename "$f" .md)
+            case "$n" in ''|*[!0-9]*) continue;; esac
+            gh issue comment "$n" --body-file "$f" || echo "could not comment on #$n"
+          done

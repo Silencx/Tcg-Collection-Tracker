@@ -1,0 +1,60 @@
+name: Missing card
+description: A card the tracker does not list, such as a stamped promo, a jumbo card or an oddity.
+title: "[Missing card]: "
+labels: ["missing-card"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        One card per report. Within a few minutes a bot checks it against the tracker's card lists. If it looks right, the bot opens a pull request that adds the card. If something is off, it comments with what to fix: edit the issue and it checks again.
+  - type: dropdown
+    id: lang
+    attributes:
+      label: Language
+      description: The language the card is printed in.
+      options:
+        - English
+        - German
+        - French
+        - Spanish
+        - Italian
+        - Portuguese
+        - Traditional Chinese (TW/HK)
+        - Thai
+        - Indonesian
+        - Japanese
+    validations:
+      required: true
+  - type: input
+    id: set
+    attributes:
+      label: Set
+      description: The set's name or code as the tracker shows it, for example "SWSH Black Star Promos" or "swshp". For Japanese cards, the set's English name or code, for example "VSTAR Universe" or "S12a".
+    validations:
+      required: true
+  - type: input
+    id: number
+    attributes:
+      label: Card number
+      description: As printed on the card, for example "SWSH020", "163/198" or "TG05".
+    validations:
+      required: true
+  - type: input
+    id: name
+    attributes:
+      label: Card name
+      description: As printed, in English for Japanese cards too, for example "Pikachu V".
+    validations:
+      required: true
+  - type: input
+    id: dex
+    attributes:
+      label: Pokémon on the card
+      description: Optional. Only when the card's name does not say which Pokémon it shows, as names or Pokédex numbers, for example "Pikachu, Zekrom" or "25".
+  - type: input
+    id: proof
+    attributes:
+      label: Proof link
+      description: An https page showing the card, on Bulbapedia, pkmncards, Limitless TCG, Serebii, TCGplayer, Cardmarket, PriceCharting, TCG Collector, Pokellector, pokemon.com, pokemon-card.com or pokemon.co.jp.
+    validations:
+      required: true
