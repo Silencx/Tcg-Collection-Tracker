@@ -10,7 +10,9 @@
 //                          cards through api/jp-source.js, which tries the PokéWallet
 //                          catalogue first and only then comes here.
 //   Overrides            : data/overrides.json (cards no source lists) is merged into
-//                          both card lists last, whichever source answered.
+//                          both card lists last, whichever source answered; then
+//                          data/print-overrides.json (prints no source lists, such as
+//                          Jumbo prints) joins the cards' print lists.
 //
 // Behaviour:
 //   • try primary with an ~8s timeout (AbortController);
@@ -31,6 +33,8 @@ import { loadSpecies } from './species.js';
 import { dexByNameFrom } from './match-model.js';
 import { loadOverrides } from './overrides.js';
 import { overrideCards, overrideSetCards, mergeSetCards } from './overrides-model.js';
+import { loadPrintOverrides } from './print-overrides.js';
+import { withPrintOverrides } from './print-overrides-model.js';
 import { LANGUAGES, POKEMON_CATALOG } from '../config.js';
 
 const TIMEOUT_MS = 8000;
@@ -123,11 +127,21 @@ async function catalogueCards(names) {
  * snapshot's cards are served rather than thrown away, and the caller must neither
  * cache the result as complete nor stay silent about the names it lacks.
  * Whichever source answers, the English overrides (data/overrides.json) are merged in
- * last: a card a source lists keeps that source's entry.
+ * last: a card a source lists keeps that source's entry. Then the English print
+ * overrides (data/print-overrides.json) join the cards' print lists.
  * @returns {Promise<{cards:Array, source:'catalogue'|'snapshot'|'tcgdex', missing?:string[]}>}
  */
 export async function getCards(names, opts = {}) {
-  return withOverrides(names, await cardsFromSources(names, opts));
+  return withPrints(await withOverrides(names, await cardsFromSources(names, opts)), 'en');
+}
+
+// Prints no source lists (a Jumbo print of a card TCGdex has none for), added to the
+// cards' `variants`; a card TCGdex already gives a print of that kind keeps its own.
+async function withPrints(res, lang) {
+  const rows = await loadPrintOverrides();
+  if (!rows.length) return res;
+  const cards = withPrintOverrides(res.cards, rows, lang);
+  return cards === res.cards ? res : { ...res, cards };
 }
 
 async function withOverrides(names, res) {
@@ -246,7 +260,7 @@ export async function getSetCards(setId, { forceRefresh = false, lang = 'en' } =
   }
   const code = LANGUAGES.find(l => l.code === lang)?.code || 'en';
   const extra = overrideSetCards(await loadOverrides(), setId, code);
-  return extra.length ? { ...res, cards: mergeSetCards(res.cards, extra) } : res;
+  return withPrints(extra.length ? { ...res, cards: mergeSetCards(res.cards, extra) } : res, code);
 }
 
 async function catalogueSetCards(setId, lang) {
