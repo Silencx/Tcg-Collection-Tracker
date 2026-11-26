@@ -9,6 +9,8 @@
 // Keyless. Five requests per language, nine languages: /{lang}/cards (the whole list in
 // one answer — verified against a full set walk, see docs/card-coverage-plan.md),
 // /{lang}/categories, and the list once per category, because list items carry none.
+// English also gets every card's Pokédex numbers, which only GraphQL gives in bulk: one
+// query per category, 5,000 cards a page, about 7 requests (2026-11-26).
 //
 //   node tools/build-catalog.mjs              # every language
 //   node tools/build-catalog.mjs en de        # just these (LANGUAGES codes)
@@ -25,8 +27,10 @@ import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { stampBuiltAt } from './lib/built-at.mjs';
 import {
-  CATALOG_LANGS, categoryCode, catalogRows, shardRows, shardFile, langSummary, indexFile, acceptCount,
+  CATALOG_LANGS, categoryCode, catalogRows, rowLetters, rowShardLetters, dexLetters, shardRows, shardFile,
+  langSummary, indexFile, acceptCount,
 } from './lib/catalog.mjs';
+import { rowDexIds, rowHasScan } from '../js/api/catalog-model.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = resolve(ROOT, 'data', 'cat');
@@ -39,12 +43,14 @@ const SHARD_WARN_BYTES = 1024 * 1024;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 const kb = n => `${Math.round(n / 1024)} KB`;
 
-async function getJSON(url) {
+async function getJSON(url, init = {}) {
   let last;
   for (const wait of [0, 2000, 10000]) {
     if (wait) await sleep(wait);
     try {
-      const r = await fetch(url, { headers: { accept: 'application/json' }, signal: AbortSignal.timeout(60000) });
+      const r = await fetch(url, {
+        ...init, headers: { accept: 'application/json', ...init.headers }, signal: AbortSignal.timeout(60000),
+      });
       if (r.ok) return await r.json();
       last = new Error(`HTTP ${r.status} — ${url}`);
       if (r.status === 404) break;
@@ -82,7 +88,35 @@ async function categories(apiCode, log) {
   return byId;
 }
 
-async function buildLang({ code, apiCode }, prevSummary, builtAt, knownSets) {
+// Card id → TCGdex's `dexId`, for every English card that has one. GraphQL is the only
+// bulk source (REST list items carry none) and answers in English, so the category words
+// are English. It refuses a `cards` query with no filter, hence one per category.
+const GQL_PAGE = 5000;
+const GQL_DEX = 'query($f:CardsFilters,$p:Int!,$k:Int){ cards(filters:$f, pagination:{page:$p,itemsPerPage:$k}){ id dexId } }';
+async function englishDexIds() {
+  const byId = new Map();
+  for (const category of ['Pokemon', 'Trainer', 'Energy']) {
+    for (let page = 1; ; page++) {
+      if (page > 20) throw new Error(`GraphQL ${category}: still paging at ${GQL_PAGE * 20} cards`);
+      const j = await getJSON(`${API}/graphql`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ query: GQL_DEX, variables: { f: { category }, p: page, k: GQL_PAGE } }),
+      });
+      const list = j?.data?.cards;
+      if (!Array.isArray(list)) throw new Error(`GraphQL ${category}: ${j?.errors?.[0]?.message || 'no data'}`);
+      for (const c of list) if (c?.id && Array.isArray(c.dexId) && c.dexId.length) byId.set(c.id, c.dexId);
+      if (list.length < GQL_PAGE) break;
+    }
+  }
+  return byId;
+}
+
+// Below this share of Pokémon cards with numbers, TCGdex's answer is taken for broken and
+// the committed English files stay (99.4% on 2026-11-26; only the newest set lacks them).
+const MIN_DEX_SHARE = 0.9;
+
+async function buildLang({ code, apiCode }, prevSummary, builtAt, knownSets, byDexLetter) {
   const log = s => console.log(`[build-catalog]   ${code}: ${s}`);
   const list = await getJSON(`${API}/${apiCode}/cards`);
   if (!Array.isArray(list) || !list.length) throw new Error('TCGdex listed no cards');
@@ -91,7 +125,24 @@ async function buildLang({ code, apiCode }, prevSummary, builtAt, knownSets) {
   try { catById = await categories(apiCode, log); }
   catch (e) { log(`! categories unavailable (${e.message}); rows carry none`); }
 
-  const { rows, skipped } = catalogRows(list, catById);
+  // Matching by Pokédex number needs every English card's numbers, so a failed or thin
+  // answer keeps the committed English files rather than writing rows without them.
+  const dexById = apiCode === 'en' ? await englishDexIds() : new Map();
+
+  const { rows, skipped } = catalogRows(list, catById, dexById);
+  if (apiCode === 'en') {
+    const pokemon = rows.filter(r => r[3] === 'P');
+    const noDex = pokemon.filter(r => !rowDexIds(r).length);
+    const share = pokemon.length ? 1 - noDex.length / pokemon.length : 0;
+    const noDexSets = [...new Set(noDex.map(r => r[0]))];
+    const extra = rows.filter(r => rowShardLetters(r, byDexLetter).length > rowLetters(r[2]).length).length;
+    log(`${rows.filter(r => rowDexIds(r).length).length} cards with Pokédex numbers; ${noDex.length} Pokémon cards without` +
+      `${noDexSets.length ? ` (${noDexSets.slice(0, 8).join(', ')}${noDexSets.length > 8 ? ', …' : ''})` : ''}; ` +
+      `${extra} filed under another Pokémon's shard for its numbers`);
+    if (share < MIN_DEX_SHARE && !FORCE) {
+      throw new Error(`only ${(share * 100).toFixed(1)}% of Pokémon cards have Pokédex numbers; kept the committed files (rerun with --force to accept)`);
+    }
+  }
   if (skipped.length) log(`! ${skipped.length} card(s) skipped (no name, or id is not set-number): ${skipped.slice(0, 5).join(', ')}`);
   const noCat = rows.filter(r => !r[3]).length;
   if (noCat) log(`! ${noCat} card(s) with no category`);
@@ -104,7 +155,7 @@ async function buildLang({ code, apiCode }, prevSummary, builtAt, knownSets) {
     throw new Error(`${rows.length} cards against ${prevSummary.cards} last time; kept the committed files (rerun with --force if TCGdex really dropped them)`);
   }
 
-  const shards = shardRows(rows);
+  const shards = shardRows(rows, byDexLetter);
   const dir = resolve(OUT, code);
   mkdirSync(dir, { recursive: true });
   let total = 0, changed = 0, biggest = ['', 0];
@@ -121,7 +172,7 @@ async function buildLang({ code, apiCode }, prevSummary, builtAt, knownSets) {
 
   const summary = langSummary(rows, shards);
   const cats = Object.fromEntries(['P', 'T', 'E'].map(k => [k, rows.filter(r => r[3] === k).length]));
-  const noScan = rows.filter(r => r[4] === 0).length;
+  const noScan = rows.filter(r => !rowHasScan(r)).length;
   log(`${summary.cards} cards in ${summary.sets} sets (P ${cats.P}, T ${cats.T}, E ${cats.E}; ${noScan} with no scan); ` +
     `${summary.shards.length} shards, ${kb(total)}, largest cards-${biggest[0]}.json ${kb(biggest[1])}; ` +
     `${changed} written, ${summary.shards.length - changed} unchanged${stale.length ? `, ${stale.length} removed` : ''}`);
@@ -138,6 +189,11 @@ async function main() {
   const prevIndex = readJson(indexPath);
   const sets = readJson(resolve(ROOT, 'data', 'sets.json'));
   const knownSets = new Set(Object.keys(sets?.setSeries || {}));
+  // Which shard each Pokémon is looked up in, so a card is also filed under the Pokémon
+  // its numbers name. Without the file, cards are filed by their own names only.
+  const species = readJson(resolve(ROOT, 'data', 'species.json'))?.species;
+  if (!Array.isArray(species)) console.warn('[build-catalog] ! data/species.json unreadable: cards are filed by name only');
+  const byDexLetter = dexLetters(species);
   const builtAt = new Date().toISOString();
   console.log(`[build-catalog] TCGdex card lists for ${langs.map(l => l.code).join(', ')}`);
 
@@ -150,7 +206,7 @@ async function main() {
   const failed = [];
   for (const lang of langs) {
     try {
-      out[lang.code] = await buildLang(lang, prevIndex?.langs?.[lang.code], builtAt, knownSets);
+      out[lang.code] = await buildLang(lang, prevIndex?.langs?.[lang.code], builtAt, knownSets, byDexLetter);
     } catch (e) {
       failed.push(lang.code);
       console.warn(`[build-catalog]   ${lang.code}: FAILED, committed files kept — ${e.message}`);

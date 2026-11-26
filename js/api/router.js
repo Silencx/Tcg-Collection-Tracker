@@ -1,7 +1,8 @@
 // =============================================================================
 // api/router.js — provider failover.
 //
-//   Master card index    : catalogue (data/cat/) → snapshot shards → TCGdex EN.
+//   Master card index    : catalogue (data/cat/) → snapshot shards → TCGdex EN, each
+//                          matching cards by name or Pokédex number (match-model.js).
 //                          Print variants: snapshot shards, then TCGdex GraphQL.
 //   Set names/dates/syms : snapshot → TCGdex
 //   Set cards (one set)  : TCGdex → catalogue
@@ -24,9 +25,21 @@ import { getCatalogCards, getCatalogSetCards } from './catalog.js';
 import { catalogSetInfo } from './catalog-model.js';
 import * as bulbaJp from './bulba-jp.js';
 import { mergeCardSets, mergeSource } from './merge.js';
-import { LANGUAGES } from '../config.js';
+import { loadSpecies } from './species.js';
+import { dexByNameFrom } from './match-model.js';
+import { LANGUAGES, POKEMON_CATALOG } from '../config.js';
 
 const TIMEOUT_MS = 8000;
+
+// Pokémon name → National Dex number, for matching cards by number (match-model.js):
+// data/species.json, else the built-in catalogue. Read once a session; never rejects.
+let dexMemo = null;
+function dexByName() {
+  dexMemo ||= loadSpecies()
+    .then(sp => dexByNameFrom(sp?.catalog || POKEMON_CATALOG))
+    .catch(() => dexByNameFrom(POKEMON_CATALOG));
+  return dexMemo;
+}
 
 // Session health for the primary (TCGdex). Once it fails, later calls in the
 // same session skip straight to the fallback (or, for cards, straight to failing)
@@ -48,8 +61,9 @@ async function liveCards(names) {
   // The snapshot's series map, for the image URL of a card TCGdex lists without one.
   // sets.json is memoised and read for set meta straight after anyway.
   const { setSeries } = await snapshot.getSeries();
+  const dex = await dexByName();
   try {
-    const cards = await withTimeout(signal => tcgdex.getCards(names, { signal, setSeries }));
+    const cards = await withTimeout(signal => tcgdex.getCards(names, { signal, setSeries, dexByName: dex }));
     if (cards && cards.length) return { cards, source: 'tcgdex' };
     throw new Error('empty result');
   } catch (err) {
@@ -68,7 +82,8 @@ async function liveCards(names) {
  */
 async function catalogueCards(names) {
   const { setSeries } = await snapshot.getSeries();
-  const cat = await getCatalogCards(names, { setSeries }).catch(() => null);
+  const dex = await dexByName();
+  const cat = await getCatalogCards(names, { setSeries, dexByName: dex }).catch(() => null);
   if (!cat?.cards.length) return null;
 
   let shardHit = null;
@@ -87,7 +102,7 @@ async function catalogueCards(names) {
   if (liveNames.length && primaryHealthy) {
     const want = new Set(liveNames);
     const need = cards.filter(c => !c.variants && want.has(c.species));
-    await withTimeout(signal => tcgdex.getVariants(need, liveNames, { signal })).catch(() => {});
+    await withTimeout(signal => tcgdex.getVariants(need, liveNames, { signal, dexByName: dex })).catch(() => {});
   }
   return { cards, source: 'catalogue' };
 }

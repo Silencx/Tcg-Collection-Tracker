@@ -38,15 +38,16 @@ async function loadShards(code, letters) {
 
 /**
  * The English cards of every Pokémon in `names`.
+ * @param {Map<string, number>} [opts.dexByName] Pokémon name → National Dex number
  * @returns {Promise<{cards:Array, empty:string[], builtAt:string}|null>}
  */
-export async function getCatalogCards(names, { setSeries = null } = {}) {
+export async function getCatalogCards(names, { setSeries = null, dexByName = null } = {}) {
   const idx = await catalogIndex();
   const en = idx?.langs.en;
   if (!en) return null;
   const shards = await loadShards('en', shardLettersFor(names, en.shards));
   if (!shards) return null;
-  return { ...matchCatalog(shards, names, { setSeries }), builtAt: idx.builtAt };
+  return { ...matchCatalog(shards, names, { setSeries, dexByName }), builtAt: idx.builtAt };
 }
 
 /**

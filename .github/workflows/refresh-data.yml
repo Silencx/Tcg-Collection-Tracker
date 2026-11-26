@@ -65,10 +65,12 @@ jobs:
         if: ${{ github.event.schedule != '0 6 * * 0,2-6' }}
         run: node tools/build-data.mjs
 
-      # Every card TCGdex lists, in all nine languages (data/cat/): the app reads it before
-      # the per-Pokémon shards, so any Pokémon gets its full list without a live name
-      # search. Keyless, 45 requests. A language whose answer fails or lost over a tenth of
-      # its cards keeps its committed files, and the log prints each language's size.
+      # Every card TCGdex lists, in all nine languages (data/cat/), with English cards'
+      # Pokédex numbers: the app reads it before the per-Pokémon shards, so any Pokémon
+      # gets its full list without a live name search. Keyless, about 52 requests. A
+      # language whose answer fails or lost over a tenth of its cards keeps its committed
+      # files (English too when its numbers did not come back), and the log prints each
+      # language's size.
       # continue-on-error: a TCGdex outage must not cost the rest of the run.
       - name: Build card catalogue
         if: ${{ github.event.schedule != '0 6 * * 0,2-6' }}

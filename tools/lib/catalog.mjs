@@ -2,11 +2,16 @@
 // tools/lib/catalog.mjs — TCGdex's whole card list, per language, as the files the app
 // reads (data/cat/). The network half is tools/build-catalog.mjs; this half is pure.
 //
-// One row per card: [set id, number, name, category], plus a trailing 0 when TCGdex lists
-// the card without a scan. The card id is always `${set}-${number}` and the image address
-// is rebuilt from data/sets.json's series map (both measured on every card in all nine
-// languages, 2026-11-25), so neither is stored. Category is one letter (P / T / E):
-// 24,000 rows repeating "Pokemon" would cost 170 KB.
+// One row per card: [set id, number, name, category], then, when they apply, the card's
+// Pokédex numbers (an array) and a 0 when TCGdex lists the card without a scan. The card
+// id is always `${set}-${number}` and the image address is rebuilt from data/sets.json's
+// series map (both measured on every card in all nine languages, 2026-11-25), so neither
+// is stored. Category is one letter (P / T / E): 24,000 rows repeating "Pokemon" would
+// cost 170 KB.
+//
+// Pokédex numbers are English only: they come from TCGdex's GraphQL, which answers in
+// English, and only the master set (English) matches cards to Pokémon. 20,132 of 20,246
+// English Pokémon cards have them (2026-11-26); js/api/match-model.js is the rule.
 //
 // The 0 follows js/api/card-image-model.js: a card has an `image` exactly when the CDN
 // holds its scan, and /{lang}/cards gives the same answer as a set listing (2,146 of
@@ -16,12 +21,15 @@
 // Rows are filed by name like data/jp-cat/: under the first letter of every word of the
 // card's name (js/api/jp-model.js, nameShardLetters), so the app finds a Pokémon's cards
 // by loading one shard. Names with no Latin letter (Traditional Chinese, Thai) go to "0".
+// A row is also filed under the shard of every Pokémon its numbers name, so a card whose
+// name lacks one ("Terapagos & Friends" numbers Pikachu) is still in Pikachu's shard.
 // =============================================================================
 
 import { LANGUAGES } from '../../js/config.js';
-import { nameShardLetters } from '../../js/api/jp-model.js';
-import { naturalCompare } from '../../js/api/catalog-model.js';
+import { nameShardLetters, speciesShardLetter } from '../../js/api/jp-model.js';
+import { naturalCompare, rowDexIds } from '../../js/api/catalog-model.js';
 import { listedImageBase } from '../../js/api/card-image-model.js';
+import { readDexIds } from '../../js/api/match-model.js';
 
 export const SCHEMA_VERSION = 1;
 
@@ -62,10 +70,11 @@ const rowCompare = (a, b) => naturalCompare(a[0], b[0]) || naturalCompare(a[1], 
  * TCGdex /{lang}/cards items → catalogue rows, sorted by set then number.
  * @param {Array<{id,localId,name,image?}>} list
  * @param {Map<string,string>} [catById] card id → 'P' | 'T' | 'E'
- * @returns {{ rows: Array<[string,string,string,string|null,0?]>, skipped: string[] }}
+ * @param {Map<string,unknown>} [dexById] card id → TCGdex's `dexId` (English only)
+ * @returns {{ rows: Array<[string,string,string,string|null,number[]?,0?]>, skipped: string[] }}
  *   `skipped`: ids that could not be read (no name, or not `${set}-${localId}`)
  */
-export function catalogRows(list, catById = new Map()) {
+export function catalogRows(list, catById = new Map(), dexById = new Map()) {
   const rows = [], skipped = [], seen = new Set();
   for (const c of list || []) {
     const set = cardSet(c?.id, c?.localId);
@@ -74,6 +83,8 @@ export function catalogRows(list, catById = new Map()) {
     if (seen.has(c.id)) continue;
     seen.add(c.id);
     const row = [set, String(c.localId), name, catById.get(c.id) || null];
+    const dex = readDexIds(dexById.get(c.id));
+    if (dex.length) row.push(dex);
     if (!listedImageBase(c.image)) row.push(0);
     rows.push(row);
   }
@@ -87,10 +98,27 @@ export function rowLetters(name) {
   return l.length ? l : ['0'];
 }
 
+/** data/species.json's rows ([dex, gen, name]) → dex → the shard letter that Pokémon is looked up in. */
+export function dexLetters(species) {
+  const map = new Map();
+  for (const s of species || []) if (Number.isInteger(s?.[0]) && typeof s[2] === 'string') map.set(s[0], speciesShardLetter(s[2]));
+  return map;
+}
+
+/**
+ * Every shard letter a row is filed under: its name's letters and, with `byDex`
+ * (dexLetters), the letter of every Pokémon its numbers name.
+ */
+export function rowShardLetters(row, byDex = new Map()) {
+  const letters = new Set(rowLetters(row[2]));
+  for (const n of rowDexIds(row)) if (byDex.get(n)) letters.add(byDex.get(n));
+  return [...letters];
+}
+
 /** Rows → { letter: rows }, letters sorted, each shard keeping the rows' order. */
-export function shardRows(rows) {
+export function shardRows(rows, byDex = new Map()) {
   const out = {};
-  for (const r of rows) for (const l of rowLetters(r[2])) (out[l] ||= []).push(r);
+  for (const r of rows) for (const l of rowShardLetters(r, byDex)) (out[l] ||= []).push(r);
   return Object.fromEntries(Object.keys(out).sort().map(l => [l, out[l]]));
 }
 
