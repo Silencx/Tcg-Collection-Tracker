@@ -78,6 +78,18 @@ jobs:
         continue-on-error: true
         run: node tools/build-catalog.mjs
 
+      # A second source, for checking only (docs/card-coverage-plan.md, Phase 6):
+      # TCGplayer's catalogue via TCGCSV, diffed against the English catalogue just built.
+      # The log gets [coverage] lines for what tools/tcgcsv-baseline.json does not already
+      # list, as set ids and numbers; nothing is committed. Keyless, about 225 requests
+      # 150 ms apart under the probe's own User-Agent, as TCGCSV's guidelines ask. On a 403
+      # or 429 it stops at once (exit 2) and tries again next Monday. continue-on-error: it
+      # must not cost the rest of the run.
+      - name: Check against TCGplayer
+        if: ${{ github.event.schedule != '0 6 * * 0,2-6' }}
+        continue-on-error: true
+        run: node tools/tcgcsv-probe.mjs
+
       # PokéWallet's raw answer for every Japanese set, kept from run to run so a run only
       # pays for what may have changed. A new key each run, restored by prefix, so the
       # newest copy wins. It holds PokéWallet's own card ids, so it is never committed;

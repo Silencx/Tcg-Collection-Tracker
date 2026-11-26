@@ -187,12 +187,13 @@ can't be reassigned across files). The markup uses inline `onclick="fn()"` handl
 | `tools/build-species.mjs` (`npm run build-species`; one-off, per new generation) | PokéAPI | `data/species.json` | none |
 | `tools/missing-card.mjs` (run by `missing-card.yml`) | an issue body, `data/` | `data/overrides.json` | none |
 | `tools/prune-overrides.mjs` | `data/overrides.json`, `data/cat/`, `data/jp-cat/` | `data/overrides.json` | none |
+| `tools/tcgcsv-probe.mjs` (Mondays, and by hand) | TCGplayer via TCGCSV, `data/cat/en/`, `tools/tcgcsv-baseline.json` | `[coverage]` log lines, report (local); the baseline with `--update-baseline` | none |
 | `tools/jumbo-prints.mjs` (by hand; after `tools/tcgcsv-probe.mjs`) | TCGplayer via TCGCSV (cached), TCGdex GraphQL, `data/cat/en/` | `data/print-overrides.json`, report (local) | none |
 | `tools/check.mjs` | `js/`, `tools/` | — | none |
-| `tools/apitcg-probe.mjs`, `tools/pokewallet-probe.mjs`, `tools/tcgdex-catalog-probe.mjs`, `tools/tcgdex-dexid-probe.mjs`, `tools/ptcg-data-probe.mjs`, `tools/tcgcsv-probe.mjs`, `tools/jp-gap-size.mjs` | research probes; reports stay local | — | their own |
+| `tools/apitcg-probe.mjs`, `tools/pokewallet-probe.mjs`, `tools/tcgdex-catalog-probe.mjs`, `tools/tcgdex-dexid-probe.mjs`, `tools/ptcg-data-probe.mjs`, `tools/jp-gap-size.mjs` | research probes; reports stay local | — | their own |
 
-`.github/workflows/refresh-data.yml` runs build-data, build-catalog, build-jp-catalog and
-build-images every Monday, and the two PokéWallet steps alone on the other days (see
+`.github/workflows/refresh-data.yml` runs build-data, build-catalog, the TCGplayer check,
+build-jp-catalog and build-images every Monday, and the two PokéWallet steps alone on the other days (see
 "Daily refresh" below); every day it ends with prune-overrides (see "Missing cards"
 below) and commits `data/` and `img/` when they changed. Every
 Pokémon's card list comes from the catalogue (see "Card catalogue" below). A pre-built
@@ -243,6 +244,44 @@ denominator most of a set's cards print (`001/011` → 11). Promo sets (`001/SV-
 numberless early sets have none and are counted as unchecked, as is any set whose card
 list request failed. TCG Pocket sets are left out. The report never changes `data/` and
 never fails the build.
+
+**Checked against TCGplayer.** The Monday run then diffs the English catalogue against
+TCGplayer's, through [TCGCSV](https://tcgcsv.com/)'s daily mirror (`tools/tcgcsv-probe.mjs`;
+the matching is `tools/lib/tcgcsv.mjs`). It is keyless and keeps to TCGCSV's usage
+guidelines: about 225 requests, 150 ms apart, under the probe's own generic User-Agent.
+TCGplayer groups are matched to our sets by name, then by release date, and compared
+number by number; sealed product and extra prints of a number are left out.
+
+The differences already known are in `tools/tcgcsv-baseline.json` (committed): Jumbo
+cards, which TCGdex files as prints; the Unseen Forces Unown, which TCGdex files in
+`exu`; Classic Collection and Radiant Collection numbering; stamped promos; and the 45
+TCGplayer groups that are product lines rather than sets (see `docs/card-coverage-plan.md`,
+Phase 6). The log shows only what is not in it:
+
+```
+[coverage] TCGplayer via TCGCSV (build 2026-11-26T20_05_59_0000): 170 of 215 groups match our sets; 20630 card numbers in both
+[coverage]   nothing new since tools/tcgcsv-baseline.json (381 numbers only TCGplayer lists and 158 only we list are known)
+```
+
+A new difference is a line per set, `sv10: 245, 246`, under "TCGplayer lists N number(s)
+we lack" or "we list N number(s) TCGplayer lacks", plus our sets no group matches and how
+many more groups match none of ours. The public log carries set ids, numbers and counts
+only; TCGplayer's product and group names are in `tools/tcgcsv-probe-report.md`, written
+when the probe runs locally. Once a new difference is looked at (a missing card, a print,
+or numbering), make it known:
+
+```bash
+node tools/tcgcsv-probe.mjs --update-baseline   # the current diff becomes the baseline
+node tools/tcgcsv-probe.mjs --offline           # rerun on the cached answers, no request
+```
+
+The baseline changes only when the differences do. On a 403 or 429 the probe stops at
+once, with no retry, and the next Monday tries again. The step is `continue-on-error`, so
+it never costs the rest of the run.
+
+**Withdrawing it.** Delete the "Check against TCGplayer" step in
+`.github/workflows/refresh-data.yml` and `tools/tcgcsv-baseline.json`. Nothing in `data/`
+or the app reads either.
 
 ### Card catalogue
 
@@ -548,7 +587,7 @@ Card data and images come from:
 - [Limitless TCG](https://limitlesstcg.com/) — Japanese card scans
 - [PokéAPI](https://pokeapi.co/) — the Pokémon catalogue and its names in other languages (`data/species.json`)
 - Collectors' "Missing card" reports — cards no source lists (`data/overrides.json`)
-- [TCGplayer](https://www.tcgplayer.com/), via [TCGCSV](https://tcgcsv.com/) — Jumbo prints TCGdex does not list yet (`data/print-overrides.json`)
+- [TCGplayer](https://www.tcgplayer.com/), via [TCGCSV](https://tcgcsv.com/) — Jumbo prints TCGdex does not list yet (`data/print-overrides.json`), and the weekly check of the English catalogue
 
 This project is [MIT-licensed](LICENSE) and is not affiliated with, endorsed
 by, or sponsored by Nintendo, The Pokémon Company, or The Pokémon Company

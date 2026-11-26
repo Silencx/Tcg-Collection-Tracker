@@ -258,13 +258,22 @@ Notes from building it:
 Used for finding gaps and confirming reports, not as the main data, until there's a
 shared card id (Phase 8).
 
-- [ ] TCGCSV (free daily mirror of TCGplayer's catalogue, no key; category 3 is Pokémon,
+- [x] TCGCSV (free daily mirror of TCGplayer's catalogue, no key; category 3 is Pokémon,
   and Pokémon Japan has its own category). Probe script first. Filter out sealed
   products; one product per print. Owner checks the terms before anything is published.
-- [ ] PokemonTCG/pokemon-tcg-data (MIT JSON per set, English only). Note: pokemontcg.io
+  Probe: `tools/tcgcsv-probe.mjs`. The owner checked the terms on 2026-11-26.
+- [x] PokemonTCG/pokemon-tcg-data (MIT JSON per set, English only). Note: pokemontcg.io
   is being folded into Scrydex, so treat it as a check source that may go stale.
-- [ ] Diff each against our catalogue; the output goes into the coverage report from
-  Phase 1.
+  Probe: `tools/ptcg-data-probe.mjs`. It stays a local probe, by the owner's choice
+  (2026-11-26): TCGCSV covers the same English sets and is newer.
+- [x] Diff each against our catalogue; the output goes into the coverage report from
+  Phase 1. TCGCSV only: every Monday `refresh-data.yml` runs the probe after the
+  catalogue build (`continue-on-error`). The diff is `tools/lib/tcgcsv.mjs`. The
+  differences known on 2026-11-26 (381 numbers only TCGplayer lists, 158 only we list,
+  45 unmatched groups, 33 sets of ours no group matches) are in
+  `tools/tcgcsv-baseline.json`. The log gets `[coverage]` lines for anything new, as
+  set ids and numbers only, so no TCGplayer name or id reaches the public log. After a
+  look, `--update-baseline` makes them known. Japanese (`--jp`) stays local.
 - [ ] Optional: use a source match to auto-confirm a Phase 5 report (level 3). Auto-merge
   only if the owner agrees.
 
