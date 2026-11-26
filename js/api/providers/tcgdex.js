@@ -5,6 +5,9 @@
 //   Base https://api.tcgdex.net/v2/{lang}/… — keyless, CORS-open, fast.
 //   /{lang}/cards?name=X  → [{ id, localId, name, image }]  (contains-match on the
 //                           LOCALIZED name; image may be absent on list items).
+//   /{lang}/cards?dexId=eq:N → the same items, for cards whose Pokédex numbers include
+//                           N. The `eq:` matters: a bare ?dexId=29 is a contains-match
+//                           on the digits and also answers 129, 229, 295… (2026-11-26).
 //   /{lang}/sets          → [{ id, name, releaseDate, symbol, logo, cardCount }].
 //   /{lang}/cards/{id}    → full detail incl. variants {normal,reverse,holo,
 //                           firstEdition,wPromo} + variants_detailed (one entry per print).
@@ -22,7 +25,12 @@
 import { LANGUAGES } from '../../config.js';
 import { tcgdexAssetBase, tcgdexSerieSegment } from '../images.js';
 import { listedImageBase } from '../card-image-model.js';
+import { namesSpecies, cardIsSpecies, readDexIds } from '../match-model.js';
 import { normalizeVariants } from '../variants.js';
+
+// The name rule moved to match-model.js with the Pokédex-number rule; re-exported for
+// the callers that have always imported it from here.
+export { namesSpecies };
 
 const API = 'https://api.tcgdex.net/v2';
 
@@ -83,11 +91,13 @@ export async function pooledForEach(items, limit, worker) {
 //     so callers merge results by exact id and ignore the rest.
 //   · never select set{serie}: it is null on some sets, and a null in a non-null field
 //     makes GraphQL drop the WHOLE card from the answer.
+//   · `dexId` is a nullable list, null on Trainers and Energy; `filters:{dexId:N}` is an
+//     exact match on one of the numbers (2026-11-26).
 const GQL = `${API}/graphql`;
 const GQL_PAGE = 1000;
 const GQL_MAX_PAGES = 5;
 const GQL_QUERY = 'query($f:CardsFilters,$p:Int!,$k:Int){ cards(filters:$f, pagination:{page:$p,itemsPerPage:$k}){ '
-  + 'id localId name suffix rarity category trainerType set{id} '
+  + 'id localId name suffix rarity category trainerType dexId set{id} '
   + 'variants{normal reverse holo firstEdition wPromo} '
   + 'variants_detailed{type subtype stamp size foil} } }';
 
@@ -129,15 +139,19 @@ const REST_VARIANT_FALLBACK_MAX = 30;
  * Attach `variants` (see variants.normalizeVariants) to `cards` in place. GraphQL first,
  * one query per filter; then REST detail for the few cards it did not return. Best
  * effort: a card with no data keeps no `variants` and is never dropped.
+ * @param {Map<string, number[]>} [dexOut] filled with the Pokédex numbers of every card
+ *   an answer covered ([] for a card that has none); a card missing from it is unknown
  */
-async function attachVariants(cards, filters, signal, apiCode = 'en') {
+async function attachVariants(cards, filters, signal, apiCode = 'en', dexOut = null) {
   if (!cards.length) return;
   const sig = budgetSignal(signal);
   const byId = new Map(cards.map(c => [c.id, c]));
+  const note = d => { if (dexOut && byId.has(d.id) && !dexOut.has(d.id)) dexOut.set(d.id, readDexIds(d.dexId)); };
   const results = await Promise.allSettled(filters.map(f => gqlCards(f, sig)));
   for (const r of results) {
     if (r.status !== 'fulfilled') continue;
     for (const d of r.value) {
+      note(d);
       const c = byId.get(d.id);
       if (!c || c.variants) continue;
       const v = normalizeVariants(d);
@@ -148,52 +162,32 @@ async function attachVariants(cards, filters, signal, apiCode = 'en') {
   if (!rest.length || rest.length > REST_VARIANT_FALLBACK_MAX) return;
   await pooledForEach(rest, DETAIL_CONCURRENCY, async c => {
     try {
-      const v = normalizeVariants(await getJSON(`${API}/${apiCode}/cards/${c.id}`, sig));
+      const d = await getJSON(`${API}/${apiCode}/cards/${c.id}`, sig);
+      if (d?.id) note(d);
+      const v = normalizeVariants(d);
       if (v) c.variants = v;
     } catch { /* no variant data for this card — leave it absent */ }
   });
 }
 
+// GraphQL filters for one Pokémon: by name, and by Pokédex number when it is known. The
+// number finds the cards the name cannot ("Nidoran ♀", "Farfetch’d", Tag Teams); the name
+// finds the ones with no number (Trainers, the newest set).
+const pokemonFilters = (names, dexByName) => (names || []).flatMap(name => {
+  const dex = dexByName?.get(name);
+  return Number.isInteger(dex) ? [{ name }, { dexId: dex }] : [{ name }];
+});
+
 /**
  * Print variants for cards that came from somewhere else (the catalogue, data/cat/),
- * looked up by Pokémon name like getCards does. In place, best effort, never throws.
+ * looked up by Pokémon like getCards does. In place, best effort, never throws.
+ * @param {Map<string, number>} [opts.dexByName] Pokémon name → National Dex number
  */
-export async function getVariants(cards, names, { signal } = {}) {
-  await attachVariants(cards, (names || []).map(name => ({ name })), signal);
+export async function getVariants(cards, names, { signal, dexByName = null } = {}) {
+  await attachVariants(cards, pokemonFilters(names, dexByName), signal);
 }
 
-const escapeRe = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
-/**
- * Does `cardName` name this species, as a whole word?
- *
- * `?name=` is a CONTAINS match (see the header note), so querying "Mew" also
- * returns every Mewtwo, Mewtwo-EX and Mew & Mewtwo-GX card. Requiring the query
- * to sit between non-alphanumerics keeps genuine cameos — "Seedot & Nuzleaf-GX"
- * still counts for both Seedot and Nuzleaf, which the README treats as a feature
- * — while "Mewtwo" stops answering to "Mew".
- *
- * Hand-rolled boundaries rather than `\b`: names ending in a non-word character
- * (Nidoran♀, Farfetch'd) get no `\b` there at all, so `\bNidoran♀\b` could never
- * match.
- */
-export function namesSpecies(cardName, species) {
-  if (typeof cardName !== 'string' || !cardName) return false;
-  const re = new RegExp(`(?<![A-Za-z0-9])${escapeRe(species)}(?![A-Za-z0-9])`, 'gi');
-  for (let m = re.exec(cardName); m; m = re.exec(cardName)) {
-    // A hyphen straight after the match is ambiguous. It either starts a card
-    // suffix — "Nuzleaf-GX", same Pokémon, keep — or continues a DIFFERENT
-    // species' name: "Porygon-Z" is not Porygon, "Kommo-o" is not Kommo,
-    // "Ho-Oh" is not Ho. Suffix tags are all-caps and at least two letters;
-    // species continuations ("Z", "o", "Oh") are not, which separates the two
-    // cases without needing a hardcoded suffix list. An unrecognised all-caps
-    // tag is kept, matching this provider's never-a-shorter-list rule.
-    const hyphen = /^-([A-Za-z]+)/.exec(cardName.slice(m.index + m[0].length));
-    if (hyphen && !(hyphen[1].length >= 2 && hyphen[1] === hyphen[1].toUpperCase())) continue;
-    return true;
-  }
-  return false;
-}
+const asList = data => (Array.isArray(data) ? data : (data?.data || []));
 
 /**
  * EN master card index for the given Pokémon names.
@@ -206,41 +200,85 @@ export function namesSpecies(cardName, species) {
  * @param {object} [opts]
  * @param {Object<string,string>|null} [opts.setSeries] set id → CDN series (data/sets.json),
  *   used for the image base of a card the list returns without one
+ * @param {Map<string, number>|null} [opts.dexByName] every Pokémon's name → National Dex
+ *   number. With it, a card numbered for the Pokémon counts as well as one named for it
+ *   (match-model.js, cardIsSpecies), and a second search by number finds the ones the
+ *   name search cannot ("Nidoran ♀", "Farfetch’d"). Without it, the name rule alone.
  */
-export async function getCards(names, { signal, withVariants = true, setSeries = null } = {}) {
-  const out = [];
-  const seen = new Set();
-  // One request per name, in parallel — they are independent, and awaiting them
-  // in sequence made a multi-Pokémon list take the SUM of its round trips.
-  // Results are consumed in the original order so `seen` still resolves a shared
-  // cameo card to the first-listed Pokémon deterministically.
-  const lists = await Promise.all(
-    names.map(name => getJSON(`${API}/en/cards?name=${encodeURIComponent(name)}`, signal))
-  );
-  for (let i = 0; i < names.length; i++) {
-    const name = names[i];
-    const data = lists[i];
-    const list = Array.isArray(data) ? data : (data?.data || []);
-    for (const c of list) {
-      if (!c?.id || seen.has(c.id)) continue;
-      if (!namesSpecies(c.name, name)) continue;   // drop the contains-match false positives
-      seen.add(c.id);
-      out.push({
+export async function getCards(names, { signal, withVariants = true, setSeries = null, dexByName = null } = {}) {
+  // Per name, in parallel — they are independent, and awaiting them in sequence made a
+  // multi-Pokémon list take the SUM of its round trips: the name search, and the exact
+  // number search when the number is known. A failed number search costs only what it
+  // would have added; a failed name search fails the call, as it always has.
+  const found = await Promise.all(names.map(async name => {
+    const n = dexByName?.get(name);
+    const dex = Number.isInteger(n) ? n : undefined;
+    const [byName, byDex] = await Promise.all([
+      getJSON(`${API}/en/cards?name=${encodeURIComponent(name)}`, signal),
+      dex ? getJSON(`${API}/en/cards?dexId=eq:${dex}`, signal).catch(() => null) : null,
+    ]);
+    return { name, dex, byName: asList(byName), byDex: byDex ? asList(byDex) : [] };
+  }));
+
+  // Every candidate once, whichever search and Pokémon found it. `numbered`: the number
+  // search found it, so its numbers include this Pokémon's.
+  const pool = new Map();
+  const keep = c => {
+    if (!pool.has(c.id)) {
+      pool.set(c.id, {
         id: c.id,
         // Keep the API's own name. Overwriting it with the query term made every
         // Mewtwo card claim to be "Mew", and erased the real names of cameo cards.
         name: c.name,
-        species: name,
         image: c.image || imageBaseFromId(c.id, setSeries),
         localId: c.localId != null ? String(c.localId) : splitId(c.id).localId,
       });
     }
+  };
+  for (const f of found) {
+    f.ids = [];
+    const mine = new Set();
+    for (const c of f.byName) {
+      // namesSpecies drops the contains-match false positives (Mewtwo for Mew).
+      if (!c?.id || mine.has(c.id) || !namesSpecies(c.name, f.name)) continue;
+      keep(c); mine.add(c.id); f.ids.push(c.id);
+    }
+    f.numbered = new Set();
+    for (const c of f.byDex) {
+      if (!c?.id) continue;
+      f.numbered.add(c.id);
+      if (mine.has(c.id)) continue;
+      keep(c); mine.add(c.id); f.ids.push(c.id);
+    }
   }
-  if (!out.length) throw new Error('TCGdex returned no cards');
+  if (!pool.size) throw new Error('TCGdex returned no cards');
 
   // Every era now: TCGdex fixed the old-era data (ex16-97 reports holo:true today), and
   // the one remaining hole — BW/XY/SM reverse holos — is filled in normalizeVariants.
-  if (withVariants) await attachVariants(out, names.map(name => ({ name })), signal);
+  // The same answers carry each card's Pokédex numbers.
+  const dexIds = new Map();
+  if (withVariants) await attachVariants([...pool.values()], pokemonFilters(names, dexByName), signal, 'en', dexIds);
+
+  // Consumed in the original order, so a shared cameo card resolves to the first-listed
+  // Pokémon deterministically.
+  const out = [];
+  const seen = new Set();
+  for (const f of found) {
+    for (const id of f.ids) {
+      if (seen.has(id)) continue;
+      const c = pool.get(id);
+      // A card the number search found is checked against its name (cardIsSpecies). Its
+      // full numbers come from GraphQL; without that answer, it is known only to carry
+      // this Pokémon's.
+      const ids = dexIds.get(id) ?? (f.numbered.has(id) ? [f.dex] : []);
+      if (!cardIsSpecies({ name: c.name, dexIds: ids }, f.name, dexByName)) continue;
+      seen.add(id);
+      const card = { id: c.id, name: c.name, species: f.name, image: c.image, localId: c.localId };
+      if (c.variants) card.variants = c.variants;
+      out.push(card);
+    }
+  }
+  if (!out.length) throw new Error('TCGdex returned no cards');
   return out;
 }
 

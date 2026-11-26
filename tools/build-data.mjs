@@ -26,6 +26,8 @@ import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { DEFAULT_POKEMON, SCHEMA_VERSION, DIGITAL_SERIES } from '../js/config.js';
 import { getCards, getSetMeta } from '../js/api/providers/tcgdex.js';
+import { readSpeciesFile } from '../js/api/species-model.js';
+import { dexByNameFrom } from '../js/api/match-model.js';
 import { fetchJpRawByName } from '../js/api/bulba-jp.js';
 import { uniqueSlug } from '../js/slug.js';
 import { planJpSnapshot } from './lib/jp-keep.mjs';
@@ -146,11 +148,14 @@ async function main() {
   // A failed fetch keeps the committed shard (same identity test as the JP guard below);
   // with none committed, no shard is written and visitors fetch that Pokémon live. If
   // EVERY fetch fails, TCGdex is down: stop before anything is written.
+  // Matched by Pokédex number like the app's catalogue and live search (match-model.js);
+  // without data/species.json, by name alone.
+  const dexByName = dexByNameFrom(readSpeciesFile(readJSON('species.json'))?.catalog);
   console.log('[build-data] fetching card shards from TCGdex…');
   const shards = [];
   for (const [i, name] of POKEMON.entries()) {
     try {
-      shards.push({ cards: (await getCards([name], { setSeries })).sort(byId) });
+      shards.push({ cards: (await getCards([name], { setSeries, dexByName })).sort(byId) });
     } catch (e) {
       const prev = readJSON(`cards/${slugs[i]}.json`);
       const kept = prev?.builtAt && prev.pokemon === name && Array.isArray(prev.cards) ? prev.cards : null;

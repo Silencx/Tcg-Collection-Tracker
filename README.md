@@ -48,9 +48,13 @@ Placeholder tiles show the Pokémon's name in the card's language for every spec
 Japanese, Korean, both Chinese scripts, and German, French, Spanish or Italian wherever
 that name differs from the English one. Thai and Indonesian tiles show the English name.
 
-Search also catches **cameo** appearances — cards where your Pokémon shows up
-alongside another (Tag Team cards, partner promos, etc.) — since matching is
-name-based, not "must be the only Pokémon on the card."
+A card is your Pokémon's when its name names it as a whole word ("Mewtwo" is not Mew's)
+or when TCGdex's Pokédex numbers for the card include it. The numbers find cards whose
+printed name the name rule cannot read ("Nidoran ♀", "Farfetch’d", "Ho Oh") and
+**cameo** appearances whose name leaves your Pokémon out ("Terapagos & Friends" is
+Pikachu's too). Tag Team cards show up for every Pokémon on them. A card whose name is
+plainly another Pokémon's is not moved by a wrong number: TCGdex numbers one "Electrode"
+as Gyarados, and it stays Electrode's (`js/api/match-model.js`).
 
 ### Print variant badges
 Each card's footer shows which prints exist: **H** holo, **RH** reverse holo,
@@ -136,8 +140,11 @@ Start with `js/main.js` (boot, mode switching, the window handler manifest),
 `js/api/router.js` (where data comes from) and `js/ui/masterset.js` (the main grid).
 
 **Data flow:**
-- EN cards: `data/cat/en/` catalogue → `data/cards/<slug>.json` shards → live TCGdex.
-  Print variants: the Pokémon's shard, else one live TCGdex GraphQL request.
+- EN cards: `data/cat/en/` catalogue → `data/cards/<slug>.json` shards → live TCGdex
+  (a name search and an exact Pokédex-number search). Each source matches cards to
+  Pokémon by name or number, by the one rule in `js/api/match-model.js`, with the
+  numbers from `data/species.json`. Print variants: the Pokémon's shard, else live TCGdex
+  GraphQL (by name and by number).
 - Single set: live TCGdex → `data/cat/{lang}/` catalogue when TCGdex is down.
 - Set names, dates, symbols: `data/sets.json` → live TCGdex.
 - Pokémon catalogue and native names: `data/species.json` → the built-in 357 in
@@ -160,7 +167,7 @@ can't be reassigned across files). The markup uses inline `onclick="fn()"` handl
 | `tools/build-catalog.mjs` (`npm run build-catalog`) | TCGdex | `data/cat/` | none |
 | `tools/build-species.mjs` (`npm run build-species`; one-off, per new generation) | PokéAPI | `data/species.json` | none |
 | `tools/check.mjs` | `js/`, `tools/` | — | none |
-| `tools/apitcg-probe.mjs`, `tools/pokewallet-probe.mjs`, `tools/tcgdex-catalog-probe.mjs`, `tools/jp-gap-size.mjs` | research probes; reports stay local | — | their own |
+| `tools/apitcg-probe.mjs`, `tools/pokewallet-probe.mjs`, `tools/tcgdex-catalog-probe.mjs`, `tools/tcgdex-dexid-probe.mjs`, `tools/jp-gap-size.mjs` | research probes; reports stay local | — | their own |
 
 `.github/workflows/refresh-data.yml` runs build-data, build-catalog, build-jp-catalog and
 build-images every Monday, and the two PokéWallet steps alone on the other days (see
@@ -168,7 +175,8 @@ build-images every Monday, and the two PokéWallet steps alone on the other days
 Pokémon's card list comes from the catalogue (see "Card catalogue" below). A pre-built
 Pokémon (`data/prebuilt.json`, at most 60) also has its print variants and its
 Bulbapedia Japanese rows baked in, so a visitor tracking only pre-built Pokémon makes zero
-API calls, and any other Pokémon costs one GraphQL request for its print badges. Run the
+API calls, and any other Pokémon costs two GraphQL requests (by name and by Pokédex
+number) for its print badges. Run the
 workflow by hand from the **Actions** tab to pre-build more: its `add` input appends
 Pokémon to `data/prebuilt.json`, so the next scheduled run keeps them.
 
@@ -220,23 +228,26 @@ built by `tools/build-catalog.mjs`:
 
 ```
 data/cat/index.json                  # which languages, how many cards, which shards
-data/cat/{lang}/cards-{a-z,0}.json   # [set, number, name, category, 0?], split by name letter
+data/cat/{lang}/cards-{a-z,0}.json   # [set, number, name, category, [dex…]?, 0?], split by name letter
 ```
 
-About 126,000 cards and 5 MB in all; English is 23,900 cards in 869 KB, and no shard is
-over 100 KB before gzip except the one `cards-0.json` of Traditional Chinese (247 KB) and
+About 126,000 cards and 5 MB in all; English is 23,900 cards in 993 KB, and no shard is
+over 115 KB before gzip except the one `cards-0.json` of Traditional Chinese (247 KB) and
 of Thai (146 KB). A card is filed under the first letter of every word in its name, as in
 `data/jp-cat/`, so the master set loads one shard per Pokémon; a name with no Latin letter
 goes in `cards-0.json`. The card id is always `{set}-{number}` and the image address is
 rebuilt from `data/sets.json`, so neither is stored. Category is `P`, `T` or `E`
-(Pokémon, Trainer, Energy). A trailing `0` marks a card TCGdex lists without a scan, which
-is about two thirds of the Traditional Chinese, Thai and Indonesian cards.
+(Pokémon, Trainer, Energy). English rows then carry the card's Pokédex numbers, when it
+has any: every Pokémon card except the newest set's, before TCGdex fills them in. A card
+is also filed under the shard of each Pokémon its numbers name, so "Terapagos & Friends"
+is in Pikachu's shard. A trailing `0` marks a card TCGdex lists without a scan, which is
+about two thirds of the Traditional Chinese, Thai and Indonesian cards.
 
 - **Master set and the True master set popup** read the English catalogue first
   (`js/api/catalog.js`), so any Pokémon gets its full list without a live name search,
-  matched by the same whole-word rule as the live search. Print badges come from the
-  Pokémon's pre-built shard if it has one, else from one TCGdex GraphQL request; if that
-  fails, the cards still show, without badges.
+  matched by name or Pokédex number like the live search. Print badges come from the
+  Pokémon's pre-built shard if it has one, else from TCGdex GraphQL; if that fails, the
+  cards still show, without badges.
 - **Single set** still asks TCGdex first: that is one request and brings print badges,
   where the catalogue would load every shard of the language. When TCGdex is down, the set
   is listed from the catalogue, with its name, date and count from `data/sets.json`, and
@@ -246,10 +257,12 @@ is about two thirds of the Traditional Chinese, Thai and Indonesian cards.
 
 The build needs no key: per language, `/{lang}/cards` (the whole list in one answer),
 `/{lang}/categories`, and the list once per category, because list items carry none.
-That is 45 requests, about 5 seconds, every Monday. A language is replaced only by a
-complete answer: one that fails, or lost more than a tenth of its cards, keeps its
-committed files (`--force` accepts the drop). The log prints each language's cards, sets,
-size and largest shard.
+English adds its Pokédex numbers from GraphQL, the only bulk source, one query per
+category. That is about 52 requests and 6 seconds every Monday. A language is replaced
+only by a complete answer: one that fails, or lost more than a tenth of its cards, keeps
+its committed files, and so does English when under 90% of its Pokémon cards come back
+with numbers (`--force` accepts either). The log prints each language's cards, sets, size
+and largest shard, and for English how many cards have numbers and which sets lack them.
 
 ```bash
 npm run build-catalog                 # every language

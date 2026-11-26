@@ -32,6 +32,7 @@ npm-debug.log*
 tools/apitcg-probe-report.md
 tools/pokewallet-probe-report.md
 tools/tcgdex-catalog-probe-report.md
+tools/tcgdex-dexid-probe-report.md
 tools/pokewallet-probe-images/
 tools/jp-gap-size-report.md
 tools/jp-gap-size.json

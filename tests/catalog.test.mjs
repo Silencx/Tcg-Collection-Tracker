@@ -8,14 +8,15 @@ import { readFileSync, existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  CATALOG_LANGS, categoryCode, cardSet, catalogRows, rowLetters, shardRows, indexFile, acceptCount,
+  CATALOG_LANGS, categoryCode, cardSet, catalogRows, rowLetters, rowShardLetters, dexLetters, shardRows,
+  indexFile, acceptCount,
 } from '../tools/lib/catalog.mjs';
 import {
   naturalCompare, readCatalogIndex, readCatalogShard, shardLettersFor, matchCatalog, catalogSetCards,
-  catalogSetInfo,
+  catalogSetInfo, rowDexIds, rowHasScan,
 } from '../js/api/catalog-model.js';
 import { nameShardLetters, speciesShardLetter } from '../js/api/jp-model.js';
-import { namesSpecies } from '../js/api/providers/tcgdex.js';
+import { cardIsSpecies, dexByNameFrom } from '../js/api/match-model.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const readJson = rel => JSON.parse(readFileSync(resolve(ROOT, rel), 'utf8'));
@@ -70,6 +71,32 @@ test('a card TCGdex lists without a scan gets a trailing 0, and only that card',
   assert.deepEqual(rows, [
     ['SV1S', '001', '皮卡丘', 'P'], ['SV1S', '002', '妙蛙種子', 'P', 0], ['SV1S', '003', '小火龍', null, 0],
   ]);
+});
+
+test('English rows carry the card\'s Pokédex numbers before the no-scan 0', () => {
+  const { rows } = catalogRows([
+    { id: 'lc-82', localId: '82', name: 'Nidoran ♀' },
+    { id: 'sm9-33', localId: '33', name: 'Pikachu & Zekrom GX', image: 'https://assets.tcgdex.net/en/sm/sm9/33' },
+    { id: 'swsh1-181', localId: '181', name: 'Rotom Bike', image: 'https://assets.tcgdex.net/en/swsh/swsh1/181' },
+  ], new Map(), new Map([['lc-82', [29]], ['sm9-33', [644, 25, 25]]]));
+  assert.deepEqual(rows, [
+    ['lc', '82', 'Nidoran ♀', null, [29], 0],
+    ['sm9', '33', 'Pikachu & Zekrom GX', null, [25, 644]],
+    ['swsh1', '181', 'Rotom Bike', null],
+  ]);
+  assert.deepEqual(rows.map(rowDexIds), [[29], [25, 644], []]);
+  assert.deepEqual(rows.map(rowHasScan), [false, true, true]);
+  assert.equal(rowHasScan(['SV1S', '002', '妙蛙種子', 'P', 0]), false, 'languages with no numbers read as before');
+});
+
+test('a row is also filed under the shard of every Pokémon its numbers name', () => {
+  const byDex = dexLetters([[25, 1, 'Pikachu'], [29, 1, 'Nidoran♀'], [1024, 9, 'Terapagos']]);
+  const friends = ['svp', '500', 'Terapagos & Friends', 'P', [25, 1024]];
+  assert.deepEqual(rowShardLetters(friends, byDex).sort(), ['f', 'p', 't']);
+  assert.deepEqual(rowShardLetters(['lc', '82', 'Nidoran ♀', 'P', [29], 0], byDex), ['n']);
+  const shards = shardRows([friends], byDex);
+  assert.deepEqual(Object.keys(shards), ['f', 'p', 't']);
+  assert.deepEqual(shardRows([friends]).p, undefined, 'without the species list, by name only');
 });
 
 test('a card is filed under every word of its name; a name with no Latin letter under "0"', () => {
@@ -131,6 +158,18 @@ test('matching: a card two listed Pokémon share goes to the first-listed one', 
   assert.equal(b.cards.find(c => c.id === 'B1-009').image, 'https://assets.tcgdex.net/en/tcgp/B1/009', 'number kept as printed');
 });
 
+test('matching: by Pokédex number as well as by name, given the species list', () => {
+  const dexByName = dexByNameFrom([{ name: 'Nidoran♀', dex: 29 }, { name: 'Gyarados', dex: 130 }, { name: 'Electrode', dex: 101 }]);
+  const shards = new Map([
+    ['n', [['lc', '82', 'Nidoran ♀', 'P', [29], 0], ['sv03.5', '029', 'Nidoran♀', 'P', [29]]]],
+    ['g', [['base1', '6', 'Gyarados', 'P', [130]], ['mfb', '22', 'Electrode', 'P', [130]]]],
+  ]);
+  assert.deepEqual(matchCatalog(shards, ['Nidoran♀'], { dexByName }).cards.map(c => c.id), ['lc-82', 'sv03.5-029']);
+  assert.deepEqual(matchCatalog(shards, ['Nidoran♀']).cards.map(c => c.id), ['sv03.5-029'], 'name rule alone');
+  assert.deepEqual(matchCatalog(shards, ['Gyarados'], { dexByName }).cards.map(c => c.id), ['base1-6'],
+    'a card numbered for Gyarados but named Electrode is not believed');
+});
+
 test('matching: Pokémon with no card are named, and only needed shards are asked for', () => {
   assert.deepEqual(matchCatalog(SHARDS, ['Mew', 'Shiftry']).empty, ['Shiftry']);
   assert.deepEqual(shardLettersFor(['Mew', 'Mewtwo', 'Seedot', 'Zygarde'], ['m', 's', 'n']), ['m', 's']);
@@ -181,7 +220,13 @@ test('the set details for a catalogue answer come from data/sets.json, per langu
 
 // ── the committed files ───────────────────────────────────────────────────────
 
-const species = readJson('data/species.json').species.map(s => s[2]);
+const speciesRows = readJson('data/species.json').species;
+const species = speciesRows.map(s => s[2]);
+const dexByName = new Map(speciesRows.map(s => [s[2], s[0]]));
+const enShards = () => {
+  const idx = readCatalogIndex(readJson('data/cat/index.json'));
+  return new Map(idx.langs.en.shards.map(l => [l, readCatalogShard(readJson(`data/cat/en/cards-${l}.json`))]));
+};
 
 test('every Pokémon is looked up under a letter its own name is filed under', () => {
   // Whole-word matching means a card naming the Pokémon has all of its words, so this is
@@ -200,13 +245,48 @@ test('the committed catalogue reads, and its shards are all there', () => {
 });
 
 test('the English catalogue finds exactly what scanning every card would (sample)', () => {
-  const idx = readCatalogIndex(readJson('data/cat/index.json'));
-  const shards = new Map(idx.langs.en.shards.map(l => [l, readCatalogShard(readJson(`data/cat/en/cards-${l}.json`))]));
+  const shards = enShards();
   const all = [...new Map([...shards.values()].flat().map(r => [`${r[0]}-${r[1]}`, r])).values()];
-  const sample = species.filter((_, i) => i % 25 === 0).concat(['Mew', 'Nidoran♀', "Farfetch'd", 'Ho-Oh', 'Porygon-Z', 'Mr. Mime']);
+  const sample = species.filter((_, i) => i % 25 === 0)
+    .concat(['Mew', 'Nidoran♀', 'Nidoran♂', "Farfetch'd", 'Ho-Oh', 'Porygon-Z', 'Mr. Mime', 'Pikachu', 'Sprigatito']);
   for (const name of sample) {
-    const want = all.filter(r => namesSpecies(r[2], name)).map(r => `${r[0]}-${r[1]}`).sort();
-    const got = matchCatalog(shards, [name]).cards.map(c => c.id).sort();
+    const want = all.filter(r => cardIsSpecies({ name: r[2], dexIds: rowDexIds(r) }, name, dexByName))
+      .map(r => `${r[0]}-${r[1]}`).sort();
+    const got = matchCatalog(shards, [name], { dexByName }).cards.map(c => c.id).sort();
     assert.deepEqual(got, want, name);
   }
+});
+
+test('every English card with numbers is in the shard of each Pokémon it numbers', () => {
+  // What lets the app load one shard per Pokémon although "Terapagos & Friends" is
+  // Pikachu's card: matching by number would otherwise need every shard.
+  const letterOf = new Map(speciesRows.map(s => [s[0], speciesShardLetter(s[2])]));
+  const shards = enShards();
+  const inShard = new Map([...shards].map(([l, rows]) => [l, new Set(rows.map(r => `${r[0]}-${r[1]}`))]));
+  let checked = 0;
+  for (const rows of shards.values()) {
+    for (const r of rows) {
+      for (const n of rowDexIds(r)) {
+        const l = letterOf.get(n);
+        if (l) { checked++; assert.ok(inShard.get(l)?.has(`${r[0]}-${r[1]}`), `${r[0]}-${r[1]} "${r[2]}" not in cards-${l}`); }
+      }
+    }
+  }
+  assert.ok(checked > 20000);
+});
+
+test('the committed English catalogue gets the plan\'s edge cases right', () => {
+  const shards = enShards();
+  const ids = name => new Set(matchCatalog(shards, [name], { dexByName }).cards.map(c => c.id));
+  const has = (name, id, want = true) => assert.equal(ids(name).has(id), want, `${name} ${want ? 'has' : 'lacks'} ${id}`);
+  has('Nidoran♀', 'lc-82');            // "Nidoran ♀"
+  has('Nidoran♂', 'lc-83');            // "Nidoran ♂"
+  has("Farfetch'd", 'sm9-127');        // "Farfetch’d"
+  has('Ho-Oh', 'xyp-XY153');           // "Ho Oh"
+  has('Pikachu', 'svp-500');           // "Terapagos & Friends"
+  has('Mew', 'base1-10', false);       // "Mewtwo" is not Mew's…
+  has('Mew', 'sm11-71');               // …"Mewtwo & Mew GX" is both
+  has('Mewtwo', 'sm11-71');
+  has('Electrode', 'mfb-22');          // …and a card TCGdex numbers wrongly stays with its name
+  has('Gyarados', 'mfb-22', false);
 });

@@ -3,20 +3,24 @@
 // tools/build-catalog.mjs). No DOM and no fetch: js/api/catalog.js loads the files.
 //
 //   data/cat/index.json            { builtAt, langs: { en: { cards, sets, shards:['0','a',…] } } }
-//   data/cat/{lang}/cards-{l}.json { builtAt, lang, rows: [[set, number, name, category, 0?]] }
+//   data/cat/{lang}/cards-{l}.json { builtAt, lang, rows: [[set, number, name, category, [dex…]?, 0?]] }
+//
+// After the category, a row may carry the card's Pokédex numbers (an array; English
+// only) and then a 0 when TCGdex lists the card without a scan (card-image-model.js).
+// The card id is `${set}-${number}`; the image address is rebuilt from data/sets.json's
+// series map.
 //
 // A card is filed under the first letter of every word of its name (the data/jp-cat/
-// rule, js/api/jp-model.js), so one Pokémon's cards are in one shard. The card id is
-// `${set}-${number}`; the image address is rebuilt from data/sets.json's series map. A
-// trailing 0 means TCGdex lists the card without a scan (card-image-model.js).
-// Cards come out in the shapes providers/tcgdex.js emits (getCards for the master set,
-// getSetCards for one set), so neither mode can tell which one answered.
+// rule, js/api/jp-model.js), and under the letter of every Pokémon its numbers name, so
+// one Pokémon's cards are in one shard. Cards come out in the shapes providers/tcgdex.js
+// emits (getCards for the master set, getSetCards for one set), so neither mode can tell
+// which one answered.
 // =============================================================================
 
 import { speciesShardLetter } from './jp-model.js';
 import { tcgdexAssetBase, tcgdexSerieSegment } from './images.js';
 import { tcgdexCdnLang } from './card-image-model.js';
-import { namesSpecies } from './providers/tcgdex.js';
+import { cardIsSpecies, readDexIds } from './match-model.js';
 
 const LETTER = /^[a-z0]$/;
 
@@ -56,7 +60,10 @@ export function readCatalogShard(json) {
 }
 
 /** Whether TCGdex has a scan for this row's card (no trailing 0). */
-export const rowHasScan = row => row[4] !== 0;
+export const rowHasScan = row => !row.slice(4).includes(0);
+
+/** The row card's Pokédex numbers; [] when it has none or the language carries none. */
+export const rowDexIds = row => readDexIds(row.slice(4).find(Array.isArray));
 
 /**
  * One row → a card in tcgdex.getCards' shape. `image` is always a base, scan or not, as
@@ -82,17 +89,20 @@ export function shardLettersFor(names, available) {
 
 /**
  * The cards of every Pokémon in `names`, from the shards loaded for them.
- * Same rules as tcgdex.getCards: whole-word name match (no Mewtwo for Mew), and a card
- * shared by two listed Pokémon goes to the first-listed one.
+ * Same rules as tcgdex.getCards: the whole-word name match or the card's Pokédex numbers
+ * (match-model.js, cardIsSpecies), and a card shared by two listed Pokémon goes to the
+ * first-listed one.
  * @param {Map<string, Array>} shards letter → rows
+ * @param {Map<string, number>} [opts.dexByName] Pokémon name → National Dex number;
+ *   without it, or for a name it lacks, the name rule alone
  * @returns {{ cards: Array, empty: string[] }} `empty`: names that matched no card
  */
-export function matchCatalog(shards, names, { setSeries = null } = {}) {
+export function matchCatalog(shards, names, { setSeries = null, dexByName = null } = {}) {
   const cards = [], empty = [], seen = new Set();
   for (const name of names || []) {
     let found = 0;
     for (const row of shards.get(speciesShardLetter(name)) || []) {
-      if (!namesSpecies(row[2], name)) continue;
+      if (!cardIsSpecies({ name: row[2], dexIds: rowDexIds(row) }, name, dexByName)) continue;
       found++;
       const id = `${row[0]}-${row[1]}`;
       if (seen.has(id)) continue;

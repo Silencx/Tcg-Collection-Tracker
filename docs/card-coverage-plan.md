@@ -153,17 +153,48 @@ Notes from building it:
 Fixes the substring problems (Mew pulling in Mewtwo, regional forms, "Team Rocket's X",
 Tag Teams, other languages).
 
-- [ ] VERIFY: TCGdex card details carry `dexId` (an array; Tag Teams have several). Check
+- [x] VERIFY: TCGdex card details carry `dexId` (an array; Tag Teams have several). Check
   how many older cards lack it.
-- [ ] Add `dexId` to `GQL_QUERY` in `js/api/providers/tcgdex.js` and to the catalogue rows
+- [x] Add `dexId` to `GQL_QUERY` in `js/api/providers/tcgdex.js` and to the catalogue rows
   from Phase 3.
-- [ ] Matching: `dexId` first; fall back to the current name match only for cards without
+- [x] Matching: `dexId` first; fall back to the current name match only for cards without
   one. Keep the cameo behaviour (Tag Team cards show up for every Pokémon on them).
-- [ ] Measure before and after on the three demo Pokémon plus Mew, Nidoran♀, Farfetch'd
+  (Built as "name or number", see the notes.)
+- [x] Measure before and after on the three demo Pokémon plus Mew, Nidoran♀, Farfetch'd
   and Pikachu; put the differences in the PR description.
-- [ ] Tests for the new matcher with those edge cases.
+- [x] Tests for the new matcher with those edge cases.
 
 Done when: those edge cases come out right without special-case regex.
+
+Notes from building it:
+
+- VERIFY held, and older cards are not the gap (2026-11-26,
+  `tools/tcgdex-dexid-probe.mjs`): 114 of 20,246 English Pokémon cards lack `dexId`, all
+  in the newest set (me06); 129 have several. One Trainer has some (Tropical Tidal Wave),
+  no Energy does. GraphQL gives every card's numbers in bulk when filtered by category
+  (5 pages of 5,000 for Pokémon, 0.7 s); REST lists carry none. For the live path,
+  `/cards?dexId=eq:N` and GraphQL `filters:{dexId:N}` are exact, but a bare `?dexId=29`
+  is a contains-match on the digits (Magikarp, #129, answers it).
+- The rule is "name or number", not "number first": a card is the Pokémon's when its
+  name names it (the whole-word rule) or when its numbers include it, unless its name is
+  plainly another Pokémon's that the numbers leave out. Measured over every English card
+  and all 1,025 species, number-first would have changed 20 species: 29 cards added, and
+  3 dropped that TCGdex numbers wrongly (mfb-22 "Electrode" as Gyarados, mfb-31 "Lapras"
+  as Magikarp, 2021swsh-12 "Chimchar" as Monferno), which it would also have filed under
+  the wrong Pokémon. The name rule had no false match left for numbers to fix. Name or
+  number changes 14 species: 26 cards added, none dropped.
+- Before → after on the committed catalogue: Seedot 21, Nuzleaf 20, Shiftry 24 and Mew 70
+  unchanged; Nidoran♀ 14 → 20 ("Nidoran ♀", "Giovanni's Nidoran ♀"), Farfetch'd 21 → 24
+  ("Farfetch’d"), Pikachu 246 → 248 ("Terapagos & Friends", "Tropical Tidal Wave"). Also
+  Nidoran♂ +5, Ho-Oh +1 ("Ho Oh"), and cameos for Psyduck, Marill, Hoppip, Omanyte,
+  Kabuto, Aerodactyl, Sprigatito, Fuecoco and Quaxly. Live TCGdex gives the same cards
+  as the catalogue for all of them.
+- Numbers are in the English catalogue only: GraphQL answers in English, and only the
+  master set (English) matches cards to Pokémon. A card is also filed under the shard of
+  every Pokémon its numbers name (6 cards needed it), so one shard per Pokémon still
+  holds all of its cards; tested on every card. English grew from 869 KB to 993 KB.
+- Japanese matching (`data/jp-cat/`, Bulbapedia) still uses names: those sources carry
+  no Pokédex numbers.
 
 ## Phase 5: Overrides file and automated "missing card" reports
 
