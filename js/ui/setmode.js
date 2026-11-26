@@ -22,7 +22,7 @@
 import { state, saveSetChk, saveSsPrints, saveSetTarget, saveSetPicker } from '../state.js';
 import { LANGUAGES, PLACEHOLDER_LANGS } from '../config.js';
 import { router } from '../api/router.js';
-import { tcgdexAssetBase, tcgdexSerieSegment } from '../api/images.js';
+import { listedImageBase } from '../api/card-image-model.js';
 import {
   langColor, mkPlaceholderEl, variantBadgesHtml, openPreviewMeta, markCardToggle,
 } from './masterset.js';
@@ -269,19 +269,17 @@ export function changeSet() {
 // ── THE SET ITSELF ────────────────────────────────────────────────────────────
 
 /**
- * Asset base for one card in one CDN language, or null for languages with no image
- * source at all (KR, SC).
+ * Asset base for one card of the open set, or null when it has no scan.
  *
- * The ONE place this mode derives a CDN path, so the serie-segment fix has a single
- * call site. `openSet.serie` comes straight from the TCGdex response and is
- * authoritative; the string rule below it is wrong for a large minority of sets
- * (swshp → swsh, cel25 → swsh, A1 → tcgp) and is only a fallback for a snapshot hit,
- * which carries no serie.
+ * The set listing already says which cards have one: TCGdex gives a card an `image`
+ * base exactly when the CDN holds its scan (api/card-image-model.js), and the provider
+ * passes it through or leaves null. That base is also the only correct path. It carries
+ * TCGdex's own language folder (zh-tw for TW, where this app's code is zh-Hant) and the
+ * set's real serie. So a card with no scan gets the placeholder and costs no request:
+ * about two thirds of TW, TH and ID cards, and whole sets such as German base1.
  */
-function assetBaseFor(card, code) {
-  if (!code) return null;
-  const serie = openSet?.serie?.id || tcgdexSerieSegment(state.ssTarget, pickerMeta?.setSeries);
-  return tcgdexAssetBase(code, serie, state.ssTarget, card.localId);
+function assetBaseFor(card) {
+  return listedImageBase(card?.image);
 }
 
 /**
@@ -294,7 +292,7 @@ function assetBaseFor(card, code) {
  * both modes would race.
  */
 function cardMeta(card, def) {
-  const base = assetBaseFor(card, def.code || null);
+  const base = assetBaseFor(card);
   return {
     name: { en: card.name, native: (state.nativeNames[def.badge] || {})[card.species || card.name] || null },
     setName: openSet?.name || state.ssTarget,
@@ -338,12 +336,11 @@ function cardTile(card, badge, color, code, pr = null) {
     openSet?.name || state.ssTarget, card.localId);
   wrap.appendChild(ph);
 
-  // `code` is null for the placeholder-only languages (KR, SC) — they have no public
-  // image source at all, so they get the placeholder and no request.
-  const base = assetBaseFor(card, code);
+  // null when the listing gave this card no scan: the placeholder stays, no request.
+  const base = assetBaseFor(card);
   const src = base ? `${base}/low.webp` : null;
-  // Known-missing artwork is skipped without a request (img-cache.js). TCGdex has no
-  // images at all for zh-Hant/th/id, and this grid renders every active language.
+  // A listed scan that still fails is remembered (img-cache.js), so it is not asked
+  // for again on the next render.
   if (src && viableSources([src]).length) {
     ph.classList.add('ph-over');
     const img = el('img', 'card-img');

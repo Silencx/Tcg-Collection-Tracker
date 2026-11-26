@@ -35,9 +35,14 @@ The True master set browser uses the same catalogue.
   TCGdex wherever it has a scan.
 - **Japanese** cards come from a catalogue of every Japanese set (see below), with scans
   from Limitless TCG where it has them.
-- **Traditional Chinese, Thai and Indonesian** cards are listed, but TCGdex has no images
-  for them yet; **Korean and Simplified Chinese** have no public card database at all.
-  All five show a placeholder tile with the card's name, set and number.
+- **Traditional Chinese, Thai and Indonesian** cards show TCGdex's scan where it has one,
+  which is about a third of them. These languages have their own sets, with ids that
+  English does not share, so the scans appear when you open one of their sets in
+  Single set. Their tiles in Master set and True master set use English card ids and
+  mostly show the placeholder.
+- **Korean and Simplified Chinese** have no public card database at all.
+
+A card with no scan shows a placeholder tile with the card's name, set and number.
 
 Placeholder tiles show the Pokémon's name in the card's language for every species:
 Japanese, Korean, both Chinese scripts, and German, French, Spanish or Italian wherever
