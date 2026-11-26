@@ -268,6 +268,86 @@ shared card id (Phase 8).
 - [ ] Optional: use a source match to auto-confirm a Phase 5 report (level 3). Auto-merge
   only if the owner agrees.
 
+Probe results so far (2026-11-26):
+
+- pokemon-tcg-data (`tools/ptcg-data-probe.mjs`, 178 keyless requests to GitHub, cached):
+  176 of its 177 sets match ours by id, name or date, and 20,632 cards are in both. Of
+  the 110 cards only it lists, 28 are the Unseen Forces Unown, which TCGdex files as a
+  set of their own (`exu`), 22 are Celebrations Classic Collection under their original
+  numbers (TCGdex numbers them CC001–CC025), and 4 are Aquapolis cards TCGdex splits into
+  `a`/`b`. The other 56 look like real gaps: Sun & Moon cards numbered with an `a` or
+  `b` (Tapu Lele-GX 60a, Pokégear 3.0 182a/182b), in 15 sets. It is behind TCGdex on new
+  sets (SVP stops at 165 of 226, SV Energy at 16 of 24) and lacks 26 of our sets (trainer
+  kits, McDonald's collections, the newest sets): useful as a check for older sets.
+- TCGCSV (`tools/tcgcsv-probe.mjs`) follows its published usage guidelines: a custom
+  generic User-Agent, 150 ms between requests, `last-updated.txt` first, and a stop on
+  403/429. Its FAQ says no permission is needed and asks for no credit. Run with the
+  owner's go-ahead on 2026-11-26, English only: 225 requests in 42 s, no block. Answers
+  are cached, so a rerun costs 1 request until TCGCSV's next daily build.
+  - 222 groups, 33,109 products. 4,852 are sealed or have no number, and 5,235 are extra
+    prints of a number already counted (stamps, Cosmos Holo).
+  - 170 groups match our sets and 20,630 cards are in both. Within matched sets,
+    TCGplayer has 381 numbers we lack:
+    - **265 Jumbo cards**: TCGdex's `jumbo` set lists none, because TCGdex files a
+      Jumbo card as a print of the normal card. See "Jumbo prints" below.
+    - 28 Unown, which TCGdex files in `exu`.
+    - 43 Classic Collection cards under their original numbers: numbering, not gaps.
+    - About 45 promos: prerelease-, W- and set-stamped prints filed under the original
+      number, Cosmos Holo reprints, and ME promos 111–117.
+  - 158 numbers only we list are mostly the same cards filed differently: Radiant
+    Collection RC1–RC32 as their own group, XY `a` cards, SM energies.
+  - 45 groups match nothing of ours. About 15 are naming: McDonald's Collection 2015–2024
+    and the trainer kits, which TCGdex splits per deck. The rest are product lines
+    TCGdex does not have as sets: Prize Pack Series (203), World Championship Decks
+    (208), League & Championship Cards (163), Deck/Blister Exclusives, Battle Academy,
+    Trick or Trade, Professor Program, Burger King, Countdown Calendar, Kids WB,
+    Pikachu World Collection, First Partner Pack, Southeast Asia Exclusives, TCG
+    Classic, EX Battle Stadium, Alternate Art Promos and Miscellaneous. Most are stamped
+    or reissued prints of existing cards.
+  - TCGplayer does not list pokemon-tcg-data's 56 Sun & Moon `a`/`b` cards as numbers
+    of their own either, so they are more likely prints than missing cards.
+
+### Jumbo prints (2026-11-26, issue #19)
+
+TCGdex files a Jumbo card as a print of the normal card: a `variants_detailed` entry
+with `size: "jumbo"`. It has one for 210 cards, and the app already shows those as a
+"Jumbo" print. Its `jumbo` set has stayed empty since 2021 and is listed for removal in
+v3 (tcgdex/cards-database#104, "Jumbo is now a variant").
+
+- [x] `tools/jumbo-prints.mjs` traces each of TCGplayer's 346 Jumbo products back to the
+  card it enlarges (same number, a set of that size, same name). 297 trace to exactly
+  one card. TCGdex already gives 148 of those cards a Jumbo print, and 149 it does not.
+- [x] Those 149 are rows in `data/print-overrides.json`, all under issue #19 (132 holo,
+  17 normal, from TCGplayer's printing). The app adds them to the card's prints
+  (`js/api/print-overrides-model.js`) and skips a row once TCGdex lists a Jumbo print
+  for its card.
+- [ ] 48 Jumbo products don't trace to one card. They are listed in
+  `tools/jumbo-prints-report.md` (local). The 16 WotC box toppers (1/12–12/12, S1–S4)
+  are cards of their own, not prints. Then 21 oversized promos have no number or more
+  than one (V-UNION, "Raikou, Entei & Suicune"), and 11 have typos or `a` numbers we
+  lack.
+
+**To do: send the 149 Jumbo prints to TCGdex.** Until TCGdex has them, only this app
+shows them. Plan:
+
+1. **The owner does the data by hand.** TCGdex's CONTRIBUTING.md refuses AI-assisted
+   data, and the contributor confirms they wrote the content and hold the rights to it.
+   The rows here only say which cards to look at. Each Jumbo print is checked against a
+   source the owner can cite (the card itself, a product listing, Bulbapedia) before it
+   goes in.
+2. **Ask first.** Open an issue in tcgdex/cards-database, or ask on their Discord, whether
+   they want Jumbo prints one PR per set, and confirm `type` is the Jumbo card's own
+   finish (most are holo). That keeps the work in a shape they will merge.
+3. **Start with the two promo sets**, which hold 90 of the 149: SM Black Star Promos (54)
+   and XY Black Star Promos (36). In a fork, each card file
+   (`data/<Serie>/<Set>/<number>.ts`) gets one more entry in its `variants` list, the
+   way Base Set Pikachu has it: `{ type: "holo", size: "jumbo" }`. Their style: tab
+   indent, double quotes in `data/`, commits like `feat(data): Add Jumbo variants for SM
+   Black Star Promos`, and their checks must pass.
+4. **After each merge and TCGdex's next deploy**, rerun
+   `node tools/jumbo-prints.mjs --issue 19`. Rows for the cards TCGdex now covers leave
+   `data/print-overrides.json`; the app already skips them in the meantime.
+
 ## Phase 7: Missing languages 🔑 OWNER
 
 Korean and Simplified Chinese have no public card database today.

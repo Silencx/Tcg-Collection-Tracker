@@ -57,7 +57,8 @@ plainly another Pokémon's is not moved by a wrong number: TCGdex numbers one "E
 as Gyarados, and it stays Electrode's (`js/api/match-model.js`).
 
 ### Missing a card?
-Some cards no source lists: stamped promos, jumbo cards, oddities. Report one with the
+Some cards no source lists: stamped promos, oddities. (A Jumbo card is a print of the
+normal card; see the badges below.) Report one with the
 **Missing card** form (the "report a missing card" link in the site footer, or
 [open it here](https://github.com/Silencx/Tcg-Collection-Tracker/issues/new?template=missing-card.yml)):
 language, set, number, name and a link that shows the card. A bot checks the report
@@ -71,10 +72,11 @@ the hand-added entry is removed and the report gets a comment.
 Each card's footer shows which prints exist: **H** holo, **RH** reverse holo,
 **1ED** 1st Edition, **SL** shadowless, **P** promo, and **+N** for anything
 rarer (stamps, Poké Ball / Master Ball patterns, jumbo, error prints). Hover
-the badges for the full list of prints. All of it comes from TCGdex. One
-exception: TCGdex has no reverse-holo data for the Black & White, XY and Sun &
+the badges for the full list of prints. Nearly all of it comes from TCGdex. Two
+exceptions. TCGdex has no reverse-holo data for the Black & White, XY and Sun &
 Moon eras, so those RH badges are worked out from rarity and drawn with a
-dashed outline. That rule matched TCGplayer on 99.9% of the era's cards.
+dashed outline; that rule matched TCGplayer on 99.9% of the era's cards. And 149
+Jumbo prints TCGdex does not list yet come from TCGplayer's catalogue.
 
 ### Tracking individual prints (optional)
 Off by default — the plain checklist only asks "do I have this card?". Turn it on
@@ -165,6 +167,8 @@ Start with `js/main.js` (boot, mode switching, the window handler manifest),
 - Japanese cards: `data/jp-cat/` catalogue → Bulbapedia (`data/jp/` shards → live).
 - Cards no source lists: `data/overrides.json`, merged into each of the lists above last
   (see "Missing cards" below).
+- Prints no source lists: `data/print-overrides.json`, added to the English cards'
+  prints after that (see "Jumbo prints" below).
 - A user-triggered **Refresh** skips the catalogue and snapshot and fetches EN cards and
   set data live.
 
@@ -183,8 +187,9 @@ can't be reassigned across files). The markup uses inline `onclick="fn()"` handl
 | `tools/build-species.mjs` (`npm run build-species`; one-off, per new generation) | PokéAPI | `data/species.json` | none |
 | `tools/missing-card.mjs` (run by `missing-card.yml`) | an issue body, `data/` | `data/overrides.json` | none |
 | `tools/prune-overrides.mjs` | `data/overrides.json`, `data/cat/`, `data/jp-cat/` | `data/overrides.json` | none |
+| `tools/jumbo-prints.mjs` (by hand; after `tools/tcgcsv-probe.mjs`) | TCGplayer via TCGCSV (cached), TCGdex GraphQL, `data/cat/en/` | `data/print-overrides.json`, report (local) | none |
 | `tools/check.mjs` | `js/`, `tools/` | — | none |
-| `tools/apitcg-probe.mjs`, `tools/pokewallet-probe.mjs`, `tools/tcgdex-catalog-probe.mjs`, `tools/tcgdex-dexid-probe.mjs`, `tools/jp-gap-size.mjs` | research probes; reports stay local | — | their own |
+| `tools/apitcg-probe.mjs`, `tools/pokewallet-probe.mjs`, `tools/tcgdex-catalog-probe.mjs`, `tools/tcgdex-dexid-probe.mjs`, `tools/ptcg-data-probe.mjs`, `tools/tcgcsv-probe.mjs`, `tools/jp-gap-size.mjs` | research probes; reports stay local | — | their own |
 
 `.github/workflows/refresh-data.yml` runs build-data, build-catalog, build-jp-catalog and
 build-images every Monday, and the two PokéWallet steps alone on the other days (see
@@ -349,6 +354,38 @@ node tools/prune-overrides.mjs                                                  
 `missing-card.yml` workflow and the prune steps in `refresh-data.yml`. The app needs no
 change: without the file every list is exactly what its sources give.
 
+### Jumbo prints
+
+TCGdex files a Jumbo card as a print of the normal card, and lists one for about 210
+cards. TCGplayer lists more. `tools/jumbo-prints.mjs` traces each of TCGplayer's Jumbo
+products back to the card it enlarges (same number, a set of that size, same name). It
+writes a row to `data/print-overrides.json` for each card TCGdex gives no Jumbo print:
+
+```json
+{"lang":"en","card":"xyp-XY17","type":"holo","size":"jumbo","source":"https://www.tcgplayer.com/…/jumbo-cards","issue":19}
+```
+
+The app adds the print after the card's own (`js/api/print-overrides-model.js`): a
+**+1** badge and, with print tracking on, a "Holo · Jumbo" chip. A card TCGdex gives
+a Jumbo print of its own keeps that one, so a row steps aside by itself once TCGdex
+catches up. All rows belong to issue #19. The only TCGplayer facts kept are that the
+Jumbo print exists and its finish; names and numbers are TCGdex's.
+
+```bash
+node tools/tcgcsv-probe.mjs                 # cache TCGplayer's catalogue (TCGCSV)
+node tools/jumbo-prints.mjs --issue 19      # rewrite issue #19's rows
+```
+
+A rerun replaces issue #19's rows and leaves every other row alone, so rerunning after
+TCGdex adds Jumbo prints drops the rows it no longer needs. Jumbo cards that do not trace
+to exactly one card are listed in `tools/jumbo-prints-report.md` (local). The plan for
+sending the 149 to TCGdex is in `docs/card-coverage-plan.md`, Phase 6.
+
+**Withdrawing it.** Delete `data/print-overrides.json` and the TCGplayer credit in the
+footer. The app needs no change: without the file every card has exactly TCGdex's prints.
+A print a collector ticked stays in their saved checklist and comes back if the print
+does.
+
 ### Pokémon catalogue
 
 The add-Pokémon picker, the first-run modal, the True master set browser, the dashboard's
@@ -511,6 +548,7 @@ Card data and images come from:
 - [Limitless TCG](https://limitlesstcg.com/) — Japanese card scans
 - [PokéAPI](https://pokeapi.co/) — the Pokémon catalogue and its names in other languages (`data/species.json`)
 - Collectors' "Missing card" reports — cards no source lists (`data/overrides.json`)
+- [TCGplayer](https://www.tcgplayer.com/), via [TCGCSV](https://tcgcsv.com/) — Jumbo prints TCGdex does not list yet (`data/print-overrides.json`)
 
 This project is [MIT-licensed](LICENSE) and is not affiliated with, endorsed
 by, or sponsored by Nintendo, The Pokémon Company, or The Pokémon Company
