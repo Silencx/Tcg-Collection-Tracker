@@ -9,6 +9,8 @@
 //   JA raw rows          : snapshot shards → live Bulbapedia. The app reads Japanese
 //                          cards through api/jp-source.js, which tries the PokéWallet
 //                          catalogue first and only then comes here.
+//   Overrides            : data/overrides.json (cards no source lists) is merged into
+//                          both card lists last, whichever source answered.
 //
 // Behaviour:
 //   • try primary with an ~8s timeout (AbortController);
@@ -27,14 +29,17 @@ import * as bulbaJp from './bulba-jp.js';
 import { mergeCardSets, mergeSource } from './merge.js';
 import { loadSpecies } from './species.js';
 import { dexByNameFrom } from './match-model.js';
+import { loadOverrides } from './overrides.js';
+import { overrideCards, overrideSetCards, mergeSetCards } from './overrides-model.js';
 import { LANGUAGES, POKEMON_CATALOG } from '../config.js';
 
 const TIMEOUT_MS = 8000;
 
 // Pokémon name → National Dex number, for matching cards by number (match-model.js):
 // data/species.json, else the built-in catalogue. Read once a session; never rejects.
+// Exported for jp-source.js, which matches Japanese overrides by the same rule.
 let dexMemo = null;
-function dexByName() {
+export function dexByName() {
   dexMemo ||= loadSpecies()
     .then(sp => dexByNameFrom(sp?.catalog || POKEMON_CATALOG))
     .catch(() => dexByNameFrom(POKEMON_CATALOG));
@@ -117,9 +122,23 @@ async function catalogueCards(names) {
  * `missing` is set only when a PARTIAL snapshot hit could not be completed live: the
  * snapshot's cards are served rather than thrown away, and the caller must neither
  * cache the result as complete nor stay silent about the names it lacks.
+ * Whichever source answers, the English overrides (data/overrides.json) are merged in
+ * last: a card a source lists keeps that source's entry.
  * @returns {Promise<{cards:Array, source:'catalogue'|'snapshot'|'tcgdex', missing?:string[]}>}
  */
-export async function getCards(names, { forceRefresh = false } = {}) {
+export async function getCards(names, opts = {}) {
+  return withOverrides(names, await cardsFromSources(names, opts));
+}
+
+async function withOverrides(names, res) {
+  const rows = await loadOverrides();
+  if (!rows.some(r => r.lang === 'en')) return res;
+  const { setSeries } = await snapshot.getSeries();
+  const extra = overrideCards(rows, names, { setSeries, dexByName: await dexByName() });
+  return extra.length ? { ...res, cards: mergeCardSets(names, [res.cards, extra]) } : res;
+}
+
+async function cardsFromSources(names, { forceRefresh = false } = {}) {
   if (forceRefresh) primaryHealthy = true;
   if (!forceRefresh) {
     const cat = await catalogueCards(names);
@@ -209,21 +228,25 @@ function setMetaShape(meta = {}) {
  * When TCGdex fails, the catalogue's list for that set, with the set's name, date and
  * count from the snapshot (no print variants: those only come live). The per-Pokémon
  * shards cannot answer "what is in this set" at all.
+ * The set's overrides for that language (data/overrides.json) are added to either answer,
+ * in number order; they never make a set out of nothing when both sources fail.
  * @returns {Promise<{cards:Array, set:Object, source:'tcgdex'|'catalogue'}>}
  */
 export async function getSetCards(setId, { forceRefresh = false, lang = 'en' } = {}) {
   if (forceRefresh) primaryHealthy = true;
+  let res;
   try {
     const live = await withTimeout(signal => tcgdex.getSetCards(setId, { signal, lang }));
-    return { ...live, source: 'tcgdex' };
+    res = { ...live, source: 'tcgdex' };
   } catch (err) {
     const fromCat = await catalogueSetCards(setId, lang).catch(() => null);
-    if (fromCat) {
-      console.warn(`[router] TCGdex set ${setId} unavailable (${err.message}); using the catalogue`);
-      return fromCat;
-    }
-    throw err;
+    if (!fromCat) throw err;
+    console.warn(`[router] TCGdex set ${setId} unavailable (${err.message}); using the catalogue`);
+    res = fromCat;
   }
+  const code = LANGUAGES.find(l => l.code === lang)?.code || 'en';
+  const extra = overrideSetCards(await loadOverrides(), setId, code);
+  return extra.length ? { ...res, cards: mergeSetCards(res.cards, extra) } : res;
 }
 
 async function catalogueSetCards(setId, lang) {

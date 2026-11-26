@@ -200,12 +200,12 @@ Notes from building it:
 
 For cards no source lists (stamped promos, jumbo cards, oddities).
 
-- [ ] `data/overrides.json` (committed): rows of
+- [x] `data/overrides.json` (committed): rows of
   `{ lang, set, number, name, dexId?, source, issue }`. The app merges it last; a missing
   file means no overrides.
-- [ ] Issue form `.github/ISSUE_TEMPLATE/missing-card.yml` with fields: language, set,
+- [x] Issue form `.github/ISSUE_TEMPLATE/missing-card.yml` with fields: language, set,
   number, name, proof link. Label `missing-card`.
-- [ ] Workflow `.github/workflows/missing-card.yml` on `issues: [opened, edited]`:
+- [x] Workflow `.github/workflows/missing-card.yml` on `issues: [opened, edited]`:
   - pass the issue body through `env`, never `${{ github.event.issue.body }}` inside
     `run:` (shell injection);
   - `tools/missing-card.mjs` parses the form, normalises to the app's id format, and
@@ -214,14 +214,44 @@ For cards no source lists (stamped promos, jumbo cards, oddities).
   - valid → open a PR that changes only `data/overrides.json`, with `Closes #N`;
     invalid → label `needs-info` and comment the reason;
   - it never pushes to `main`; minimal permissions.
-- [ ] Weekly build: drop any override that an upstream source now lists (same lang + set
+- [x] Weekly build: drop any override that an upstream source now lists (same lang + set
   + number), and comment on its issue.
 - [ ] Optional, after Phase 1 is trusted: the gap report opens one issue per set that has
-  a gap (deduplicated, rate-limited).
-- [ ] Tests: form parsing (including hostile input), validation, pruning.
+  a gap (deduplicated, rate-limited). (Not built, see the notes.)
+- [x] Tests: form parsing (including hostile input), validation, pruning.
 
 Done when: a filed report becomes a ready-to-merge PR with no manual editing, and
 overrides remove themselves once upstream catches up.
+
+Notes from building it:
+
+- Where an override shows: English rows in master set and the TMS popup
+  (`router.getCards`, matched by the Phase 4 name-or-number rule), any TCGdex language in
+  single set (`router.getSetCards`, in number order), Japanese rows in the Japanese cards
+  (`jp-source.js`) for sets `data/jp-cat/` has. Master set's card list is English, shown
+  in every language, so a German-only card shows in single set but not in master set.
+- "Normalises to the app's id format" means the set's own spelling: the number takes the
+  prefix and zero padding the set's listed numbers use ("20" in `swshp` → `SWSH020`, "7"
+  in `svp` → `007`, "007" in `base1` → `7`). A card counts as listed when its number
+  matches ignoring case and padding. "Plausible" is up to twice the set's size, or the
+  size plus 50 for a small set, per prefix.
+- The set may be given by id, by name in its language, or by English name; Japanese by
+  key, code or name. An ambiguous name ("Battle Academy" is two Japanese sets) asks for
+  the code. TCG Pocket sets are refused.
+- Proof links must be https pages on an allow-list (`PROOF_HOSTS`): Bulbapedia,
+  pkmncards, Limitless, Serebii, TCGplayer, Cardmarket, PriceCharting, TCG Collector,
+  Pokellector, pokemon.com, pokemon-card.com, pokemon.co.jp.
+- The workflow also triggers on a title starting `[Missing card]`, so a report still gets
+  checked while the `missing-card` label does not exist yet; the job creates both labels.
+  An edit that breaks a valid report closes its pull request.
+- Pull requests need the repository setting "Allow GitHub Actions to create and approve
+  pull requests" (owner, once). Pull requests made with the workflow token run no CI, so
+  the committed file is checked by `tests/overrides-model.test.mjs` once merged.
+- Pruning runs daily, not weekly: the Japanese list changes daily, and it costs no
+  requests. Comments go out only after the push.
+- The optional per-set issues are not built. The Phase 1 report lists hundreds of gaps
+  (German alone, 13 sets and 491 cards), so one issue per set would flood the tracker.
+  Worth an owner decision, maybe for sets with a handful of missing numbers only.
 
 ## Phase 6: Second sources for checking 🔑 OWNER
 
