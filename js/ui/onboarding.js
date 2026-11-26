@@ -45,8 +45,8 @@ export function showFirstRunModal(onDone, onCancel) {
       </div>
       <div class="first-run-foot">
         <p class="first-run-hint">
-          Non-default Pokémon are fetched live from TCGdex on first load, instead of the
-          instant pre-built snapshot — this may take a few seconds longer.
+          Every Pokémon's card list is built in. Print details for Pokémon outside the
+          demo line are looked up live from TCGdex, which can take a few seconds the first time.
         </p>
         <div class="first-run-actions">
           <button type="button" class="tms-act-btn first-run-demo">Try the demo (Seedot line)</button>
