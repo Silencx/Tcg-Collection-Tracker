@@ -171,7 +171,7 @@ test('a long list is cut short', () => {
 });
 
 test('the committed baseline is in its own format and holds ids and numbers only', () => {
-  const text = readFileSync(new URL('../tools/tcgcsv-baseline.json', import.meta.url), 'utf8');
+  const text = readFileSync(new URL('../tools/tcgcsv-baseline.json', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
   const b = JSON.parse(text);
   assert.equal(b.schemaVersion, 1);
   assert.equal(formatBaseline(b), text);

@@ -138,7 +138,8 @@ try {
   const base = existsSync(BASELINE) ? readJSON(BASELINE) : null;
   if (updateBaseline) {
     const text = formatBaseline(baselineOf(en, stamp));
-    const before = existsSync(BASELINE) ? readFileSync(BASELINE, 'utf8') : '';
+    // A Windows checkout may have CRLF line ends; git stores LF either way.
+    const before = existsSync(BASELINE) ? readFileSync(BASELINE, 'utf8').replace(/\r\n/g, '\n') : '';
     // Only the build stamp changed: keep the file as it is.
     const changed = before.replace(/"build": "[^"]*"/, '') !== text.replace(/"build": "[^"]*"/, '');
     if (changed) writeFileSync(BASELINE, text);
