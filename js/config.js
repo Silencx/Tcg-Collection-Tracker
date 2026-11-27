@@ -102,16 +102,16 @@ export const CACHE_TTL  = 24*60*60*1000; // 24h EN card-data cache TTL
 // letting newly-added artwork appear on its own — nothing here is ever a permanent
 // verdict.
 export const IMG_FAIL_TTL = 7*24*60*60*1000;
-// Cap so a big Pokémon list can't grow this blob without bound (65 cards × 9
-// languages is ~585 entries for the default list). Oldest entries are evicted.
+// Cap so a big Pokémon list can't grow this blob without bound (65 cards × the 9
+// languages with art is ~585 entries for the default list). Oldest entries are evicted.
 export const IMG_FAIL_MAX = 4000;
 
 // ── LANGUAGES (data languages with TCGdex coverage) ───────────────────────────
 export const LANGUAGES = [
   // code = the app's language key (data maps, picker, sets.json)
   // apiCode = TCGdex's language code, for the REST API AND the image CDN folder. They
-  // differ only for TW: art is under /zh-tw/, and /zh-Hant/ is a 404 folder. Build card
-  // image URLs with api/card-image-model.js, never from `code`.
+  // differ for TW (art is under /zh-tw/, and /zh-Hant/ is a 404 folder) and SC (zh-cn).
+  // Build card image URLs with api/card-image-model.js, never from `code`.
   { code:'en',      apiCode:'en',    badge:'EN', color:'#1565c0', label:'English',                     hasSetsApi:true  },
   { code:'de',      apiCode:'de',    badge:'DE', color:'#5b4000', label:'German',                      hasSetsApi:true  },
   { code:'fr',      apiCode:'fr',    badge:'FR', color:'#1a237e', label:'French',                      hasSetsApi:true  },
@@ -123,17 +123,19 @@ export const LANGUAGES = [
   { code:'zh-Hant', apiCode:'zh-tw', badge:'TW', color:'#c62828', label:'Traditional Chinese (TW/HK)', hasSetsApi:true  },
   { code:'th',      apiCode:'th',    badge:'TH', color:'#283593', label:'Thai',                        hasSetsApi:true  },
   { code:'id',      apiCode:'id',    badge:'ID', color:'#e65100', label:'Indonesian',                  hasSetsApi:true  },
-];
-
-// ── PLACEHOLDER-ONLY LANGUAGES (no public image source) ───────────────────────
-export const PLACEHOLDER_LANGS = [
-  { badge:'KR', color:'#00695c', label:'Korean',
-    note:'Korean cards exist but no public image database yet.',
+  // mirror:'placeholder': TCGdex lists these languages' own sets (names, dates, counts)
+  // and a few of their card lists, but has no scans for them, and no Korean or Chinese
+  // set shares an id with English. So on an English card in Master Set and TMS their
+  // tile is a placeholder that requests no image, with the id it had before they were
+  // LANGUAGES (KR_sv04-001): every saved tick still matches. Set mode shows their own
+  // sets, like any other language's. `sources`: fuller card lists, linked from the bell.
+  { code:'ko',      apiCode:'ko',    badge:'KR', color:'#00695c', label:'Korean',                      hasSetsApi:true, mirror:'placeholder',
     sources:[{name:'KrystalKollectz',url:'https://krystalkollectz.com/pages/card-lists'}] },
-  { badge:'SC', color:'#4a148c', label:'Simplified Chinese (CN)',
-    note:'Simplified Chinese launched 2022. TCGdex support coming soon.',
+  { code:'zh-Hans', apiCode:'zh-cn', badge:'SC', color:'#4a148c', label:'Simplified Chinese (CN)',     hasSetsApi:true, mirror:'placeholder',
     sources:[{name:'KrystalKollectz',url:'https://krystalkollectz.com/pages/card-lists'},{name:'PokiPair',url:'https://pokipair.com/simplified-chinese-pokemon-set-list/'}] },
 ];
+// (KR and SC were a PLACEHOLDER_LANGS list of their own before TCGdex had their sets;
+// ui/mirror-model.js now tells the two kinds of tile apart.)
 
 // ── NATIVE POKéMON NAMES (for missing-image placeholder cards) ────────────────
 // The FALLBACK: the app reads state.nativeNames, which boot fills from data/species.json

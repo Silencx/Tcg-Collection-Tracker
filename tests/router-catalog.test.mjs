@@ -88,3 +88,9 @@ test('single-set mode: a set the catalogue lacks still fails with the live error
   resetHealth();
   await assert.rejects(getSetCards('sv06', { lang: 'en' }), /fetch failed/);
 });
+
+test('single-set mode: a language with no catalogue (Korean here) fails with the live error', async () => {
+  // data/cat/ko/ may be missing, like any language's files: the index above lists none.
+  resetHealth();
+  await assert.rejects(getSetCards('SV4M', { lang: 'ko' }), /fetch failed/);
+});

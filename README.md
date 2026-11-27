@@ -40,7 +40,13 @@ The True master set browser uses the same catalogue.
   English does not share, so the scans appear when you open one of their sets in
   Single set. Their tiles in Master set and True master set use English card ids and
   mostly show the placeholder.
-- **Korean and Simplified Chinese** have no public card database at all.
+- **Korean and Simplified Chinese** sets come from TCGdex too: 95 Korean and 41
+  Simplified Chinese sets with names, dates and sizes, but card lists for only a few of
+  them (3 Korean sets and 1 Chinese one, November 2026) and no scans. Open one in Single
+  set; a set with no card list yet is greyed out, and the Missing card form below adds
+  the cards TCGdex lacks. Their tiles in Master set and True master set stay placeholders,
+  because no Korean or Chinese set shares an id with English. The 🔔 bell says how many
+  of their sets have a card list.
 
 A card with no scan shows a placeholder tile with the card's name, set and number.
 
@@ -190,7 +196,7 @@ can't be reassigned across files). The markup uses inline `onclick="fn()"` handl
 | `tools/tcgcsv-probe.mjs` (Mondays, and by hand) | TCGplayer via TCGCSV, `data/cat/en/`, `tools/tcgcsv-baseline.json` | `[coverage]` log lines, report (local); the baseline with `--update-baseline` | none |
 | `tools/jumbo-prints.mjs` (by hand; after `tools/tcgcsv-probe.mjs`) | TCGplayer via TCGCSV (cached), TCGdex GraphQL, `data/cat/en/` | `data/print-overrides.json`, report (local) | none |
 | `tools/check.mjs` | `js/`, `tools/` | — | none |
-| `tools/apitcg-probe.mjs`, `tools/pokewallet-probe.mjs`, `tools/tcgdex-catalog-probe.mjs`, `tools/tcgdex-dexid-probe.mjs`, `tools/ptcg-data-probe.mjs`, `tools/jp-gap-size.mjs` | research probes; reports stay local | — | their own |
+| `tools/apitcg-probe.mjs`, `tools/pokewallet-probe.mjs`, `tools/tcgdex-catalog-probe.mjs`, `tools/tcgdex-dexid-probe.mjs`, `tools/ptcg-data-probe.mjs`, `tools/cardmarket-probe.mjs`, `tools/pokemonkorea-probe.mjs`, `tools/jp-gap-size.mjs` | research probes; reports stay local | — | their own |
 
 `.github/workflows/refresh-data.yml` runs build-data, build-catalog, the TCGplayer check,
 build-jp-catalog and build-images every Monday, and the two PokéWallet steps alone on the other days (see
@@ -210,6 +216,9 @@ Pokémon to `data/prebuilt.json`, so the next scheduled run keeps them.
 - `data/sets.json` carries a date for every set, because a snapshot with any gap is a
   miss. Its maps are flat unions across languages, with per-language overrides under
   `lang`; read them through `dateFor` / `countFor` in `js/ui/setmode-model.js`.
+- TCGdex's Simplified Chinese set list is cleaned first (`js/api/set-list-model.js`):
+  its copies of the Traditional Chinese sets, eight lowercase twins of CSM sets and a
+  repeated id are left out, and the build log names them.
 - A set's CDN path segment is its TCGdex **series** (`setSeries`), never a slice of its
   id: always go through `tcgdexSerieSegment` in `js/api/images.js`.
 - Sets in `DIGITAL_SERIES` (`js/config.js`; TCG Pocket) are left out of the single-set
@@ -285,7 +294,7 @@ or the app reads either.
 
 ### Card catalogue
 
-Every card TCGdex lists, in all nine languages it covers, is committed as a catalogue
+Every card TCGdex lists, in all eleven languages it covers, is committed as a catalogue
 built by `tools/build-catalog.mjs`:
 
 ```
@@ -320,7 +329,10 @@ about two thirds of the Traditional Chinese, Thai and Indonesian cards.
 The build needs no key: per language, `/{lang}/cards` (the whole list in one answer),
 `/{lang}/categories`, and the list once per category, because list items carry none.
 English adds its Pokédex numbers from GraphQL, the only bulk source, one query per
-category. That is about 52 requests and 6 seconds every Monday. A language is replaced
+category. Simplified Chinese adds two set lists, its own and Traditional Chinese's: TCGdex
+lists the Traditional Chinese sets with cards as Simplified Chinese ones too, and only
+the sets `js/api/set-list-model.js` keeps are written. That is about 64 requests every
+Monday. A language is replaced
 only by a complete answer: one that fails, or lost more than a tenth of its cards, keeps
 its committed files, and so does English when under 90% of its Pokémon cards come back
 with numbers (`--force` accepts either). The log prints each language's cards, sets, size
@@ -334,7 +346,10 @@ node tools/build-catalog.mjs en de    # just these
 **Withdrawing it.** Delete `data/cat/` and the "Build card catalogue" workflow step.
 TCGdex stays credited in the footer for its other data. The app needs no change: without
 `data/cat/index.json` the router goes back to the per-Pokémon shards and live TCGdex, and
-single-set mode simply has no fallback.
+single-set mode simply has no fallback. To withdraw only Korean or Simplified Chinese, set
+`hasSetsApi: false` on its entry in `js/config.js` and delete its `data/cat/` folder: the
+next build leaves its sets out of `data/sets.json` and Single set stops offering it,
+while its tiles on English cards stay placeholders, ticks and all.
 
 ### Missing cards
 

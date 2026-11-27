@@ -107,6 +107,16 @@ async function main() {
     `(${nameCount} EN), ${dateCount} dates, ${countCount} counts, ${logoCount} logos, ` +
     `${serieCount} series-mapped`);
   if (emptyByLang.length) console.log(`[build-data]   → sets with no card list: ${emptyByLang.join(' ')}`);
+  // TCGdex's zh-cn list holds copies of the Traditional Chinese sets, and twins and a
+  // repeat of its own; js/api/set-list-model.js leaves them out.
+  for (const [code, c] of Object.entries(meta.cleaned || {})) {
+    if (c.missing) {
+      console.warn(`[build-data]   ! ${code}: no ${c.missing} set list to tell its copies apart, so no ${code} sets are written this week`);
+    } else if (c.copies.length || c.twins.length || c.repeats.length) {
+      console.log(`[build-data]   → ${code}: left out ${c.copies.length} copies of other languages' sets (${c.copies.join(', ')}), ` +
+        `${c.twins.length} lowercase twins (${c.twins.join(', ')}), ${c.repeats.length} repeated ids (${c.repeats.join(', ')})`);
+    }
+  }
 
   // ── CANARIES ──
   // The additive sets.json shape rests on two measured invariants. Both hold today (0

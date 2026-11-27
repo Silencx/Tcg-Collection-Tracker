@@ -12,8 +12,9 @@ import {
   state, saveTms, saveTmsPrints, saveTmsFilter, saveTmsCache, removeTmsCache,
 } from '../state.js';
 import {
-  LANGUAGES, PLACEHOLDER_LANGS, BADGE_ORDER,
+  LANGUAGES, BADGE_ORDER,
 } from '../config.js';
+import { mirrorTileId, mirrorLangs } from './mirror-model.js';
 import {
   limitlessJpUrl, tcgdexSymbolUrl, tcgdexSerieSegment,
 } from '../api/images.js';
@@ -31,6 +32,9 @@ import {
   printsOf, tracksPrints, printId, applyPrint, applyCard, clearPrintsOf, printUnset, slotCount,
 } from './prints-model.js';
 import { mkPrintChips, syncChips, markUnset, mkPrintTag } from './prints-ui.js';
+
+// Which languages' tiles on an English card get art, and which a placeholder.
+const TILE_LANGS=mirrorLangs();
 
 // Per-print tracking in the popup: TMS card id → its prints, for the open Pokémon's cards
 // that have two or more. Rebuilt by renderTmsPopupCards. In this mode a print is a binder
@@ -236,15 +240,16 @@ async function fetchTmsCardsForPoke(pokeName){
     const setName=enNames[tcgdexSetId]||tcgdexSetId;
     const releaseDate=(meta.dates&&meta.dates[tcgdexSetId])||'1999/01/01';
     const symSrc=(meta.symbols&&meta.symbols[tcgdexSetId])||tcgdexSymbolUrl(series,tcgdexSetId);
-    for(const langDef of LANGUAGES){
-      const id=`${langDef.badge}_${tc.id}`;
+    for(const langDef of TILE_LANGS.art){
+      const id=mirrorTileId(langDef,tc.id);
       // The CDN folder, not langDef.code: TW art lives under zh-tw (card-image-model.js).
       const base=tcgdexCardBase(langDef.code, series, tcgdexSetId, tcgdexLocalId);
       state._tmsCardPokemon.set(id,pokeName);
       cards.push({id,pokeName,setId:tcgdexSetId,setName,releaseDate,localId:tcgdexLocalId,lang:langDef.badge,langColor:langDef.color,imgSrc:`${base}/low.webp`,hiSrc:`${base}/high.webp`,symSrc,serie:series,variants:tc.variants||null});
     }
-    for(const pl of PLACEHOLDER_LANGS){
-      const id=`${pl.badge}_${tc.id}`;
+    // KR and SC: a placeholder, no image request, the same ids as before (mirror-model.js).
+    for(const pl of TILE_LANGS.placeholder){
+      const id=mirrorTileId(pl,tc.id);
       state._tmsCardPokemon.set(id,pokeName);
       cards.push({id,pokeName,setId:tcgdexSetId,setName,releaseDate,localId:tcgdexLocalId,lang:pl.badge,langColor:pl.color,imgSrc:null,hiSrc:null,symSrc,serie:series});
     }
@@ -278,7 +283,7 @@ function renderTmsPopup(pokeName){
   ordered.forEach(badge=>{
     const pill=document.createElement('button'); pill.className='filter-pill'+(state._tmsPopupActive.has(badge)?' active':'');
     pill.textContent=badge; pill.style.background=langColor(badge);
-    const l=LANGUAGES.find(x=>x.badge===badge)||PLACEHOLDER_LANGS.find(x=>x.badge===badge);
+    const l=LANGUAGES.find(x=>x.badge===badge);
     pill.title=(l?l.label:badge==='JP'?'Japanese':badge);
     pill.onclick=()=>{
       state._tmsPopupActive.has(badge)?state._tmsPopupActive.delete(badge):state._tmsPopupActive.add(badge);

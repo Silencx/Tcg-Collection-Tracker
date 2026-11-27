@@ -22,7 +22,7 @@ test('a malformed file or row reads as no override', () => {
   }
   const rows = readOverrides({ overrides: [
     row(),
-    row({ lang: 'ko' }),                        // a language we have no cards for
+    row({ lang: 'xx' }),                        // a language we have no cards for
     row({ set: '../../etc' }),                  // not a set id
     row({ number: '<b>1</b>' }),                // not a card number
     row({ name: '' }), row({ name: 'x'.repeat(81) }),
@@ -32,6 +32,15 @@ test('a malformed file or row reads as no override', () => {
   ] });
   assert.equal(rows.length, 2);
   assert.deepEqual(rows[1], { lang: 'en', set: 'swshp', number: 'SWSH020', name: 'Pikachu', dexId: [25], source: '', issue: 2 });
+});
+
+test('Korean and Simplified Chinese cards can be added by hand', () => {
+  // TCGdex has card lists for few of their sets, so these are where collectors fill in.
+  const rows = readOverrides({ overrides: [
+    row({ lang: 'ko', set: 'SV2a', number: '025', name: '피카츄' }),
+    row({ lang: 'zh-Hans', set: 'CSV1C', number: '001', name: '妙蛙种子' }),
+  ] });
+  assert.deepEqual(rows.map(r => `${r.lang} ${r.set}-${r.number}`), ['ko SV2a-025', 'zh-Hans CSV1C-001']);
 });
 
 test('one card, whatever its case or zero padding', () => {

@@ -13,7 +13,7 @@ import {
   loadCache, saveCache, clearCardCache,
 } from '../state.js';
 import {
-  LANGUAGES, PLACEHOLDER_LANGS, BADGE_ORDER, CACHE_TTL,
+  LANGUAGES, BADGE_ORDER, CACHE_TTL,
 } from '../config.js';
 import { limitlessJpUrl, tcgdexSymbolUrl } from '../api/images.js';
 import { tcgdexCardBase } from '../api/card-image-model.js';
@@ -41,6 +41,8 @@ import { setNavReset, setNavRebuild, setNavSync } from './setnav.js';
 import { toggleBlockCollapsed, applyCollapseState, resetCollapse } from './collapse.js';
 import { cacheAge } from './notify-model.js';
 import { record as recordNotice } from './notify.js';
+import { mirrorTileId, mirrorLangs, cardListShare, mirrorNotice } from './mirror-model.js';
+import { getSetMeta as snapshotSetMeta } from '../api/providers/snapshot.js';
 import {
   openPokemonPicker as openPokemonPickerModal, openLanguagePicker, renderLangSummary,
 } from './pickers.js';
@@ -421,8 +423,24 @@ function removePoke(name){
 
 // ── DOM HELPERS ───────────────────────────────────────────────────────────────
 const JP_DEF = {badge:'JP', color:'#4527a0'};
+// Which languages' tiles on an English card get art, and which a placeholder.
+const TILE_LANGS = mirrorLangs();
+
+/**
+ * The bell's note on each placeholder language (KR, SC), with how many of its sets
+ * TCGdex has a card list for. data/sets.json is memoized, so after the first read this
+ * costs no request; without the file the note says less. Once per session.
+ */
+function noteMirrorLangs(){
+  snapshotSetMeta([]).catch(()=>null).then(meta=>{
+    for(const pl of TILE_LANGS.placeholder){
+      recordNotice(mirrorNotice(pl,meta&&cardListShare(meta,pl.code)),'banner-amber',{once:`plang-${pl.badge}`});
+    }
+  });
+}
+
 function langColor(badge){
-  return ([...LANGUAGES,...PLACEHOLDER_LANGS,JP_DEF].find(l=>l.badge===badge)||{}).color||'#555';
+  return ([...LANGUAGES,JP_DEF].find(l=>l.badge===badge)||{}).color||'#555';
 }
 
 // Informational print-variant badges. `variants` is the card's normalized TCGdex print
@@ -787,7 +805,7 @@ function buildSetsMap(enCards, setNamesAll, setMeta = { dates: {}, symbols: {} }
       for(const lang of LANGUAGES){
         namesByBadge[lang.badge] = (setNamesAll[lang.code]||{})[setId] || enName;
       }
-      for(const pl of PLACEHOLDER_LANGS) namesByBadge[pl.badge] = enName;
+      for(const pl of TILE_LANGS.placeholder) namesByBadge[pl.badge] = enName;
       namesByBadge['JP'] = enName;
       const allUnique = [...new Set(Object.values(namesByBadge))];
       map.set(setId,{
@@ -829,15 +847,12 @@ function renderBySet(enCards, setNamesAll, container, setMeta = { dates: {}, sym
 
   // Placeholder-language notices go to the BELL ONLY — recordNotice, not mkBanner.
   //
-  // "Korean cards exist but no public image database yet" is a standing fact about the
-  // data, not an event: it was true before you opened the page and will be true after.
-  // As an in-flow banner it would be a permanent strip above the sets on every render,
-  // saying the same thing every time. The notification log is the right home for a
-  // message you read once and go back to when you wonder why KR tiles are blank.
-  for(const pl of PLACEHOLDER_LANGS){
-    const links=pl.sources.map(s=>`<a href="${s.url}" target="_blank" style="color:inherit;font-weight:bold">${s.name}</a>`).join(' · ');
-    recordNotice(`<strong>${pl.label} (${pl.badge})</strong>: ${pl.note} — ${links}`,'banner-amber',{once:`plang-${pl.badge}`});
-  }
+  // "The KR tiles here are placeholders" is a standing fact about the data, not an
+  // event: it was true before you opened the page and will be true after. As an in-flow
+  // banner it would be a permanent strip above the sets on every render, saying the same
+  // thing every time. The notification log is the right home for a message you read
+  // once and go back to when you wonder why KR tiles are blank.
+  noteMirrorLangs();
 
   // Sort eras and sets by release date (data/sets.json, or TCGdex live)
   function relDate(si){ return new Date(si.releaseDate||'1999/01/01').getTime(); }
@@ -909,9 +924,9 @@ function renderBySet(enCards, setNamesAll, container, setMeta = { dates: {}, sym
           const plist=printsOf(card.variants);
           const tracked=state.printView!=='off'&&tracksPrints(plist);
           const pmeta=tracksPrints(plist)?{printList:plist,printKeys:plist.map(x=>x.key)}:{};
-          // TCGdex languages
-          for(const langDef of LANGUAGES){
-            const id=`${langDef.badge}_${card.id}`, isDone=state.checked.has(id);
+          // TCGdex languages with art (KR and SC follow as placeholders)
+          for(const langDef of TILE_LANGS.art){
+            const id=mirrorTileId(langDef,card.id), isDone=state.checked.has(id);
             // TCGdex asset CDN for every language; a missing scan falls to the placeholder.
             // The folder is TCGdex's (zh-tw for TW), not langDef.code: card-image-model.js.
             // These are EN ids, and TW/TH/ID set ids share none with English, so those
@@ -947,9 +962,9 @@ function renderBySet(enCards, setNamesAll, container, setMeta = { dates: {}, sym
             el.appendChild(footer);
             grid.appendChild(el); count++;
           }
-          // Placeholder langs (KR, SC)
-          for(const pl of PLACEHOLDER_LANGS){
-            const id=`${pl.badge}_${card.id}`, isDone=state.checked.has(id);
+          // Placeholder langs (KR, SC): no image request, ids as before (mirror-model.js)
+          for(const pl of TILE_LANGS.placeholder){
+            const id=mirrorTileId(pl,card.id), isDone=state.checked.has(id);
             const nat=(state.nativeNames[pl.badge]||{})[spec]||null;
             state._meta.set(id,{name:{en:card.name,native:nat},setName:si.enName,num:`#${card.localId}`,lang:pl.badge,langColor:pl.color,...imgMeta([],[]),symSrc:si.symSrc});
             const el=document.createElement('div');

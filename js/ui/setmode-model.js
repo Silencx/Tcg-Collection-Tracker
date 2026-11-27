@@ -10,7 +10,7 @@
 
 import { parseCardId } from './dashboard-model.js';
 import {
-  LANGUAGES, PLACEHOLDER_LANGS, DIGITAL_SERIES, OTHER_SERIES_ID, OTHER_SERIES_NAME,
+  LANGUAGES, DIGITAL_SERIES, OTHER_SERIES_ID, OTHER_SERIES_NAME,
 } from '../config.js';
 
 /**
@@ -138,7 +138,7 @@ export const countFor = (meta, lang, id) =>
 export function pickerLanguages(meta = {}, { includeDigital = false } = {}) {
   const setSeries = meta.setSeries || {};
   const out = [];
-  for (const l of [...LANGUAGES, ...PLACEHOLDER_LANGS]) {
+  for (const l of LANGUAGES) {
     const map = meta.names?.[l.code];
     if (!map) continue;
     const count = Object.keys(map)

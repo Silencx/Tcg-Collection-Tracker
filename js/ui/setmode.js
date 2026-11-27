@@ -20,7 +20,7 @@
 // =============================================================================
 
 import { state, saveSetChk, saveSsPrints, saveSetTarget, saveSetPicker } from '../state.js';
-import { LANGUAGES, PLACEHOLDER_LANGS } from '../config.js';
+import { LANGUAGES } from '../config.js';
 import { router } from '../api/router.js';
 import { listedImageBase } from '../api/card-image-model.js';
 import {
@@ -222,8 +222,7 @@ function pickerCard(row) {
   // Progress against the SEPARATE single-set checklist, so a set you have already
   // started is obvious in the list — and scoped to the language being browsed, because
   // that is the language you would be completing it in.
-  const badge = (LANGUAGES.find(l => l.code === state.ssPickerLang)
-    || PLACEHOLDER_LANGS.find(l => l.code === state.ssPickerLang) || {}).badge || null;
+  const badge = (LANGUAGES.find(l => l.code === state.ssPickerLang) || {}).badge || null;
   const prog = setProgress(state.ssChecked, row.id, badge);
   const official = row.count?.official || 0;
   const card = expansionCard({
@@ -461,8 +460,7 @@ function renderSetStats() {
   if (bar) bar.style.width = `${pct ?? 0}%`;
   const label = document.getElementById('set-progress-label');
   if (label) {
-    const lang = (LANGUAGES.find(l => l.badge === badge)
-      || PLACEHOLDER_LANGS.find(l => l.badge === badge) || {}).label || badge;
+    const lang = (LANGUAGES.find(l => l.badge === badge) || {}).label || badge;
     label.textContent = (pct === null
       ? `${prog.cards} collected · ${lang}`
       : `${pct}% complete · ${prog.cards} of ${official} · ${lang}`)
@@ -490,8 +488,7 @@ function renderSetStats() {
 /** The badge the open set's cards are checked under — its own language. */
 function openBadge() {
   const code = openSet?.lang || setLanguage(state.ssTarget);
-  return (LANGUAGES.find(l => l.code === code)
-       || PLACEHOLDER_LANGS.find(l => l.code === code) || LANGUAGES[0]).badge;
+  return (LANGUAGES.find(l => l.code === code) || LANGUAGES[0]).badge;
 }
 
 /** Inline-onclick target: tick every tile (or untick them all if already done). */
@@ -672,8 +669,7 @@ export function setModeMetas() {
     if (badge !== only) continue;
     const card = byId.get(id.slice(cut + 1));
     if (!card) continue;
-    const def = LANGUAGES.find(l => l.badge === badge)
-             || PLACEHOLDER_LANGS.find(l => l.badge === badge);
+    const def = LANGUAGES.find(l => l.badge === badge);
     if (!def) continue;
     // With prints tracked: one sheet entry per ticked print (prints-model.expandMeta).
     if (state.printView !== 'off') metas.push(...expandMeta(cardMeta(card, def), id, openPrints.get(id) || [], state.ssPrints));
@@ -691,9 +687,7 @@ function paintSet(root) {
   // language — 12× the DOM, 11 of them guaranteed 404s for any single-namespace set, and
   // a question the picker had already answered.
   const code = openSet?.lang || setLanguage(state.ssTarget);
-  const def = LANGUAGES.find(l => l.code === code)
-           || PLACEHOLDER_LANGS.find(l => l.code === code)
-           || LANGUAGES[0];
+  const def = LANGUAGES.find(l => l.code === code) || LANGUAGES[0];
   const grid = el('div', 'cards-grid');
   openPrints.clear();
   for (const card of openCards) {

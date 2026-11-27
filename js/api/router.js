@@ -196,8 +196,8 @@ export async function getSetMeta({ forceRefresh = false, setIds = [] } = {}) {
     } catch (e) { /* snapshot miss/absent → go live */ }
   }
   // withSeries:false — the series sweep is ~116 extra requests and only the BUILD needs
-  // it. A browser that has fallen through to live set meta is already paying for nine
-  // /sets sweeps, so the series data comes from the snapshot instead.
+  // it. A browser that has fallen through to live set meta is already paying for one
+  // /sets list per language, so the series data comes from the snapshot instead.
   const meta = await withTimeout(signal => tcgdex.getSetMeta({ signal, setIds, withSeries: false }));
   return { ...setMetaShape(await withSnapshotSeries(meta)), source: 'tcgdex' };
 }

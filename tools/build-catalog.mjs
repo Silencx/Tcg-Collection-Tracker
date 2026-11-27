@@ -6,9 +6,12 @@
 // Pokémon that is not pre-built still gets its full English list without a live name
 // search; single-set mode falls back to it when TCGdex is down.
 //
-// Keyless. Five requests per language, nine languages: /{lang}/cards (the whole list in
+// Keyless. Five requests per language, eleven languages: /{lang}/cards (the whole list in
 // one answer — verified against a full set walk, see docs/card-coverage-plan.md),
 // /{lang}/categories, and the list once per category, because list items carry none.
+// Simplified Chinese costs two more: its set list and Traditional Chinese's, because
+// TCGdex lists the Traditional Chinese sets with cards as zh-cn ones too, and only the
+// sets js/api/set-list-model.js keeps (the ones data/sets.json names) are written.
 // English also gets every card's Pokédex numbers, which only GraphQL gives in bulk: one
 // query per category, 5,000 cards a page, about 7 requests (2026-11-26).
 //
@@ -31,6 +34,7 @@ import {
   langSummary, indexFile, acceptCount,
 } from './lib/catalog.mjs';
 import { rowDexIds, rowHasScan } from '../js/api/catalog-model.js';
+import { SET_LIST_QUIRKS, setListFor } from '../js/api/set-list-model.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = resolve(ROOT, 'data', 'cat');
@@ -129,7 +133,21 @@ async function buildLang({ code, apiCode }, prevSummary, builtAt, knownSets, byD
   // answer keeps the committed English files rather than writing rows without them.
   const dexById = apiCode === 'en' ? await englishDexIds() : new Map();
 
-  const { rows, skipped } = catalogRows(list, catById, dexById);
+  const { rows: listed, skipped } = catalogRows(list, catById, dexById);
+  // A language whose set list TCGdex gets wrong keeps the rows of the sets the app has
+  // for it, and no others: zh-cn's copies of Traditional Chinese sets are TW cards.
+  let rows = listed;
+  const quirk = SET_LIST_QUIRKS[apiCode];
+  if (quirk) {
+    const lists = new Map();
+    for (const c of [apiCode, quirk.copyOf].filter(Boolean)) lists.set(c, await getJSON(`${API}/${c}/sets`));
+    const clean = setListFor(apiCode, c => lists.get(c) ?? null);
+    const keep = new Set(clean.sets.map(s => s.id));
+    rows = listed.filter(r => keep.has(r[0]));
+    const gone = [...new Set(listed.filter(r => !keep.has(r[0])).map(r => r[0]))];
+    log(`${listed.length - rows.length} card(s) left out, in set(s) that are not ${code}'s: ${gone.join(', ') || 'none'}` +
+      ` (set list: ${clean.copies.length} copies of ${quirk.copyOf} sets, ${clean.twins.length} twins, ${clean.repeats.length} repeated ids)`);
+  }
   if (apiCode === 'en') {
     const pokemon = rows.filter(r => r[3] === 'P');
     const noDex = pokemon.filter(r => !rowDexIds(r).length);

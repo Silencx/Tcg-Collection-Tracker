@@ -20,6 +20,8 @@ const SETS = {
   names: {
     en: { swshp: 'SWSH Black Star Promos', svp: 'SVP Black Star Promos', base1: 'Base Set', swsh9: 'Brilliant Stars', A1: 'Genetic Apex', bw1: 'Black & White', bw1b: 'Black & White' },
     de: { svp: 'SVP Black Star Promos', swsh9: 'Strahlende Sterne' },
+    ko: { SV4M: '퓨처 플래시', SV4K: '와일드 포스' },
+    'zh-Hans': { CSV1C: '亘古开来', CBB2C: '宝石包Vol.2' },
   },
   counts: { swshp: { official: 307, total: 307 }, svp: { official: 225, total: 226 }, base1: { official: 102, total: 102 }, swsh9: { official: 172, total: 216 } },
   setSeries: { A1: 'tcgp', swshp: 'swsh', svp: 'sv', base1: 'base', swsh9: 'swsh' },
@@ -100,6 +102,18 @@ test('languages by label or code; sets by id, name or English name', () => {
   assert.equal(resolveSet('ja', 'vstar universe', { jpSets: JP_SETS }).set, 'vstar-universe');
   assert.equal(resolveSet('ja', 'battle-academy-svi', { jpSets: JP_SETS }).set, 'battle-academy-svi');
   assert.match(resolveSet('ja', 'Battle Academy', { jpSets: JP_SETS }).problem, /More than one Japanese set/);
+});
+
+test('Korean and Simplified Chinese sets by code or by their own name', () => {
+  assert.equal(resolveLang('Korean'), 'ko');
+  assert.equal(resolveLang('Simplified Chinese (CN)'), 'zh-Hans');
+  assert.equal(resolveSet('ko', 'sv4m', { sets: SETS }).set, 'SV4M');
+  // Hangul and Han names used to read as empty, and so matched every set of the language.
+  assert.equal(resolveSet('ko', '퓨처 플래시', { sets: SETS }).set, 'SV4M');
+  assert.equal(resolveSet('zh-Hans', '亘古开来', { sets: SETS }).set, 'CSV1C');
+  assert.equal(resolveSet('zh-Hans', '宝石包vol.2', { sets: SETS }).set, 'CBB2C');
+  assert.match(resolveSet('ko', '무엇', { sets: SETS }).problem, /no Korean set/);
+  assert.match(resolveSet('ko', '!!!', { sets: SETS }).problem, /no Korean set/);
 });
 
 test("numbers take the set's own prefix and padding", () => {

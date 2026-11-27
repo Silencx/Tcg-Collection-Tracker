@@ -103,8 +103,10 @@ export function parseIssueForm(body) {
 
 // ── Checking a report ─────────────────────────────────────────────────────────
 
+// Letters of every script count: a Korean, Chinese or Thai name kept only a-z0-9 was
+// empty, and so matched every set of its language.
 const loose = s => cleanText(s).normalize('NFKD').replace(/\p{M}/gu, '')
-  .toLowerCase().replace(/[’']/g, '').replace(/[^a-z0-9]+/g, ' ').trim();
+  .toLowerCase().replace(/[’']/g, '').replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
 
 /** A language from the form's answer: its label ("German") or code ("de"). */
 export function resolveLang(answer) {
@@ -133,9 +135,10 @@ export function resolveSet(lang, answer, { sets = {}, jpSets = [] } = {}) {
     const names = sets.names?.[lang] || {};
     const en = sets.names?.en || {};
     const ids = Object.keys(names).filter(id => !DIGITAL_SERIES.has(sets.setSeries?.[id]));
+    const la = loose(a);
     const byId = ids.filter(id => id.toLowerCase() === a.toLowerCase());
-    const byName = ids.filter(id => loose(names[id]) === loose(a));
-    const byEnName = ids.filter(id => en[id] && loose(en[id]) === loose(a));
+    const byName = la ? ids.filter(id => loose(names[id]) === la) : [];
+    const byEnName = la ? ids.filter(id => en[id] && loose(en[id]) === la) : [];
     found = [byId, byName, byEnName].find(l => l.length) || [];
     const counts = sets.lang?.[lang]?.counts || sets.counts || {};
     found = found.map(id => {
