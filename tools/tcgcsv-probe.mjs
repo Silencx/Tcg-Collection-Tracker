@@ -38,7 +38,9 @@
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { baselineOf, compareCatalogue, formatBaseline, groupCards, logLines, newSince, ourSets } from './lib/tcgcsv.mjs';
+import { baselineOf, compareCatalogue, formatBaseline, groupCards, logLines, loose, newSince, ourSets } from './lib/tcgcsv.mjs';
+import { catalogueIndex } from './lib/jumbo.mjs';
+import { stampedPrintOf } from './lib/stamped.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const DATA = resolve(ROOT, 'data');
@@ -80,23 +82,31 @@ async function cached(path) {
   return json;
 }
 
-/** Our side, from the committed files. */
+/**
+ * Our side, from the committed files. For English, also `isStampedPrint`: whether a
+ * product is a stamped print of a card of ours filed under that card's number
+ * (tools/lib/stamped.mjs), which is that card's print, not a number of its group's set.
+ */
 function ours(lang) {
   const dir = resolve(DATA, lang === 'ja' ? 'jp-cat' : 'cat/en');
   const rows = readdirSync(dir).filter(f => /^cards-[a-z0]\.json$/.test(f)).flatMap(f => readJSON(resolve(dir, f)).rows || []);
-  return lang === 'ja'
-    ? ourSets('ja', { jpSets: readJSON(resolve(DATA, 'jp-cat/sets.json')).sets || [], rows })
-    : ourSets('en', { sets: readJSON(resolve(DATA, 'sets.json')), rows });
+  if (lang === 'ja') return { mine: ourSets('ja', { jpSets: readJSON(resolve(DATA, 'jp-cat/sets.json')).sets || [], rows }), isStampedPrint: () => false };
+  const sets = readJSON(resolve(DATA, 'sets.json'));
+  const index = catalogueIndex(rows, { setSeries: sets.setSeries || {} });
+  const opts = { counts: sets.counts || {}, setNames: new Set(Object.values(sets.names?.en || {}).map(loose)) };
+  return { mine: ourSets('en', { sets, rows }), isStampedPrint: (p, group) => !!stampedPrintOf(p, group, index, opts)?.card };
 }
 
 async function probeCategory(categoryId, lang, say) {
-  const mine = ours(lang);
+  const { mine, isStampedPrint } = ours(lang);
   const groups = (await cached(`tcgplayer/${categoryId}/groups`)).results || [];
-  let products = 0, sealed = 0, prints = 0;
+  let products = 0, sealed = 0, prints = 0, stamped = 0;
   const cardGroups = [];
   for (const g of groups) {
-    const list = (await cached(`tcgplayer/${categoryId}/${g.groupId}/products`)).results || [];
-    products += list.length;
+    const all = (await cached(`tcgplayer/${categoryId}/${g.groupId}/products`)).results || [];
+    products += all.length;
+    const list = all.filter(p => !isStampedPrint(p, g.name));
+    stamped += all.length - list.length;
     const c = groupCards(list, lang);
     sealed += c.sealed; prints += c.prints;
     if (c.theirs.size) cardGroups.push({ name: g.name, publishedOn: g.publishedOn, cards: c.theirs.size, theirs: c.theirs, numbered: c.numbered });
@@ -105,7 +115,7 @@ async function probeCategory(categoryId, lang, say) {
 
   const fmt = l => l.map(x => `${x.number} ${x.name}`.trim()).join('; ');
   say(`## Category ${categoryId} vs ${lang === 'ja' ? 'data/jp-cat/' : 'data/cat/en/'}`, '');
-  say(`${groups.length} groups, ${products} products: ${sealed} sealed or without a number, ${prints} extra prints of a number already counted.`);
+  say(`${groups.length} groups, ${products} products: ${sealed} sealed or without a number, ${prints} extra prints of a number already counted, ${stamped} stamped prints of a card of ours filed under its number (tools/stamped-prints.mjs).`);
   say(`Group matching: ${Object.entries(res.how).map(([k, v]) => `${k} ${v}`).join(', ')}.`);
   if (res.byCards.length) say(`Sets found by their cards (${res.byCards.length}): ${res.byCards.join(', ')}.`);
   say(`Cards in both: ${res.inBoth}. Only TCGplayer: ${res.onlyTheirs}. Only ours (matched sets): ${res.onlyOurs}.`, '');

@@ -82,7 +82,8 @@ the badges for the full list of prints. Nearly all of it comes from TCGdex. Two
 exceptions. TCGdex has no reverse-holo data for the Black & White, XY and Sun &
 Moon eras, so those RH badges are worked out from rarity and drawn with a
 dashed outline; that rule matched TCGplayer on 99.9% of the era's cards. And 149
-Jumbo prints TCGdex does not list yet come from TCGplayer's catalogue.
+Jumbo prints and 135 stamped prints TCGdex does not list yet come from TCGplayer's
+catalogue.
 
 ### Tracking individual prints (optional)
 Off by default — the plain checklist only asks "do I have this card?". Turn it on
@@ -174,7 +175,7 @@ Start with `js/main.js` (boot, mode switching, the window handler manifest),
 - Cards no source lists: `data/overrides.json`, merged into each of the lists above last
   (see "Missing cards" below).
 - Prints no source lists: `data/print-overrides.json`, added to the English cards'
-  prints after that (see "Jumbo prints" below).
+  prints after that (see "Jumbo prints" and "Stamped prints" below).
 - A user-triggered **Refresh** skips the catalogue and snapshot and fetches EN cards and
   set data live.
 
@@ -195,6 +196,7 @@ can't be reassigned across files). The markup uses inline `onclick="fn()"` handl
 | `tools/prune-overrides.mjs` | `data/overrides.json`, `data/cat/`, `data/jp-cat/` | `data/overrides.json` | none |
 | `tools/tcgcsv-probe.mjs` (Mondays, and by hand) | TCGplayer via TCGCSV, `data/cat/en/`, `tools/tcgcsv-baseline.json` | `[coverage]` log lines, report (local); the baseline with `--update-baseline` | none |
 | `tools/jumbo-prints.mjs` (by hand; after `tools/tcgcsv-probe.mjs`) | TCGplayer via TCGCSV (cached), TCGdex GraphQL, `data/cat/en/` | `data/print-overrides.json`, report (local) | none |
+| `tools/stamped-prints.mjs` (by hand; after `tools/tcgcsv-probe.mjs`) | TCGplayer via TCGCSV (cached), TCGdex GraphQL, `data/cat/en/`, `data/sets.json` | `data/print-overrides.json`, report (local) | none |
 | `tools/check.mjs` | `js/`, `tools/` | — | none |
 | `tools/apitcg-probe.mjs`, `tools/pokewallet-probe.mjs`, `tools/tcgdex-catalog-probe.mjs`, `tools/tcgdex-dexid-probe.mjs`, `tools/ptcg-data-probe.mjs`, `tools/cardmarket-probe.mjs`, `tools/pokemonkorea-probe.mjs`, `tools/jp-gap-size.mjs` | research probes; reports stay local | — | their own |
 
@@ -263,17 +265,19 @@ cards: a set of 10 cards or more, 9 in 10 of which one group lists under the sam
 and card name, or the other way round. That finds the trainer kits (one TCGplayer group
 per kit, one TCGdex set per half deck), the McDonald's collections, the Unseen Forces
 Unown and the Radiant Collections. Then each set is compared number by number; sealed
-product and extra prints of a number are left out.
+product, extra prints of a number and stamped prints filed under a card of ours
+("Arcanine - 12/99 (Prerelease)" in a promo group; see "Stamped prints") are left out.
 
 The differences already known are in `tools/tcgcsv-baseline.json` (committed): Jumbo
-cards, which TCGdex files as prints; Classic Collection numbering; stamped promos; the
+cards, which TCGdex files as prints; Classic Collection numbering; stamped promos with
+a promo number of their own; the
 Fighting Energy TCGdex leaves out of the Lycanroc trainer kit; and 25 TCGplayer groups
 TCGdex has no set for, mostly product lines (see `docs/card-coverage-plan.md`, Phase 6).
 The log shows only what is not in it:
 
 ```
 [coverage] TCGplayer via TCGCSV (build 2026-11-26T20_05_59_0000): 190 of 215 groups match our sets; 21277 card numbers in both
-[coverage]   nothing new since tools/tcgcsv-baseline.json (366 numbers only TCGplayer lists and 104 only we list are known)
+[coverage]   nothing new since tools/tcgcsv-baseline.json (338 numbers only TCGplayer lists and 104 only we list are known)
 ```
 
 A new difference is a line per set, `sv10: 245, 246`, under "TCGplayer lists N number(s)
@@ -444,6 +448,34 @@ footer. The app needs no change: without the file every card has exactly TCGdex'
 A print a collector ticked stays in their saved checklist and comes back if the print
 does.
 
+### Stamped prints
+
+TCGplayer files many stamped prints under the original card's number, mostly in its promo
+groups: "Arcanine - 12/99 (Prerelease) [Staff]" is a prerelease staff print of Next
+Destinies' Arcanine (`bw4-12`). `tools/stamped-prints.mjs` traces each back to its card
+the way a Jumbo card is traced, and turns the product's notes into TCGdex's stamp words
+(`tools/lib/stamped.mjs`): Prerelease, Staff, W Stamped (`wotc`), City, State, Regional
+and National Championships, Toys R Us, and "‹set› Stamped" (`set-logo`). Every note must
+be one of these, so a print is never written with half its stamps: League Cup, Cosmos
+Holo and the like are left out and listed in `tools/stamped-prints-report.md` (local).
+TCGdex already lists many of these prints; a row is written only for the ones it lacks:
+
+```json
+{"lang":"en","card":"bw4-12","type":"normal","stamp":["pre-release","staff"],"source":"https://www.tcgplayer.com/…/black-and-white-promos","issue":24}
+```
+
+The print's type is TCGplayer's printing, else the card's own. All rows belong to issue
+#24; a rerun replaces them and leaves the Jumbo rows alone.
+
+```bash
+node tools/tcgcsv-probe.mjs              # cache TCGplayer's catalogue (TCGCSV)
+node tools/stamped-prints.mjs --issue 24  # rewrite the stamped rows
+```
+
+The weekly TCGplayer check skips these products too: they are prints of a card of ours,
+not numbers of the promo set their group matched. Withdrawing works as for the Jumbo
+prints: the rows live in the same file.
+
 ### Pokémon catalogue
 
 The add-Pokémon picker, the first-run modal, the True master set browser, the dashboard's
@@ -606,7 +638,7 @@ Card data and images come from:
 - [Limitless TCG](https://limitlesstcg.com/) — Japanese card scans
 - [PokéAPI](https://pokeapi.co/) — the Pokémon catalogue and its names in other languages (`data/species.json`)
 - Collectors' "Missing card" reports — cards no source lists (`data/overrides.json`)
-- [TCGplayer](https://www.tcgplayer.com/), via [TCGCSV](https://tcgcsv.com/) — Jumbo prints TCGdex does not list yet (`data/print-overrides.json`), and the weekly check of the English catalogue
+- [TCGplayer](https://www.tcgplayer.com/), via [TCGCSV](https://tcgcsv.com/) — Jumbo and stamped prints TCGdex does not list yet (`data/print-overrides.json`), and the weekly check of the English catalogue
 
 This project is [MIT-licensed](LICENSE) and is not affiliated with, endorsed
 by, or sponsored by Nintendo, The Pokémon Company, or The Pokémon Company
