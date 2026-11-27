@@ -22,6 +22,8 @@ body:
         - Traditional Chinese (TW/HK)
         - Thai
         - Indonesian
+        - Korean
+        - Simplified Chinese (CN)
         - Japanese
     validations:
       required: true

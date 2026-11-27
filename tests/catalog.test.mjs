@@ -116,9 +116,10 @@ test('a list that lost over a tenth of its cards does not replace the committed 
   assert.equal(acceptCount(0, null), false, 'an empty answer never does');
 });
 
-test('nine languages, English first, and the index keeps that order', () => {
-  assert.deepEqual(CATALOG_LANGS.map(l => l.code), ['en', 'de', 'fr', 'es', 'it', 'pt', 'zh-Hant', 'th', 'id']);
+test('eleven languages, English first, and the index keeps that order', () => {
+  assert.deepEqual(CATALOG_LANGS.map(l => l.code), ['en', 'de', 'fr', 'es', 'it', 'pt', 'zh-Hant', 'th', 'id', 'ko', 'zh-Hans']);
   assert.equal(CATALOG_LANGS.find(l => l.code === 'zh-Hant').apiCode, 'zh-tw');
+  assert.equal(CATALOG_LANGS.find(l => l.code === 'zh-Hans').apiCode, 'zh-cn');
   const idx = indexFile({ th: { cards: 1 }, en: { cards: 2 }, xx: { cards: 3 } });
   assert.deepEqual(Object.keys(idx.langs), ['en', 'th']);
 });
@@ -186,8 +187,11 @@ test('one set: a card with no scan has image null, as live getSetCards gives it'
   const rows = [['SV1S', '001', '皮卡丘', 'P'], ['SV1S', '002', '妙蛙種子', 'P', 0]];
   const tw = catalogSetCards([rows], 'SV1S', { setSeries: { SV1S: 'SV' }, code: 'zh-Hant' });
   assert.deepEqual(tw.map(c => c.image), ['https://assets.tcgdex.net/zh-tw/SV/SV1S/001', null]);
-  assert.deepEqual(catalogSetCards([rows], 'SV1S', { code: 'ko' }).map(c => c.image), [null, null],
-    'a language TCGdex has no art for gets no address');
+  assert.deepEqual(catalogSetCards([rows], 'SV1S', { code: 'xx' }).map(c => c.image), [null, null],
+    'a language TCGdex has no folder for gets no address');
+  // TCGdex has no Korean scans: the build marks every Korean row as having none.
+  const ko = [['SV4M', '001', '이상해씨', 'P', 0]];
+  assert.deepEqual(catalogSetCards([ko], 'SV4M', { code: 'ko' }).map(c => c.image), [null]);
   // The master set still gets a base for it: it reads the card's set and era from it.
   const { cards } = matchCatalog(new Map([['m', [['sv05', '99', 'Mew', 'P', 0]]]]), ['Mew'], { setSeries: SERIES });
   assert.equal(cards[0].image, 'https://assets.tcgdex.net/en/sv/sv05/99');

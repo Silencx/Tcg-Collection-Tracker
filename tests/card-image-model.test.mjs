@@ -29,11 +29,16 @@ test('every TCGdex language gets a CDN folder, and the Latin ones are unchanged'
   assert.equal(tcgdexCardBase('de', 'sv', 'sv05', '163'), 'https://assets.tcgdex.net/de/sv/sv05/163');
 });
 
-test('a language TCGdex has no art for gets no folder and no URL', () => {
-  // KR and SC are PLACEHOLDER_LANGS with no `code`; an unknown code is the same case.
+test('Korean and Simplified Chinese are filed under the TCGdex codes ko and zh-cn', () => {
+  // TCGdex has no scans in either today; Set mode asks the listing, which gives none.
+  assert.equal(tcgdexCdnLang('ko'), 'ko');
+  assert.equal(tcgdexCdnLang('zh-Hans'), 'zh-cn');
+});
+
+test('a language TCGdex has no folder for gets no folder and no URL', () => {
   assert.equal(tcgdexCdnLang(undefined), null);
-  assert.equal(tcgdexCdnLang('ko'), null);
-  assert.equal(tcgdexCardBase('ko', 'sv', 'sv05', '163'), null);
+  assert.equal(tcgdexCdnLang('xx'), null);
+  assert.equal(tcgdexCardBase('xx', 'sv', 'sv05', '163'), null);
 });
 
 test('a language without an apiCode falls back to its code', () => {

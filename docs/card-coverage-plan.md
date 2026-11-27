@@ -361,14 +361,214 @@ shows them. Plan:
 
 Korean and Simplified Chinese have no public card database today.
 
-- [ ] Simplified Chinese: Cardmarket says it now carries all Simplified Chinese sets and
+- [x] Simplified Chinese: Cardmarket says it now carries all Simplified Chinese sets and
   singles, and publishes its product catalogue as a download. Owner checks the terms,
-  then probe: can it give set + number + name?
+  then probe: can it give set + number + name? (2026-11-27: no; its files have no card
+  numbers and no Chinese names. Simplified Chinese comes from TCGdex.)
 - [ ] Korean: the official `pokemoncard.co.kr/cards` search is the best source, but
   scraping it is fragile and promos are incomplete. Owner decides if it's worth it; if
   yes, a CI scraper writing `data/cat/ko/`, failing soft like the PokéWallet steps
-  (`continue-on-error`).
-- [ ] Both: placeholder tiles keep working; credit and withdrawal notes in the README.
+  (`continue-on-error`). (2026-11-27: not without Pokémon Korea's written permission,
+  see "Terms" below. Korean comes from TCGdex until then.)
+- [x] Both: placeholder tiles keep working; credit and withdrawal notes in the README.
+  (TCGdex was credited already; the withdrawal note is under "Card catalogue".)
+
+Research (2026-11-27), reading only:
+
+- **TCGdex now has both languages**, keyless, on the API we already use (`zh-cn`, `ko`):
+  set lists with names and official counts, but cards for only a few sets so far, and no
+  images (`tools/tcgdex-catalog-probe.mjs zh-cn ko`, about 7 requests each):
+
+  | | Sets listed | Cards by set count | Sets with cards | Cards listed |
+  |---|---|---|---|---|
+  | Simplified Chinese (`zh-cn`) | 57 | 6,962 | 8 | 877 |
+  | Korean (`ko`) | 95 | 7,931 | 3 | 239 |
+
+  Its set ids follow the Japanese sets (`SV4M`, `SM1M`; Chinese-only sets like
+  `CSM1aC`), not the English ones. So in the app these are languages with sets of their
+  own, like Japanese, not more columns on the English sets.
+- **Simplified Chinese, Cardmarket.** Its "What's new" for May 2026 says every Simplified
+  Chinese set and single is now listed. The product catalogue is a public JSON file per
+  game (`downloads.s3.cardmarket.com/productCatalog/productList/products_singles_{game}.json`;
+  Pokémon is game 6 according to third-party projects, not confirmed). Those projects
+  describe its fields as product id, English name, expansion id, metacard id and date
+  added: no card number and no Chinese name, so it probably cannot give set + number +
+  name. The download page (`cardmarket.com/en/Pokemon/Data/Product-List`) is behind
+  Cloudflare's bot check, which the assistant does not get past: the owner opens it and
+  reads the terms.
+- **Korean, pokemoncard.co.kr** (Pokémon Korea's official site). `robots.txt` allows
+  everything. The card search lists one product's cards per page, chosen from 581
+  products going back to DP. Each card's page gives number (`127/103`), rarity, name and
+  set name; the images are watermarked. The footer forbids unauthorised copying of the
+  site's content; terms at `pokemonkorea.co.kr/terms`. Only facts (set, number, name)
+  would be taken, never images.
+- **Ids.** Today's KR and SC placeholder tiles mirror the English cards: `KR_sv04-001`,
+  `SC_sv04-001`, and collectors may have ticked them. Real Korean and Chinese cards have
+  sets of their own, so those ids cannot be mapped one to one. They stay as they are
+  (kept, never dropped); real cards get ids of their own, and linking the two waits for
+  Phase 8.
+
+Owner decisions (2026-11-27):
+
+1. Simplified Chinese: TCGdex, and try Cardmarket. The owner reads Cardmarket's terms
+   for the download first; then `tools/cardmarket-probe.mjs` fetches the one file (a
+   HEAD for its size, then one GET, cached) and reports its fields.
+2. Korean: TCGdex, and the official site after the owner reads Pokémon Korea's terms.
+   The search page loads a product's cards from a JSON endpoint it calls itself (internal
+   id, image and title per card); number, rarity and set are on each card's page.
+   `tools/pokemonkorea-probe.mjs` checks this with 4 requests, 2 s apart.
+3. Real Korean and Chinese cards get sets and ids of their own, like Japanese. The old
+   KR/SC placeholder tiles and their ticks stay as they are until Phase 8 links them.
+
+Terms (read 2026-11-27):
+
+- **Pokémon Korea** (`pokemonkorea.co.kr/terms`, in force since 2026-10-03; read and
+  translated by the assistant, as the owner does not read Korean). They cover
+  `pokemoncard.co.kr` too (art. 1). Art. 12: the copyright and other rights in the
+  service's documents, images, designs, **data** and other content belong to Pokémon
+  Korea, and without its prior consent users may not copy, distribute, transmit, publish,
+  sell or change that content or otherwise use it for profit, except where the law
+  allows. Art. 11 forbids using the service's information for profit without approval.
+  Nothing mentions crawlers, and `robots.txt` allows everything. A free, non-profit app
+  is not "for profit", but republishing the whole Korean card list is copying and
+  distributing their data, and Korean copyright law also protects a database as a whole
+  (database producers' rights). Without Pokémon Korea's written permission, the official
+  site is not a source for published data. The probe stays unrun.
+- **Cardmarket**: the download page is `cardmarket.com/en/Pokemon/Data/Product-List`
+  (the "Product-Catalogue" address was wrong), and the general terms are at
+  `cardmarket.com/en/Pokemon/Policies/GeneralTermsAndConditions`. Both are behind
+  Cloudflare's bot check, which the assistant does not get past, so the owner opens them.
+
+Cardmarket's files (2026-11-26 build, downloaded by the owner from the Product-List
+page; `node tools/cardmarket-probe.mjs --file … --nonsingles …`, no request to
+Cardmarket):
+
+- 75,928 singles and 5,199 sealed products. Each has a product id, an English name with
+  the attacks in brackets ("Kakuna [Bug Bite | Primal Clash]"), a category, an expansion
+  id, a metacard id and a date. **No card number, no Chinese name, no set name.**
+- Simplified Chinese sets are found by the set code their sealed products start with
+  ("CSM1aC: Storming Emergence - Radiant Booster"): 67 sets with 9,893 singles. 36 of
+  those codes are TCGdex `zh-cn` set ids. Cardmarket has more cards per set than TCGdex's
+  official count (CSV2C: 163 against 128), so it lists the secret rares too. 31 sets
+  TCGdex lacks, among them CSV10C, the Happy Sets, Battle Party sets and starter decks.
+- TCGdex's own `zh-cn` list has quirks: `CSV1C` twice (127 and 9 cards), lowercase twins
+  of the CSM sets (`csm1a`, 211 cards, next to `CSM1aC`, 151), and its 8 sets with cards
+  are filed under Japanese ids (`SV7a`, `SV8`, …).
+- **So Cardmarket cannot give set + number + name**, and is not a card-list source. At
+  most it is a check: its set list and card count per set against TCGdex, kept local,
+  like the TCGplayer check. Cardmarket's ids never leave the build machine.
+
+Next:
+
+- [x] Owner: download Cardmarket's catalogue; probe it (2026-11-27, above).
+- [ ] Owner: read Cardmarket's general terms before its counts feed any check that runs
+  in CI or is published.
+- [ ] Owner: ask Pokémon Korea for permission (`webmaster@pokemonkorea.co.kr`) before
+  `node tools/pokemonkorea-probe.mjs` is run or anything is built on the site; until
+  then Korean comes from TCGdex only.
+- [x] Build Korean and Simplified Chinese from TCGdex (2026-11-27; design and what the
+  build found below).
+- [ ] Owner, optional: tell TCGdex about its `zh-cn` slips (copies, twins, the repeat;
+  "Built" below), so the source gets fixed.
+
+### Design: Korean and Simplified Chinese from TCGdex (2026-11-27)
+
+**How the app already treats Asian set lists.** Traditional Chinese, Thai and
+Indonesian are ordinary `LANGUAGES` entries whose TCGdex set ids (`SV7a`, `CS4b`) share
+none with English. They live in two places:
+
+- Master Set and TMS are built from the English card list. Every language gets one
+  tile per English card, `{badge}_{English card id}` (`TW_sv04-001`). Today's KR and SC
+  placeholder tiles are exactly that shape: `KR_sv04-001`, `SC_sv04-001`.
+- Set mode shows each language's own sets, one tile per card, ticked in its own list
+  (`state.ssChecked`) as `{badge}_{that language's card id}` (`TW_SV7a-052`). A set TCGdex
+  lists without cards is shown greyed out: "no card list published in this language
+  yet". Set mode offers no KR or SC today.
+
+So Korean and Simplified Chinese need no pipeline of their own like Japanese. They
+become two more `LANGUAGES` entries, and the build, `data/sets.json`, the catalogue, the
+coverage report and the "Missing card" overrides pick them up from that list.
+
+**What TCGdex has** (checked 2026-11-27):
+
+- Korean (`ko`): 95 sets with names, dates, series and official counts; cards for 3
+  (SV4M, SV4K, SV5K: 239 cards with names, numbers, rarity, prints). No images. No set id
+  is also an English id; 53 are shared with TW/TH/ID, which `sets.json`'s per-language
+  `lang` overrides already handle.
+- Simplified Chinese (`zh-cn`): 57 sets. The 7 with cards (SV7a, SV7, SV8, SV8a, SV9,
+  SV9a, SV10) are copies of the Traditional Chinese sets, with the same names in
+  Traditional characters. The real Simplified Chinese sets (`CS…C`, `CSM…C`, `CSV…C`) have
+  names and counts but about 9 cards in all. `CSV1C` is listed twice (127 and 9), and
+  eight CSM sets also appear under lowercase twins (`csm1a` next to `CSM1aC`).
+
+**The change**
+
+1. `js/config.js`: move KR and SC from `PLACEHOLDER_LANGS` into `LANGUAGES` as
+   `{ code:'ko', apiCode:'ko', badge:'KR' }` and `{ code:'zh-Hans', apiCode:'zh-cn',
+   badge:'SC' }`, after ID, with a new flag `mirror:'placeholder'`. `PLACEHOLDER_LANGS`
+   stays as an export, empty.
+2. Master Set and TMS: a language with `mirror:'placeholder'` gets its tile on each
+   English card as today's placeholder tile, with the same id (`KR_{English card id}`)
+   and no image request (an English card id never has Korean or Chinese art). **Every
+   tick saved on a KR or SC tile keeps its id; nothing is migrated.** Tested.
+3. Set mode: KR and SC join the language picker with their own sets. The sets with
+   cards open as usual, with names and numbers from TCGdex and placeholder art where
+   TCGdex has none. The rest are greyed out, as for Italian or Thai today. Ticks are
+   new ids (`KR_SV4M-001`) in the set-mode list, so nothing clashes.
+4. TCGdex's `zh-cn` quirks, filtered in one pure function used by the build and by the
+   live refresh (`js/api/…-model.js`, with tests): leave out a set whose id and name
+   are the Traditional Chinese set's (a copy); leave out a lowercase twin of a `…C` set
+   (`csm1a` of `CSM1aC`); keep one entry per id (the larger count). A note goes to
+   TCGdex, from the owner, so the source gets fixed.
+5. The build needs no new script: `build-data` reads the two set lists and their sets
+   (about 155 more keyless TCGdex requests each Monday), and `build-catalog` writes
+   `data/cat/ko/` and `data/cat/zh-Hans/` (8 requests). The coverage report then lists
+   Korean and Chinese gaps per set, like every other language.
+6. "Missing card" form: add Korean and Simplified Chinese to its language list. The
+   overrides already accept any `LANGUAGES` code, so collectors can add the cards TCGdex
+   lacks, checked against the set's official count.
+7. The bell notice "Korean cards exist but no public image database yet" becomes a
+   count from the data ("TCGdex has card lists for 3 of 95 Korean sets so far").
+   README: languages, the Set mode note, the removed "no public card database" line.
+8. Tests: the language list (now eleven), unchanged KR/SC ids in Master Set and TMS,
+   the `zh-cn` filter, the picker offering both, and the catalogue index order.
+
+**Not in it:** Korean from the official site (needs Pokémon Korea's permission);
+Cardmarket (no numbers; at most a local count check later); linking a Korean or Chinese
+card to its English or Japanese twin (Phase 8).
+
+**Cost and risk.** No new source, key or credit. About 160 more TCGdex requests a week.
+`data/sets.json` grows by two language maps (about 150 set names). The app must work
+with `data/cat/ko/` or `data/cat/zh-Hans/` missing, as it does for the other languages'
+catalogue files (a test covers it); Master Set and TMS do not read them.
+
+### Built (2026-11-27)
+
+As designed, with these differences and findings:
+
+- **`PLACEHOLDER_LANGS` is gone** rather than kept empty: nothing imports it any more.
+  `js/ui/mirror-model.js` splits `LANGUAGES` into tiles with art and placeholder tiles,
+  and builds every tile id on an English card (tested: `KR_sv04-001`, `SC_sv04-001`).
+- **Data:** Korean 95 sets, 3 with card lists (SV4M, SV4K, SV5K: 239 cards, no scans).
+  Simplified Chinese 41 sets after cleaning, 1 with a card list (CSMPiC, 48 cards); the
+  catalogue left out 829 cards of the 7 Traditional Chinese copies. `data/sets.json`
+  went from 91 to 102 KB; nothing already in it changed except the count fix below.
+- **The lowercase twins** (`csm1a`, …) have no cards, and nor do the `CSM…C` sets they
+  shadow, so dropping them loses nothing collectable. The codes printed on the products
+  (`CSM1aC`) are kept. But the twins' names, dates and counts look like the right ones
+  for six of them: `csm1a` is 风暴涌现 (Storming Emergence), 211 cards, 2022-10-22, and
+  Cardmarket has 211 singles for CSM1aC, while TCGdex's `CSM1aC` is named 横空出世 赫
+  (the name of CS1aC), 151 cards, 2020-10-28. For the note to TCGdex.
+- **Counts per language** are now compared with the shared map's count, not only with
+  English's. Thai, Indonesian and Korean showed Traditional Chinese's count for the ids
+  they share with it (SV4M: 66/66 TW, 66/95 KR); 33 overrides now say otherwise
+  (TH 13, ID 8, KR 12).
+- **Set ids are URL-encoded** in the build's per-set requests: four Korean ids end in
+  `+` (SM1+, SM3+, SM4+, SM5+), and unencoded they were 404s, so those sets had no date
+  and looked like they had cards.
+- **The Missing card checker** read a set name in Hangul, Han or Thai as empty, so it
+  matched every set of the language ("more than one set is called…"). It now keeps
+  letters of every script; this was already true of Traditional Chinese and Thai.
 
 ## Phase 8: One card id across all sources (largest piece)
 
@@ -379,6 +579,27 @@ Only start once Phases 3 to 6 show it's needed.
 - [ ] Used for: "same card in other languages" in True master set, combining sources
   without duplicates, optional prices/links later.
 - [ ] Build-side only for third-party ids (gitignored); what's published uses our own ids.
+
+## Optional, after all phases
+
+Left open on purpose. Pick them up once Phases 7 and 8 are done, or when one is needed.
+
+- [ ] Phase 5: the gap report opens one issue per set that has a gap (deduplicated,
+  rate-limited).
+- [ ] Phase 6: a source match auto-confirms a "Missing card" report (level 3). Do it in
+  the weekly run, from the TCGplayer diff, rather than per issue, so nobody can trigger
+  requests to TCGCSV by opening issues. Auto-merge only if the owner agrees.
+- [ ] Phase 6: the 48 Jumbo products that do not trace to one card
+  (`tools/jumbo-prints-report.md`): 16 WotC box toppers (cards of their own, not
+  prints), 21 with no number or several, 11 with typos or `a` numbers.
+- [ ] Phase 6: send the 149 Jumbo prints to TCGdex, by hand (issue #19; plan under
+  "Jumbo prints").
+- [ ] Phase 6: about 45 stamped promos TCGplayer lists under the original number
+  (prerelease, W and set stamps), as print overrides with a `stamp`.
+- [ ] Phase 6: TCGplayer's Pokémon Japan category against `data/jp-cat/`
+  (`node tools/tcgcsv-probe.mjs --jp`, about 330 requests, local).
+- [ ] Phase 6: match TCGplayer's trainer kits and McDonald's groups to TCGdex's sets
+  (about 15 groups), so the baseline shrinks.
 
 ## Out of scope for now
 

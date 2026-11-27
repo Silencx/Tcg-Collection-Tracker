@@ -25,6 +25,7 @@
 import { LANGUAGES } from '../../config.js';
 import { tcgdexAssetBase, tcgdexSerieSegment } from '../images.js';
 import { listedImageBase } from '../card-image-model.js';
+import { SET_LIST_QUIRKS, setListFor } from '../set-list-model.js';
 import { namesSpecies, cardIsSpecies, readDexIds } from '../match-model.js';
 import { normalizeVariants } from '../variants.js';
 
@@ -310,15 +311,18 @@ export async function getCards(names, { signal, withVariants = true, setSeries =
  *   setSeries: { setId: seriesId }                    — language-INVARIANT (0 disagreements measured)
  *   series:    { langCode: [{id,name,date}] }         — newest first, for picker grouping
  *   lang:      { langCode: {dates,counts,noCards} }   — ONLY values that differ from the flat maps
+ *   cleaned:   { langCode: {copies,twins,repeats,missing} } — what set-list-model.js left
+ *              out of a language's list (zh-Hans), for the build's log; not written out
  *
  * SHAPE NOTE: dates/symbols/logos/counts stay FLAT `{setId: value}` maps keyed on the
  * set id, exactly as before, and are now the UNION across languages rather than EN only.
  * That is deliberate and is what keeps this change additive: masterset.js, tms.js,
  * dashboard.js and snapshot.js's coverage check all look ids up in them, and every id
- * they looked up before still resolves to the same value. Only the zh-Hant/th/id
- * namespace — which shares no ids with English — needs per-language values, and those
- * go in `lang` as sparse overrides rather than duplicating all five maps nine times
- * (measured: 88 KB this way, 275 KB duplicated, on a file fetched every boot).
+ * they looked up before still resolves to the same value. Only the Asian namespaces
+ * (zh-Hant/th/id/ko/zh-Hans), which share no ids with English, need per-language
+ * values, and those go in `lang` as sparse overrides rather than duplicating all five
+ * maps per language (measured: 88 KB this way, 275 KB duplicated, on a file fetched
+ * every boot, with nine languages).
  */
 export async function getSetMeta({ signal, setIds = [], allEnSets = false, withSeries = true, onDetail } = {}) {
   const eligible = LANGUAGES.filter(l => l.hasSetsApi && l.apiCode);
@@ -327,14 +331,22 @@ export async function getSetMeta({ signal, setIds = [], allEnSets = false, withS
   );
   const names = {}, dates = {}, symbols = {}, logos = {}, counts = {};
   const setSeries = {}, series = {}, lang = {};
-  // EN is the reference namespace: a value differs "from the flat map" relative to it.
-  const enCounts = {};
+  // Each language's /sets answer by API code: cleaning zh-cn's list needs zh-tw's next
+  // to it (api/set-list-model.js).
+  const listOf = apiCode => {
+    const r = results[eligible.findIndex(l => l.apiCode === apiCode)];
+    return r?.status === 'fulfilled' && Array.isArray(r.value.s) ? r.value.s : null;
+  };
+  // What the cleaning left out, per language, for the build's log. A cleaned language is
+  // also "closed": the series sweep adds none of its sets, or the copies would be back.
+  const cleaned = {}, closed = new Set();
   results.forEach((r, i) => {
     const code = eligible[i].code;
     const isEn = eligible[i].apiCode === 'en';
     names[code] = {};
     if (r.status !== 'fulfilled') return;
-    const arr = Array.isArray(r.value.s) ? r.value.s : [];
+    const { sets: arr, ...left } = setListFor(eligible[i].apiCode, listOf);
+    if (SET_LIST_QUIRKS[eligible[i].apiCode]) { closed.add(code); cleaned[code] = left; }
     for (const set of arr) {
       if (!set?.id) continue;
       names[code][set.id] = set.name || set.id;
@@ -354,17 +366,20 @@ export async function getSetMeta({ signal, setIds = [], allEnSets = false, withS
       // picker shows both when they differ.
       const c = readCardCount(set.cardCount);
       if (!c) continue;
-      if (isEn) { enCounts[set.id] = c; counts[set.id] = c; }
-      else if (!counts[set.id]) counts[set.id] = c;
-      // cardCount genuinely differs per language for 61 ids (A1 is 226/286 EN vs
-      // 226/226 DE), so a language whose count disagrees with EN records an override.
-      if (!isEn && enCounts[set.id] && !sameCount(enCounts[set.id], c)) {
+      // EN sweeps first, so the flat map holds English's count for every set English
+      // has, and the first listing language's for the rest (TW's, for most Asian ids).
+      if (!counts[set.id]) { counts[set.id] = c; continue; }
+      // cardCount genuinely differs per language (A1 is 226/286 EN vs 226/226 DE; SV4M
+      // is 66/66 TW vs 66/95 KR), so a language whose count disagrees with the flat
+      // map's records an override. Compared with English's alone, TH, ID and KR showed
+      // TW's count for the ids they share with it.
+      if (!isEn && !sameCount(counts[set.id], c)) {
         (lang[code] ||= {}).counts = { ...(lang[code].counts || {}), [set.id]: c };
       }
     }
   });
 
-  if (withSeries) await sweepSeries(eligible, signal, { names, symbols, logos, setSeries, series });
+  if (withSeries) await sweepSeries(eligible, signal, { names, symbols, logos, setSeries, series }, closed);
 
   // The /sets LIST often omits releaseDate (only /sets/{id} carries it), which would
   // collapse every set to the 1999 sort fallback. Fill dates for the sets we actually
@@ -393,7 +408,8 @@ export async function getSetMeta({ signal, setIds = [], allEnSets = false, withS
     if (!need.length) continue;
     await pooledForEach(need, DETAIL_CONCURRENCY, async id => {
       try {
-        const s = await getJSON(`${API}/${l.apiCode}/sets/${id}`, signal);
+        // Encoded: four Korean ids end in "+" (SM1+), which unencoded is a 404.
+        const s = await getJSON(`${API}/${l.apiCode}/sets/${encodeURIComponent(id)}`, signal);
         try { onDetail?.(l.code, id, s); } catch { /* a caller's hook never costs the meta */ }
         // First writer wins, and EN sweeps first, so the flat map holds EN's value for
         // every id English has. A later language that DISAGREES records an override
@@ -427,7 +443,7 @@ export async function getSetMeta({ signal, setIds = [], allEnSets = false, withS
       } catch { /* a missing date just falls back to the sort default, as before */ }
     });
   }
-  return { names, dates, symbols, logos, counts, setSeries, series, lang };
+  return { names, dates, symbols, logos, counts, setSeries, series, lang, cleaned };
 }
 
 /** Do two readCardCount results agree? */
@@ -447,7 +463,7 @@ function sameCount(a, b) {
  * /{lang}/series arrives ascending by release date, so its index is a valid tiebreaker
  * for series whose own date is missing.
  */
-async function sweepSeries(eligible, signal, { names, symbols, logos, setSeries, series }) {
+async function sweepSeries(eligible, signal, { names, symbols, logos, setSeries, series }, closed = new Set()) {
   for (const l of eligible) {
     let list;
     try { list = await getJSON(`${API}/${l.apiCode}/series`, signal); }
@@ -463,6 +479,8 @@ async function sweepSeries(eligible, signal, { names, symbols, logos, setSeries,
         dated.push({ id: s.id, name: s.name || d?.name || s.id, date: d?.releaseDate || null });
         for (const x of (Array.isArray(d?.sets) ? d.sets : [])) {
           if (!x?.id) continue;
+          // A cleaned language's sets are its cleaned /sets list (set-list-model.js).
+          if (closed.has(l.code) && !names[l.code]?.[x.id]) continue;
           // Language-invariant: measured 0 disagreements across all 9 languages AND
           // against /sets/{id}.serie, so first writer wins is safe.
           if (!setSeries[x.id]) setSeries[x.id] = s.id;

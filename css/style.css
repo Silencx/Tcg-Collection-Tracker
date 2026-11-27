@@ -1060,7 +1060,7 @@ main{width:min(100%,var(--page-w));margin:0 auto;padding:12px;}
 
   /* Off-screen grids skip style, layout and paint entirely. The default list is
      776 tiles / 12k nodes over a 24000px page (65 EN cards × 11 languages —
-     see LANGUAGES + PLACEHOLDER_LANGS); a popular Pokémon is ten times that, and
+     see LANGUAGES); a popular Pokémon is ten times that, and
      every full relayout used to walk all of it (~31ms on the demo). Images inside
      a skipped subtree are also not considered near-viewport, so their lazy loads
      never enter the network queue until the grid is actually approached.

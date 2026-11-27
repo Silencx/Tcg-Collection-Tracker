@@ -19,7 +19,7 @@
 // =============================================================================
 
 import { state, savePoke } from '../state.js';
-import { LANGUAGES, PLACEHOLDER_LANGS, BADGE_ORDER } from '../config.js';
+import { LANGUAGES, BADGE_ORDER } from '../config.js';
 import { searchSpecies } from '../api/species-model.js';
 import { flagSvg } from './flags.js';
 import { escapeHtml } from './html.js';
@@ -172,9 +172,9 @@ function pokeTile(name, tracked, onClick, disabled = false, dex = null) {
 
 // ── LANGUAGES ────────────────────────────────────────────────────────────────
 
-/** Display name for a badge, including the two JP/placeholder cases pills also handle. */
+/** Display name for a badge, including JP, which pills also handle. */
 export function languageLabel(badge) {
-  const l = LANGUAGES.find(x => x.badge === badge) || PLACEHOLDER_LANGS.find(x => x.badge === badge);
+  const l = LANGUAGES.find(x => x.badge === badge);
   if (l) return l.label;
   if (badge === 'JP') return 'Japanese';
   return badge;

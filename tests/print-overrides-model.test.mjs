@@ -19,7 +19,7 @@ test('a malformed file or row reads as no print override', () => {
   }
   const rows = readPrintOverrides({ prints: [
     row(),
-    row({ lang: 'ja' }), row({ lang: 'ko' }),     // not a TCGdex language we have
+    row({ lang: 'ja' }), row({ lang: 'xx' }),     // not a TCGdex language we have
     row({ card: 'xyp' }), row({ card: '../x-1' }), row({ card: 'xyp-XY 17' }),
     row({ type: 'shiny' }), row({ size: 'huge' }),
     row({ stamp: [] }), row({ stamp: ['Pre Release'] }), row({ stamp: 'pre-release' }),
