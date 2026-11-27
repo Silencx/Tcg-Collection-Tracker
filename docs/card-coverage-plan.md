@@ -595,8 +595,20 @@ Left open on purpose. Pick them up once Phases 7 and 8 are done, or when one is 
   prints), 21 with no number or several, 11 with typos or `a` numbers.
 - [ ] Phase 6: send the 149 Jumbo prints to TCGdex, by hand (issue #19; plan under
   "Jumbo prints").
-- [ ] Phase 6: about 45 stamped promos TCGplayer lists under the original number
-  (prerelease, W and set stamps), as print overrides with a `stamp`.
+- [x] Phase 6: about 45 stamped promos TCGplayer lists under the original number
+  (prerelease, W and set stamps), as print overrides with a `stamp`. Done 2026-11-27
+  (`tools/stamped-prints.mjs`, issue #24): every TCGplayer product with an
+  original `n/size` number and stamp notes, in any group but Jumbo, traced to its card.
+  There were more than 45: 152 such prints TCGdex already lists, 135 rows for the ones it
+  lacks, 65 left out (49 with a note that is no TCGdex stamp, 14 that do not trace, 1
+  staff print with no event, 1 alternate art). The TCGplayer check now skips these
+  products, so the baseline went from 366 to 338 numbers only TCGplayer lists.
+- [ ] Phase 6: the 65 stamped prints left out (`tools/stamped-prints-report.md`): League
+  Cup and international championship stamps, Cosmos Holo and magazine notes, which need
+  TCGdex's word for them first.
+- [ ] Phase 6: stamped prints filed under a promo's own number ("005 (Prerelease)"):
+  about 300 products, mostly in the SM, SV and SWSH promo groups, which the check counts
+  as extra prints of that number. Compare them with TCGdex's prints of the promo card.
 - [ ] Phase 6: TCGplayer's Pokémon Japan category against `data/jp-cat/`
   (`node tools/tcgcsv-probe.mjs --jp`, about 330 requests, local).
 - [x] Phase 6: match TCGplayer's trainer kits and McDonald's groups to TCGdex's sets
