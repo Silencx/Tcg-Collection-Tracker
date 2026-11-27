@@ -99,7 +99,7 @@ async function probeCategory(categoryId, lang, say) {
     products += list.length;
     const c = groupCards(list, lang);
     sealed += c.sealed; prints += c.prints;
-    if (c.theirs.size) cardGroups.push({ name: g.name, publishedOn: g.publishedOn, cards: c.theirs.size, theirs: c.theirs });
+    if (c.theirs.size) cardGroups.push({ name: g.name, publishedOn: g.publishedOn, cards: c.theirs.size, theirs: c.theirs, numbered: c.numbered });
   }
   const res = compareCatalogue(cardGroups, mine);
 
@@ -107,6 +107,7 @@ async function probeCategory(categoryId, lang, say) {
   say(`## Category ${categoryId} vs ${lang === 'ja' ? 'data/jp-cat/' : 'data/cat/en/'}`, '');
   say(`${groups.length} groups, ${products} products: ${sealed} sealed or without a number, ${prints} extra prints of a number already counted.`);
   say(`Group matching: ${Object.entries(res.how).map(([k, v]) => `${k} ${v}`).join(', ')}.`);
+  if (res.byCards.length) say(`Sets found by their cards (${res.byCards.length}): ${res.byCards.join(', ')}.`);
   say(`Cards in both: ${res.inBoth}. Only TCGplayer: ${res.onlyTheirs}. Only ours (matched sets): ${res.onlyOurs}.`, '');
   say('| Set | TCGplayer group | Theirs | Ours | Only theirs | Only ours |', '|---|---|---|---|---|---|');
   for (const d of [...res.diffs].sort((x, y) => (y.theirs.length + y.ours.length) - (x.theirs.length + x.ours.length))) {
