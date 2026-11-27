@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  loose, head, numberOf, ourSets, groupCards, matchGroups, compareCatalogue,
+  loose, looseCard, head, numberOf, ourSets, groupCards, matchGroups, matchByCards, compareCatalogue,
   baselineOf, formatBaseline, newSince, logLines,
 } from '../tools/lib/tcgcsv.mjs';
 
@@ -55,6 +55,19 @@ test('a group counts sealed product and extra prints, and keeps one entry per nu
   assert.equal(g.prints, 1);
   assert.deepEqual([...g.theirs.keys()], ['1', 'RC1']);
   assert.deepEqual(g.theirs.get('1'), { number: '1', name: 'Pikachu' });
+  // Every numbered product, prints too: a trainer kit's two half decks share numbers.
+  assert.deepEqual(g.numbered.map(c => [c.key, c.name]), [['1', 'Pikachu'], ['1', 'Pikachu (Cosmos Holo)'], ['RC1', 'Snivy']]);
+});
+
+test('card names reduce to one spelling across both sides', () => {
+  assert.equal(looseCard('Lombre (#6)'), 'lombre');
+  assert.equal(looseCard('Psychic Energy (#8 - Latias)'), looseCard('Psychic Energy'));
+  assert.equal(looseCard('Pikachu - 58/102'), 'pikachu');
+  assert.equal(looseCard('Energy Search [Manaphy]'), 'energysearch');
+  assert.equal(looseCard('Jolteon-EX'), looseCard('Jolteon EX'));
+  assert.equal(looseCard('Flabébé'), 'flabebe');
+  assert.equal(looseCard('Ho-Oh'), 'hooh');
+  assert.equal(looseCard(null), '');
 });
 
 test('groups match by name, then by date only to an unclaimed set of similar size', () => {
@@ -109,6 +122,97 @@ test('the diff pools groups on one set and lists numbers only one side has', () 
   assert.equal(res.onlyTheirs, 2);
   assert.equal(res.onlyOurs, 1);
   assert.equal(res.inBoth, 30);
+});
+
+// ── Matching by cards (number and card name) ───────────────────────────────────
+const group = (name, products, publishedOn = '2020-01-01') => {
+  const c = groupCards(products);
+  return { name, publishedOn, cards: c.theirs.size, theirs: c.theirs, numbered: c.numbered };
+};
+const deck = (set, names) => names.map((n, i) => [set, String(i + 1), n]);
+const LATIAS = ['Treecko', 'Grovyle', 'Lotad', 'Lombre', 'Fire Energy', 'Tangela', 'Tangrowth', 'Surskit', 'Acro Bike', 'Latias', 'Grass Energy', 'Potion'];
+const LATIOS = ['Skitty', 'Delcatty', 'Machop', 'Machoke', 'Rhyhorn', 'Rhydon', 'Solrock', 'Psychic Energy', 'Fighting Energy', 'Latios', 'Acro Bike'];
+const BURGER = ['Rowlet', 'Litten', 'Popplio', 'Pikachu', 'Grubbin', 'Rockruff', 'Cutiefly', 'Mimikyu', 'Wimpod', 'Dewpider', 'Jangmo-o', 'Lycanroc'];
+const LETTERS = 'ABCDEFGHIJKL'.split('');
+const radiant = ([set, n, name]) => [set, `RC${n}`, `Radiant ${name}`];
+const cardOurs = () => ourSets('en', {
+  sets: {
+    names: { en: { 'tk-a': 'Trainer Kit (Latias)', 'tk-b': 'Trainer Kit (Latios)', mcd: 'Burger Collection 2018', sm8: 'Lost Thunder', ex10: 'Unseen Forces', exu: 'Unseen Forces Unown Collection', g1: 'Generations' } },
+    dates: { sm8: '2018-11-02', mcd: '2018-10-19' },
+  },
+  rows: [
+    ...deck('tk-a', LATIAS), ...deck('tk-b', LATIOS),   // the Latios deck's 12, a Potion, is missing
+    ...deck('mcd', BURGER), ...nums('sm8', 20),
+    ...nums('ex10', 20), ...LETTERS.map(l => ['exu', l, 'Unown']),
+    ...nums('g1', 10), ...nums('g1', 10).map(radiant),
+  ],
+});
+const CARD_GROUPS = () => [
+  group('Trainer Kit: Latias & Latios', [
+    ...LATIAS.map((n, i) => product(`${i === 4 ? 4 : i + 1}/12`, `${n} (#${i + 1})`)),   // Fire Energy filed under 4
+    product('10/12', 'Latias (#10 Holo)'),                                                // another print
+    ...LATIOS.map((n, i) => product(`${i + 1}/12`, `${n} (Latios)`)),
+    product('12/12', 'Potion (Latios)'),
+    product(null, 'Trainer Kit: Latias & Latios'),
+  ], '2015-04-29'),
+  group('SM - Lost Thunder', nums('sm8', 20).map(([, n, name]) => product(`${n}/214`, name)), '2018-11-02'),
+  group('Burger Promos 2018', [...BURGER.map((n, i) => product(`${i + 1}/12`, n)), product('4/12', 'Pikachu (Holo)')], '2018-11-02'),
+  group('EX Unseen Forces', [
+    ...nums('ex10', 20).map(([, n, name]) => product(`${n}/115`, name)),
+    ...[...LETTERS, 'M'].map(l => product(`${l}/28`, `Unown (${l})`)),                    // TCGdex lacks M
+  ], '2005-08-22'),
+  group('Generations', nums('g1', 10).map(([, n, name]) => product(`${n}/83`, name)), '2016-02-22'),
+  group('Generations: Radiant Collection', nums('g1', 10).map(radiant).map(([, n, name]) => product(`${n}/RC32`, name)), '2016-02-22'),
+];
+
+test('sets found inside a group and groups found inside a set, by number and card name', () => {
+  const groups = CARD_GROUPS(), o = cardOurs();
+  const byGroup = matchGroups(groups, o);
+  assert.deepEqual([...byGroup.values()].map(m => m.id), [null, 'sm8', null, 'ex10', 'g1', null]);
+  const { sets, groups: inSet } = matchByCards(groups, o, byGroup);
+  // One kit group holds both half decks; Fire Energy filed under 4 still leaves 11 of 12.
+  assert.deepEqual(sets.get(groups[0]), ['tk-a', 'tk-b']);
+  assert.deepEqual(sets.get(groups[2]), ['mcd'], 'released with Lost Thunder, which its name already claims');
+  assert.deepEqual(sets.get(groups[3]), ['exu'], 'inside the group that matched ex10 by name');
+  assert.equal(inSet.get(groups[5]), 'g1');
+  assert.equal(sets.size + inSet.size, 4);
+});
+
+test('a group feeding several sets splits its cards by number and name', () => {
+  const res = compareCatalogue(CARD_GROUPS(), cardOurs());
+  assert.deepEqual(res.how, { cards: 3, name: 3 });
+  assert.equal(res.matched, 6);
+  assert.deepEqual(res.unmatched, []);
+  assert.deepEqual(res.lonely, []);
+  assert.deepEqual(res.byCards, ['exu', 'mcd', 'tk-a', 'tk-b']);
+  const diff = Object.fromEntries(res.diffs.map(d => [d.id, [d.theirs.map(x => x.number), d.ours.map(x => x.number)]]));
+  assert.deepEqual(diff, {
+    ex10: [['M'], []],          // an Unown exu lacks stays with the set its group matched
+    'tk-a': [[], ['5']],        // TCGplayer files Fire Energy under 4, which both decks have
+    'tk-b': [['12'], []],       // the Latios Potion: tk-a's 12 is taken, so it goes where 12 is free
+  });
+  assert.deepEqual(res.diffs.find(d => d.id === 'tk-b').groups, ['Trainer Kit: Latias & Latios']);
+  assert.equal(res.inBoth, 11 + 11 + 12 + 20 + 20 + 12 + 20);
+});
+
+test('matching by cards needs 10 cards, one place, and a group mostly of the set', () => {
+  const other = n => Array.from({ length: n }, (_, i) => product(`${100 + i}/200`, `Other ${i}`));
+  const o = ourSets('en', {
+    sets: { names: { en: { small: 'Small', twice: 'Twice', inside: 'Inside' } } },
+    rows: [...nums('small', 9), ...deck('twice', BURGER), ...deck('inside', LATIOS.slice(0, 10))],
+  });
+  const groups = [
+    group('Nine', nums('small', 9).map(([, n, name]) => product(n, name))),
+    group('One', [...BURGER.map((n, i) => product(String(i + 1), n)), ...other(4)]),
+    group('Two', [...BURGER.map((n, i) => product(String(i + 1), n)), ...other(4)]),
+    group('Mixed', [...LATIOS.slice(0, 10).map((n, i) => product(String(i + 1), n)), ...other(20)]),
+  ];
+  const { sets, groups: inSet } = matchByCards(groups, o);
+  assert.equal(sets.size, 0, 'small has 9 cards; twice is in two groups; inside is a third of Mixed');
+  assert.equal(inSet.size, 0, 'Nine has 9 cards; One, Two and Mixed are not 9 in 10 inside one set');
+  const res = compareCatalogue(groups, o);
+  assert.deepEqual(res.lonely, ['inside', 'small', 'twice']);
+  assert.equal(res.unmatched.length, 4);
 });
 
 test('the baseline holds set ids and number keys, never TCGplayer names', () => {
@@ -175,7 +279,8 @@ test('the committed baseline is in its own format and holds ids and numbers only
   const b = JSON.parse(text);
   assert.equal(b.schemaVersion, 1);
   assert.equal(formatBaseline(b), text);
-  const ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/, NUM = /^[A-Za-z0-9!?.-]{1,16}$/;
+  // `%`: TCGdex numbers exu's "?" Unown %3F.
+  const ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/, NUM = /^[A-Za-z0-9!?.%-]{1,16}$/;
   for (const side of ['onlyTcgplayer', 'onlyOurs']) {
     for (const [id, keys] of Object.entries(b[side])) {
       assert.match(id, ID);

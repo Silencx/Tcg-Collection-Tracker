@@ -258,18 +258,22 @@ never fails the build.
 TCGplayer's, through [TCGCSV](https://tcgcsv.com/)'s daily mirror (`tools/tcgcsv-probe.mjs`;
 the matching is `tools/lib/tcgcsv.mjs`). It is keyless and keeps to TCGCSV's usage
 guidelines: about 225 requests, 150 ms apart, under the probe's own generic User-Agent.
-TCGplayer groups are matched to our sets by name, then by release date, and compared
-number by number; sealed product and extra prints of a number are left out.
+TCGplayer groups are matched to our sets by name, then by release date, then by their
+cards: a set of 10 cards or more, 9 in 10 of which one group lists under the same number
+and card name, or the other way round. That finds the trainer kits (one TCGplayer group
+per kit, one TCGdex set per half deck), the McDonald's collections, the Unseen Forces
+Unown and the Radiant Collections. Then each set is compared number by number; sealed
+product and extra prints of a number are left out.
 
 The differences already known are in `tools/tcgcsv-baseline.json` (committed): Jumbo
-cards, which TCGdex files as prints; the Unseen Forces Unown, which TCGdex files in
-`exu`; Classic Collection and Radiant Collection numbering; stamped promos; and the 45
-TCGplayer groups that are product lines rather than sets (see `docs/card-coverage-plan.md`,
-Phase 6). The log shows only what is not in it:
+cards, which TCGdex files as prints; Classic Collection numbering; stamped promos; the
+Fighting Energy TCGdex leaves out of the Lycanroc trainer kit; and 25 TCGplayer groups
+TCGdex has no set for, mostly product lines (see `docs/card-coverage-plan.md`, Phase 6).
+The log shows only what is not in it:
 
 ```
-[coverage] TCGplayer via TCGCSV (build 2026-11-26T20_05_59_0000): 170 of 215 groups match our sets; 20630 card numbers in both
-[coverage]   nothing new since tools/tcgcsv-baseline.json (381 numbers only TCGplayer lists and 158 only we list are known)
+[coverage] TCGplayer via TCGCSV (build 2026-11-26T20_05_59_0000): 190 of 215 groups match our sets; 21277 card numbers in both
+[coverage]   nothing new since tools/tcgcsv-baseline.json (366 numbers only TCGplayer lists and 104 only we list are known)
 ```
 
 A new difference is a line per set, `sv10: 245, 246`, under "TCGplayer lists N number(s)

@@ -306,7 +306,8 @@ Probe results so far (2026-11-26):
   - 158 numbers only we list are mostly the same cards filed differently: Radiant
     Collection RC1–RC32 as their own group, XY `a` cards, SM energies.
   - 45 groups match nothing of ours. About 15 are naming: McDonald's Collection 2015–2024
-    and the trainer kits, which TCGdex splits per deck. The rest are product lines
+    and the trainer kits, which TCGdex splits per deck (matched by their cards since
+    2026-11-27; see "Optional, after all phases"). The rest are product lines
     TCGdex does not have as sets: Prize Pack Series (203), World Championship Decks
     (208), League & Championship Cards (163), Deck/Blister Exclusives, Battle Academy,
     Trick or Trade, Professor Program, Burger King, Countdown Calendar, Kids WB,
@@ -598,8 +599,28 @@ Left open on purpose. Pick them up once Phases 7 and 8 are done, or when one is 
   (prerelease, W and set stamps), as print overrides with a `stamp`.
 - [ ] Phase 6: TCGplayer's Pokémon Japan category against `data/jp-cat/`
   (`node tools/tcgcsv-probe.mjs --jp`, about 330 requests, local).
-- [ ] Phase 6: match TCGplayer's trainer kits and McDonald's groups to TCGdex's sets
-  (about 15 groups), so the baseline shrinks.
+- [x] Phase 6: match TCGplayer's trainer kits and McDonald's groups to TCGdex's sets
+  (about 15 groups), so the baseline shrinks. Done 2026-11-27 by matching on cards
+  (`matchByCards` in `tools/lib/tcgcsv.mjs`): a set of 10 cards or more, 9 in 10 of
+  which one group lists under the same number and card name, or a group that sits in
+  one set the same way. A kit group feeds both half decks, each card going to the deck
+  that lists it. It found 28 sets inside 18 groups (10 kits, 7 McDonald's collections,
+  and `exu` in the Unseen Forces group) and 3 groups inside a set (both Radiant
+  Collections and Base Set (Shadowless)). Only 9 in 10 of a set's cards need to match,
+  so a few cards filed differently do not stop the set being found. On the
+  2026-11-26 build: 190 of 215 groups match (was 170), 366 numbers only TCGplayer lists
+  (was 381), 104 only we list (was 158), 25 unmatched groups (was 45), 5 sets of ours no
+  group matches (was 33). What the kits turned up, now in the baseline:
+  - `tk-sm-l`: TCGdex lists 18 of the Lycanroc half deck's 30 cards; the 12 it lacks are
+    its Fighting Energy. A real gap, worth telling TCGdex or adding as overrides.
+  - `tk-xy-n` 29: TCGdex has the Noivern deck's Switch at 29; TCGplayer files it under
+    4, where Bunnelby is, and has Granbull at 29. Probably TCGplayer's slip.
+  - `tk-sm-r` 3: TCGplayer files a Lightning Energy "#3" under 2/30. TCGplayer's slip.
+  - `exu`: TCGdex numbers the "?" Unown `%3F` (URL-encoded), so it stays one number
+    apart from TCGplayer's `?` in `ex10`.
+  Still unmatched: 25 groups TCGdex has no set for (23 product lines, the 2026
+  McDonald's promos and the Alolan Sandslash & Alolan Ninetales trainer kit), and our
+  `ex5.5`, `fut2020`, `miscp`, `xya` (under 10 cards) and `mfb`.
 
 ## Out of scope for now
 

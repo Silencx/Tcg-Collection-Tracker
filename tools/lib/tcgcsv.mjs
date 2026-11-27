@@ -34,6 +34,16 @@ export const head = n => String(n || '').split('/')[0].trim();
 export const numberOf = p => (p?.extendedData || []).find(e => e?.name === 'Number')?.value || null;
 
 /**
+ * A card name in one spelling for both sides: TCGplayer's "Lombre (#6)", "Psychic Energy
+ * (#8 - Latias)" and "Pikachu - 58/102" are "lombre", "psychicenergy" and "pikachu", and
+ * TCGdex's "Jolteon-EX" is TCGplayer's "Jolteon EX".
+ */
+export function looseCard(s) {
+  return String(s || '').replace(/\s*[([].*$/s, '').replace(/\s+-\s.*$/s, '')
+    .normalize('NFKD').replace(/\p{M}/gu, '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+}
+
+/**
  * Our side: set id → { name, date, numbers: Map numberKey → { number, name } }.
  * @param {string} lang  'en' (TCGdex sets from data/sets.json) or 'ja' (data/jp-cat/)
  * @param {object} opts.sets  data/sets.json, for 'en'
@@ -59,26 +69,31 @@ export function ourSets(lang, { sets = {}, jpSets = [], rows = [] } = {}) {
 /**
  * One group's card numbers: numberKey → { number, name }. Sealed product (no number) is
  * counted and left out; a second product with a number already seen is another print
- * of that card ("Pikachu (Cosmos Holo)"), counted and left out.
+ * of that card ("Pikachu (Cosmos Holo)"), counted and left out. `numbered` keeps every
+ * product with a number, prints too, for matchSetsByCards: a trainer kit's two half
+ * decks share numbers 1–30.
  */
 export function groupCards(products, lang = 'en') {
-  const theirs = new Map();
+  const theirs = new Map(), numbered = [];
   let sealed = 0, prints = 0;
   for (const p of products || []) {
     const num = numberOf(p);
     if (!num) { sealed++; continue; }
     const k = numberKey(lang, head(num));
+    const card = { number: head(num), name: String(p.name || '') };
+    numbered.push({ key: k, ...card });
     if (theirs.has(k)) { prints++; continue; }
-    theirs.set(k, { number: head(num), name: String(p.name || '') });
+    theirs.set(k, card);
   }
-  return { theirs, sealed, prints };
+  return { theirs, numbered, sealed, prints };
 }
 
 /**
  * Group → our set. First by name; then, for a group no name matched, by release date —
  * but only to a set no name claimed and of a similar size, so "McDonald's Promos 2018"
  * (12 cards, released with Lost Thunder) does not become Lost Thunder. Several groups may
- * land on one set, and compareCatalogue pools their numbers.
+ * land on one set, and compareCatalogue pools their numbers. Sets left over may still be
+ * found by their cards, and groups left over found in a set (matchByCards).
  * @param {{name:string, publishedOn?:string, cards:number}[]} groups
  * @returns {Map<object, {id:string|null, how:string}>}
  */
@@ -107,22 +122,112 @@ export function matchGroups(groups, ours) {
   return out;
 }
 
+// Matching by cards: a set or group needs at least this many cards, and this share of
+// them must be on the other side under the same number and card name.
+const BY_CARDS_MIN = 10, BY_CARDS_SHARE = 0.9;
+const cardTag = (key, name) => `${key}|${looseCard(name)}`;
+
+/**
+ * What names and dates left unmatched, matched by cards (number and card name), both ways.
+ *
+ * `sets`: our sets no group matched, found inside a group. A set of 10 cards or more, 9 in
+ * 10 of which one group, and only one, lists. TCGplayer has one group per trainer kit
+ * where TCGdex has a set per half deck, names its McDonald's groups differently, and
+ * lists the Unseen Forces Unown (TCGdex's `exu`) in the Unseen Forces group. A group that
+ * no name or date matched must be at least half made of the found sets' cards, so a large
+ * mixed group is not pinned on a small set inside it.
+ *
+ * `groups`: groups still unmatched, found inside one of our sets. A group of 10 distinct
+ * cards or more, 9 in 10 of which one set, and only one, lists: the Radiant Collections,
+ * which TCGdex numbers RC1… in the main set, and Base Set (Shadowless).
+ * @param {{numbered?:{key:string,number:string,name:string}[]}[]} groups  groupCards'
+ *   `numbered` per group; a group without it is not searched
+ * @param {Map<object,{id:string|null}>} [byGroup]  matchGroups' answer
+ * @returns {{sets: Map<object, string[]>, groups: Map<object, string>}} group → the set
+ *   ids found in it (in id order); group → the set it was found in
+ */
+export function matchByCards(groups, ours, byGroup = matchGroups(groups, ours)) {
+  const claimed = new Set([...byGroup.values()].map(m => m.id).filter(Boolean));
+  const listed = new Map(groups.map(g => [g, new Set((g.numbered || []).map(c => cardTag(c.key, c.name)))]));
+  const tags = new Map([...ours].map(([id, s]) => [id, new Set([...s.numbers].map(([k, v]) => cardTag(k, v.name)))]));
+  const enough = (want, has) => want.size >= BY_CARDS_MIN && [...want].filter(w => has.has(w)).length >= want.size * BY_CARDS_SHARE;
+
+  const sets = new Map();
+  for (const id of ours.keys()) {
+    if (claimed.has(id)) continue;
+    const hits = groups.filter(g => enough(tags.get(id), listed.get(g)));
+    if (hits.length !== 1) continue;
+    if (!sets.has(hits[0])) sets.set(hits[0], []);
+    sets.get(hits[0]).push(id);
+  }
+  for (const [g, ids] of [...sets]) {
+    ids.sort();
+    if (byGroup.get(g)?.id) continue;
+    const mine = new Set(ids.flatMap(id => [...tags.get(id)]));
+    const theirs = g.numbered || [];
+    if (theirs.filter(c => mine.has(cardTag(c.key, c.name))).length < theirs.length / 2) sets.delete(g);
+  }
+
+  const inSet = new Map();
+  for (const g of groups) {
+    if (byGroup.get(g)?.id || sets.has(g)) continue;
+    const hits = [...tags].filter(([, t]) => enough(listed.get(g), t));
+    if (hits.length === 1) inSet.set(g, hits[0][0]);
+  }
+  return { sets, groups: inSet };
+}
+
+/**
+ * A group's cards per set it feeds. With no set found inside it, all go to the set it
+ * matched by name, date or cards (`mainId`). Otherwise each card goes to a found set
+ * that lists it under that number and name and has not got it yet; the rest go to
+ * `mainId` or, for a group found only by its cards, to the first found set with nothing
+ * under that number yet, so a card TCGdex lacks shows in the half deck it is missing
+ * from. A card with nowhere left to go is another print of a number already counted.
+ * @returns {[string, Map][]} [set id, numberKey → {number, name}]
+ */
+function splitGroup(g, mainId, found, ours) {
+  if (!found.length) return [[mainId, g.theirs]];
+  const out = new Map([...(mainId ? [mainId] : []), ...found].map(id => [id, new Map()]));
+  const nameAt = (id, k) => (ours.get(id).numbers.has(k) ? looseCard(ours.get(id).numbers.get(k).name) : null);
+  const put = (id, c) => out.get(id).set(c.key, { number: c.number, name: c.name });
+  const rest = [];
+  for (const c of g.numbered) {
+    const to = found.find(id => nameAt(id, c.key) === looseCard(c.name) && !out.get(id).has(c.key));
+    if (to) put(to, c); else rest.push(c);
+  }
+  for (const c of rest) {
+    const to = mainId || found.find(id => !out.get(id).has(c.key));
+    if (to && !out.get(to).has(c.key)) put(to, c);
+  }
+  return [...out];
+}
+
 const byNumber = (x, y) => naturalCompare(x.number, y.number);
 
 /**
  * The diff: per set of ours that some group matched, the numbers only TCGplayer lists
  * (`theirs`) and only we list (`ours`), each [{key, number, name}] in number order.
- * @param {{name, publishedOn, cards, theirs:Map}[]} cardGroups  groups with card numbers
+ * `byCards`: the set ids matchByCards found inside a group.
+ * @param {{name, publishedOn, cards, theirs:Map, numbered?:Array}[]} cardGroups  groups
+ *   with card numbers
  */
 export function compareCatalogue(cardGroups, ours) {
   const how = {}, unmatched = [], bySet = new Map();
-  for (const [g, m] of matchGroups(cardGroups, ours)) {
-    how[m.how] = (how[m.how] || 0) + 1;
-    if (!m.id) { unmatched.push({ name: g.name, date: String(g.publishedOn || '').slice(0, 10), cards: g.cards, how: m.how }); continue; }
-    if (!bySet.has(m.id)) bySet.set(m.id, { groups: [], theirs: new Map() });
-    const s = bySet.get(m.id);
-    s.groups.push(g.name);
-    for (const [k, v] of g.theirs) if (!s.theirs.has(k)) s.theirs.set(k, v);
+  const byGroup = matchGroups(cardGroups, ours);
+  const byCards = matchByCards(cardGroups, ours, byGroup);
+  for (const [g, m] of byGroup) {
+    const found = byCards.sets.get(g) || [];
+    const main = m.id || byCards.groups.get(g) || null;
+    const h = m.id || !main && !found.length ? m.how : 'cards';
+    how[h] = (how[h] || 0) + 1;
+    if (!main && !found.length) { unmatched.push({ name: g.name, date: String(g.publishedOn || '').slice(0, 10), cards: g.cards, how: m.how }); continue; }
+    for (const [id, cards] of splitGroup(g, main, found, ours)) {
+      if (!bySet.has(id)) bySet.set(id, { groups: [], theirs: new Map() });
+      const s = bySet.get(id);
+      s.groups.push(g.name);
+      for (const [k, v] of cards) if (!s.theirs.has(k)) s.theirs.set(k, v);
+    }
   }
   let inBoth = 0, onlyTheirs = 0, onlyOurs = 0;
   const diffs = [];
@@ -135,7 +240,10 @@ export function compareCatalogue(cardGroups, ours) {
   }
   diffs.sort((x, y) => (x.id < y.id ? -1 : x.id > y.id ? 1 : 0));
   const lonely = [...ours].filter(([id, s]) => !bySet.has(id) && s.numbers.size).map(([id]) => id).sort();
-  return { how, matched: cardGroups.length - unmatched.length, groups: cardGroups.length, unmatched, diffs, inBoth, onlyTheirs, onlyOurs, lonely };
+  return {
+    how, matched: cardGroups.length - unmatched.length, groups: cardGroups.length, unmatched, diffs, inBoth, onlyTheirs, onlyOurs, lonely,
+    byCards: [...byCards.sets.values()].flat().sort(),
+  };
 }
 
 // ── The baseline: differences already known ──────────────────────────────────
